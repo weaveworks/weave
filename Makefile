@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all exes testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes images testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -21,8 +21,9 @@ ALL_ARCHITECTURES=amd64 arm arm64
 ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64
 
 ifeq ($(ARCH),amd64)
-# The architecture to use when downloading the docker binary
+# The architecture and URL to use when downloading the docker binary
 	WEAVEEXEC_DOCKER_ARCH?=x86_64
+	DOCKER_DISTRIB_URL?=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(DOCKER_VERSION).tgz
 
 # The name of the alpine baseimage to use as the base for weave images
 	ALPINE_BASEIMAGE?=alpine:3.4
@@ -38,8 +39,9 @@ ifeq ($(ARCH),amd64)
 	CGO_LDFLAGS=
 endif
 ifeq ($(ARCH),arm)
-# The architecture to use when downloading the docker binary
+# The architecture and URL to use when downloading the docker binary
 	WEAVEEXEC_DOCKER_ARCH?=armel
+	DOCKER_DISTRIB_URL?=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(DOCKER_VERSION).tgz
 
 # Using the (semi-)official alpine image
 	ALPINE_BASEIMAGE?=armhf/alpine:3.4
@@ -58,8 +60,9 @@ ifeq ($(ARCH),arm)
 	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
 endif
 ifeq ($(ARCH),arm64)
-# Use the arm 32-bit docker client variant
-	WEAVEEXEC_DOCKER_ARCH?=armel
+# Use Ubuntu's build of the Docker binary, as Docker don't publish one for arm64
+	WEAVEEXEC_DOCKER_ARCH?=arm64
+	DOCKER_DISTRIB_URL?= https://launchpad.net/ubuntu/+archive/primary/+files/docker.io_$(DOCKER_VERSION)-0ubuntu6_$(WEAVEEXEC_DOCKER_ARCH).deb
 
 # Using the (semi-)official alpine image
 	ALPINE_BASEIMAGE?=aarch64/alpine:3.5
@@ -131,7 +134,6 @@ WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
 
 DOCKER_VERSION=1.10.3
 DOCKER_BINARY=prog/weaveexec/docker
-DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
 	echo "\nYour go standard library was built without the 'netgo' build tag."; \
@@ -166,6 +168,7 @@ $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
 tests: tools/.git
 lint: tools/.git
+images: $(IMAGES_UPTODATE)
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
@@ -284,7 +287,8 @@ $(WEAVE_EXPORT): $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE)
 
 $(DOCKER_BINARY):
 ifeq ($(ARCH),arm64)
-	curl -o /tmp/docker.deb https://launchpad.net/ubuntu/+archive/primary/+files/docker.io_$(DOCKER_VERSION)-0ubuntu6_$(ARCH).deb
+# For arm64 we're unpacking a .deb package to find the binary
+	curl -sSL -o /tmp/docker.deb $(DOCKER_DISTRIB_URL)
 	cd /tmp; ar x docker.deb data.tar.xz
 	tar -xf /tmp/data.tar.xz ./usr/bin/docker -O > $(DOCKER_BINARY)
 else
@@ -309,7 +313,7 @@ endif
 
 sub-publish-%:
 	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) clean-bin
-	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) $(IMAGES_UPTODATE)
+	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) images
 	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) publish-one-arch
 
 publish-one-arch: $(PUBLISH)
