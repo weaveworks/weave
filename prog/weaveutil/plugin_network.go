@@ -74,6 +74,9 @@ while Weave is not running`, networkName, containers)
 }
 
 // Exits with 0 if the given plugin (v2) is enabled.
+//
+// Any failure due to missing plugin support is non-harmful as plugin (v2)
+// cannot be enabled when Docker does not support it.
 func isDockerPluginEnabled(args []string) error {
 	if len(args) != 1 {
 		cmdUsage("is-docker-plugin-enabled", "<plugin-name>")
