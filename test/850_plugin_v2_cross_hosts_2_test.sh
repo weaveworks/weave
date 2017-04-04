@@ -2,7 +2,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-PLUGIN_NAME="weave-ci-registry:5000/weaveworks/plugin-v2"
+PLUGIN_NAME="weave-ci-registry:5000/weaveworks/net-plugin"
 HOST1_IP=$($SSH $HOST1 getent ahosts $HOST1 | grep "RAW" | cut -d' ' -f1)
 SERVICE="weave-850-service"
 NETWORK="weave-850-network"
@@ -46,9 +46,7 @@ setup_worker() {
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
         ping -nq -W 2 -c 1 weave-ci-registry
         docker swarm join --token "$1" "${HOST1_IP}:2377"
-        echo "Installing..."
         docker plugin install --disable --grant-all-permissions $PLUGIN_NAME
-        echo "Done"
 
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
         #docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
@@ -100,7 +98,6 @@ start_suite "Test Docker plugin-v2"
 #exit 1
 
 setup_master
-#sleep 20 # registry seems to be async :(
 setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 
 echo "Creating network and service..."
@@ -117,16 +114,13 @@ EOF
 
 wait_for_service $HOST1 $SERVICE 2
 
-$SSH $HOST1 "docker service ls"
-$SSH $HOST1 "docker ps"
-$SSH $HOST2 "docker ps"
-
 C1=$($SSH $HOST1 weave ps | grep -v weave:expose | awk '{print $1}')
 C2_IP=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $3}' | cut -d/ -f1)
 
-# TODO test for encryption
-
 assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
+
+# We do not test "weave {status,launch}", because the weave script does not detect
+# plugin-v2 if its name is prefixed with a registry name.
 
 # Failing to cleanup will make the rest of the tests to fail
 cleanup $HOST1 $HOST2

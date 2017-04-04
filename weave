@@ -883,27 +883,28 @@ attach() {
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
-check_not_running_v2_plugin() {
-    if is_docker_plugin_enabled $PLUGIN_NAME; then
-        echo "Docker plugin \"$PLUGIN_NAME\" is already running." >&2
-        return 1
-    fi
-}
-
-# Docker Plugin V2
-is_docker_plugin_enabled() {
-    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
-}
-
-# Docker Plugin (part of weaver process, so V2 or V1).
-# Assumes that plugin is running inside Docker container.
-is_plugin_enabled() {
-    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--plugin"
-}
-
 ######################################################################
 # functions for interacting with containers
 ######################################################################
+
+# Docker Plugin V1 runs in a Docker container.
+is_plugin_v1_enabled() {
+    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME 2>/dev/null | grep -q -- "--plugin"
+}
+
+# The presence of Docker Plugin V2 can be checked only via 'docker plugin',
+# as v2 plugins do not run as regular containers.
+is_plugin_v2_enabled() {
+    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
+}
+
+# Check that plugin (v2) is not running.
+check_not_running_plugin_v2() {
+    if is_plugin_v2_enabled; then
+        echo "Docker plugin \"$PLUGIN_NAME\" is running; Aborting." >&2
+        return 1
+    fi
+}
 
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
@@ -1752,7 +1753,7 @@ populate_router() {
 }
 
 stop_router() {
-    ! is_plugin_enabled || util_op remove-plugin-network weave || true
+    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
 }
@@ -1796,7 +1797,7 @@ stop_proxy() {
 
 protect_against_docker_hang() {
     # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
-    if ! is_docker_plugin_enabled 2>/dev/null ; then
+    if ! is_plugin_v2_enabled 2>/dev/null ; then
         rm -f /run/docker/plugins/weave.sock /run/docker/plugins/weavemesh.sock
     fi
 }
@@ -1984,7 +1985,7 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
-        check_not_running_v2_plugin
+        check_not_running_plugin_v2
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router --plugin "$@"
         launch_proxy  $COMMON_ARGS
@@ -1992,7 +1993,7 @@ EOF
     launch-router)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME $BASE_IMAGE
-        check_not_running_v2_plugin
+        check_not_running_plugin_v2
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -2010,7 +2011,7 @@ EOF
     launch-proxy)
         deprecation_warnings "$@"
         check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
-        check_not_running_v2_plugin
+        check_not_running_plugin_v2
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
@@ -2055,14 +2056,14 @@ EOF
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
         fi
-        if [ -z "$SUB_STATUS" ] && is_docker_plugin_enabled ; then
+        if [ -z "$SUB_STATUS" ] && is_plugin_v1_enabled ; then
             echo
-            echo "        Service: plugin"
-            echo "     DriverName: $PLUGIN_NAME"
-        elif [ -z "$SUB_STATUS" ] && is_plugin_enabled ; then
-            echo
-            echo "        Service: plugin"
+            echo "        Service: plugin (v1)"
             echo "     DriverName: weave"
+        elif [ -z "$SUB_STATUS" ] && is_plugin_v2_enabled ; then
+            echo
+            echo "        Service: plugin (v2)"
+            echo "     DriverName: $PLUGIN_NAME"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
@@ -2261,7 +2262,7 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || [ $# -eq 1 -a "$1" = "--force" ] || usage
-        ! is_plugin_enabled || util_op remove-plugin-network weave || true
+        ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
         warn_if_stopping_proxy_in_env
         res=0
         [ "$1" = "--force" ] || check_running $CONTAINER_NAME 2>/dev/null || res=$?
