@@ -6,7 +6,7 @@ menu_order: 63
 The following topics are discussed:
 
 * [Installation](#install)
-* [Network Policy Controller](#npc)
+ * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
  * [Upgrading the Daemon Sets](#daemon-sets)
 * [Network Policy Controller](#npc)
  * [Troubleshooting Blocked Connections](#blocked-connections)
@@ -64,7 +64,7 @@ to the YAML file for the [latest release](https://github.com/weaveworks/weave/re
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
 
-## Upgrading Kubernetes to version 1.6
+##<a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
 In version 1.6, Kubernetes has increased security, so we need to
 create a special service account to run Weave Net. This is done in
