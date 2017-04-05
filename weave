@@ -70,12 +70,8 @@ weave env           [--restore]
 weave connect       [--replace] [<peer> ...]
       forget        <peer> ...
 
-weave run           [--without-dns] [--no-rewrite-hosts] [--no-multicast-route]
-                      [<addr> ...] <docker run args> ...
-      start         [<addr> ...] <container_id>
-      attach        [<addr> ...] <container_id>
+weave attach        [<addr> ...] <container_id>
       detach        [<addr> ...] <container_id>
-      restart       <container_id>
 
 weave expose        [<addr> ...] [-h <fqdn>]
       hide          [<addr> ...]
@@ -223,33 +219,6 @@ collect_cidr_args() {
     done
 }
 
-dns_arg_count() {
-    if [ "$1" = "--with-dns" -o "$1" = "--without-dns" ] ; then
-        echo 1
-    else
-        echo 0
-    fi
-}
-
-extra_hosts_args() {
-    DNS_EXTRA_HOSTS=
-    DNS_EXTRA_HOSTS_ARGS=
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            --add-host)
-                DNS_EXTRA_HOSTS="$2 $DNS_EXTRA_HOSTS"
-                DNS_EXTRA_HOSTS_ARGS="--add-host=$2 $DNS_EXTRA_HOSTS_ARGS"
-                shift
-                ;;
-            --add-host=*)
-                DNS_EXTRA_HOSTS="${1#*=} $DNS_EXTRA_HOSTS"
-                DNS_EXTRA_HOSTS_ARGS="--add-host=${1#*=} $DNS_EXTRA_HOSTS_ARGS"
-                ;;
-        esac
-        shift
-    done
-}
-
 kill_container() {
     docker kill $1 >/dev/null 2>&1 || true
 }
@@ -281,46 +250,6 @@ elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
         echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
         exit 0
     fi
-elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
-    # non-local "run" is a special case because we want to use docker
-    # directly, rather than the docker in $EXEC_IMAGE remotely. That's
-    # because we are passing arbitrary arguments on to docker run, and
-    # we can't rely on our baked-in docker to support those arguments.
-    shift 1
-
-    handle_help_arg "$1"
-    [ "$1" = "--without-dns" ] || DNS_ARGS=$(exec_remote dns-args "$@" || true)
-    shift $(dns_arg_count "$@")
-
-    REWRITE_HOSTS=1
-    NO_MULTICAST_ROUTE=
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            --no-rewrite-hosts)
-                REWRITE_HOSTS=
-                ;;
-            --no-multicast-route)
-                NO_MULTICAST_ROUTE=1
-                ;;
-            *)
-                break
-                ;;
-        esac
-        shift
-    done
-
-    [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && DNS_EXTRA_HOSTS_ARGS="--rewrite-hosts $DNS_EXTRA_HOSTS_ARGS"
-    [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
-
-    collect_cidr_args "$@"
-    shift $CIDR_ARG_COUNT
-    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
-    if ! exec_remote attach $CIDR_ARGS $DNS_EXTRA_HOSTS_ARGS $ATTACH_ARGS $CONTAINER >/dev/null ; then
-        kill_container $CONTAINER
-        exit 1
-    fi
-    echo $CONTAINER
-    exit 0
 fi
 
 if [ -z "$IS_LOCAL" ] ; then
@@ -820,15 +749,6 @@ destroy_bridge() {
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
-}
-
-do_or_die() {
-    CONTAINER="$1"
-    shift 1
-    if ! "$@" ; then
-        kill_container $CONTAINER
-        exit 1
-    fi
 }
 
 add_iface_fastdp() {
@@ -1369,13 +1289,6 @@ ipam_cidrs() {
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
     done
-}
-
-ipam_cidrs_or_die() {
-    if ! ipam_cidrs "$@" ; then
-        kill_container $2
-        exit 1
-    fi
 }
 
 show_addrs() {
@@ -2078,34 +1991,10 @@ EOF
             call_weave GET /report -H 'Accept: application/json'
         fi
         ;;
-    run)
-        dns_args "$@"
-        shift $(dns_arg_count "$@")
-        REWRITE_HOSTS=1
-        NO_MULTICAST_ROUTE=
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --no-rewrite-hosts)
-                    REWRITE_HOSTS=
-                    ;;
-                --no-multicast-route)
-                    NO_MULTICAST_ROUTE=1
-                    ;;
-                *)
-                    break
-                    ;;
-            esac
-            shift
-        done
-        collect_cidr_args "$@"
-        shift $CIDR_ARG_COUNT
-        CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
-        create_bridge
-        ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
-        [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        do_or_die $CONTAINER attach $ALL_CIDRS
-        when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
-        echo $CONTAINER
+    run|start|restart)
+        echo "The 'weave $COMMAND' command has been removed as of Weave Net version 2.0" >&2
+        echo "Please see release notes for further information" >&2
+        exit 1
         ;;
     dns-args)
         dns_args "$@"
@@ -2113,18 +2002,6 @@ EOF
         ;;
     docker-bridge-ip)
         util_op bridge-ip $DOCKER_BRIDGE
-        ;;
-    start)
-        collect_cidr_args "$@"
-        shift $CIDR_ARG_COUNT
-        [ $# -eq 1 ] || usage
-        RES=$(docker start $1)
-        CONTAINER=$(container_id $1)
-        create_bridge
-        ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
-        do_or_die $CONTAINER attach $ALL_CIDRS
-        when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
-        echo $RES
         ;;
     attach)
         DNS_EXTRA_HOSTS=
@@ -2174,20 +2051,6 @@ EOF
             call_weave DELETE /ip/$CONTAINER/${CIDR%/*}
         done
         show_addrs $ALL_CIDRS
-        ;;
-    restart)
-        [ $# -ge 1 ] || usage
-        create_bridge
-        ALL_CIDRS=$(with_container_addresses echo_cidrs $1)
-        RES=$(docker restart $1)
-        CONTAINER=$(container_id $1)
-        for CIDR in $ALL_CIDRS ; do
-            call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
-        done
-        detect_awsvpc
-        do_or_die $CONTAINER attach $ALL_CIDRS
-        when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
-        echo $RES
         ;;
     dns-add)
         collect_dns_add_remove_args "$@"

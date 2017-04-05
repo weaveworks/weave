@@ -16,7 +16,8 @@ weave_on $HOST1 launch-router
 weave_on $HOST1 launch-proxy --no-multicast-route
 weave_on $HOST1 launch-plugin # plugin defaults to multicast off except for 'net=weave'
 
-start_container $HOST1 --no-multicast-route --name c1
+docker_on $HOST1 run --name c1 -dt $SMALL_IMAGE /bin/sh
+weave_on $HOST1 attach --no-multicast-route c1
 proxy_start_container $HOST1 --name c2
 start_container_local_plugin $HOST1 --name=c3
 

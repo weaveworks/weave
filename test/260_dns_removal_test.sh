@@ -26,8 +26,4 @@ docker_on $HOST1 run    $DOPTS -dt $SMALL_IMAGE /bin/sh
 weave_on  $HOST1 attach $C2/24 c2
 check
 
-docker_on $HOST1 create $DOPTS  -t $SMALL_IMAGE /bin/sh
-weave_on  $HOST1 start  $C2/24 c2
-check
-
 end_suite
