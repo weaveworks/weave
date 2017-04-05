@@ -8,6 +8,8 @@ The following topics are discussed:
 * [Installation](#install)
  * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
  * [Upgrading the Daemon Sets](#daemon-sets)
+ * [CPU and Memory Requirements](#resources)
+ * [Pod Eviction](#eviction)
 * [Network Policy Controller](#npc)
  * [Troubleshooting Blocked Connections](#blocked-connections)
  * [Changing Configuration Options](#configuration-options)
@@ -90,6 +92,49 @@ and so you will need to perform the procedure manually:
 **Note:** If you delete all Weave Net pods at the same time they will
   lose track of IP address range ownership, possibly leading to
   duplicate IP addresses if you then start a new copy of Weave Net.
+
+## <a name="resources"></a>CPU and Memory Requirements
+
+Kubernetes manages
+[resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+on each node, and will only schedule pods to run on nodes which have
+enough free resources. A typical Kubernetes install will have
+components (etcd, scheduler, api-server, ...) totalling 95% of one
+CPU, leaving very little room to run anything else.  Yet Weave Net
+must run on every node, including master, for all features to work.
+
+The best way to resolve this is to use machines with at least two CPU
+cores. However, people installing for the first time will probably not
+know this, so we write into the DaemonSet specification that Weave Net
+only needs 1% CPU for each container, and thus it will start up on a
+single-CPU node.
+
+Weave Net will, depending on workload, need more than 1% of CPU, but
+the number in the DaemonSet is a minimum request, not a limit, so
+Weave Net can "burst" above that level.
+
+## <a name="eviction"></a>Pod Eviction
+
+If a node runs out of CPU, memory or disk, Kubernetes may [decide to
+evict](https://kubernetes.io/docs/concepts/cluster-administration/out-of-resource/)
+one or more pods. It may choose to evict the Weave Net pod, which will
+disrupt pod network operations.
+
+You can reduce the chance of eviction by changing the DaemonSet to
+have a much bigger request, and a limit of the same value. This will
+cause Kubernetes to apply ["guaranteed" rather than "burstable"
+policy](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-qos.md).
+However there is no similar request for disk space, so you should be
+aware of this issue and monitor your resources to stay below 100%.
+
+Kubernetes will give a notification in the event of an eviction, like this:
+
+```
+pod weave-net-4ozht_kube-system(546acee0-ee25-11e6-8965-068f417b4097) evicted successfully
+```
+
+If you see this in your cluster, consider some of the above steps to
+reduce disruption.
 
 ## <a name="npc"></a>Network Policy Controller
 
