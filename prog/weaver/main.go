@@ -405,7 +405,7 @@ func main() {
 	}
 
 	if enablePlugin {
-		go plugin.Start(httpAddr, dockerAPI, pluginSocket, pluginMeshSocket)
+		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket)
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)

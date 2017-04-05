@@ -47,7 +47,8 @@ if [ -z "$IPALLOC_INIT" ]; then
 fi
 
 exec /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
-    --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
+    --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR \
+    --no-dns \
     --ipalloc-range=$IPALLOC_RANGE \
     --ipalloc-init $IPALLOC_INIT \
     --nickname "$(hostname)" \
