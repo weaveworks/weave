@@ -54,4 +54,5 @@ exec /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
     --log-level=debug \
     --db-prefix="$WEAVE_DIR/weave" \
     --plugin \
+    --plugin-mesh-socket='' \
     $(echo $SWARM_MANAGER_PEERS | tr '\n' ' ')
