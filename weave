@@ -70,7 +70,8 @@ weave env           [--restore]
 weave connect       [--replace] [<peer> ...]
       forget        <peer> ...
 
-weave attach        [<addr> ...] <container_id>
+weave attach        [--without-dns] [--rewrite-hosts] [--no-multicast-route]
+                      [<addr> ...] <container_id>
       detach        [<addr> ...] <container_id>
 
 weave expose        [<addr> ...] [-h <fqdn>]
