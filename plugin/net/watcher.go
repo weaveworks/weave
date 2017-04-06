@@ -41,9 +41,11 @@ func (w *watcher) ContainerStarted(id string) {
 			continue
 		}
 		if network.isOurs {
-			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
-			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-				w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+			if !w.driver.noDNS {
+				fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
+				if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
+					w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+				}
 			}
 			if _, err := weavenet.WithNetNSByPid(info.State.Pid, "configure-arp", weavenet.VethName); err != nil {
 				w.driver.warn("ContainerStarted", "unable to configure interfaces: %s", err)

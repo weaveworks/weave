@@ -28,19 +28,23 @@ type network struct {
 }
 
 type driver struct {
-	name   string
-	scope  string
-	docker *docker.Client
+	name       string
+	scope      string
+	docker     *docker.Client
+	noDNS      bool
+	isPluginV2 bool
 	sync.RWMutex
 	networks map[string]network
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, name, scope string) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, name, scope string, noDNS, isPluginV2 bool) (skel.Driver, error) {
 	driver := &driver{
-		name:     name,
-		scope:    scope,
-		docker:   client,
-		networks: make(map[string]network),
+		name:       name,
+		scope:      scope,
+		docker:     client,
+		noDNS:      noDNS,
+		isPluginV2: isPluginV2,
+		networks:   make(map[string]network),
 	}
 
 	_, err := NewWatcher(client, weave, driver)

@@ -20,23 +20,23 @@ import (
 
 var Log = common.Log
 
-func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string) {
+func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, noDNS bool, isPluginV2 bool) {
 	weave := weaveapi.NewClient(weaveAPIAddr, Log)
 
 	Log.Info("Waiting for Weave API Server...")
 	weave.WaitAPIServer(30)
 	Log.Info("Finished waiting for Weave API Server")
 
-	if err := run(dockerClient, weave, address, meshAddress); err != nil {
+	if err := run(dockerClient, weave, address, meshAddress, noDNS, isPluginV2); err != nil {
 		Log.Fatal(err)
 	}
 }
 
-func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string) error {
+func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, noDNS, isPluginV2 bool) error {
 	endChan := make(chan error, 1)
 
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false)
+		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false, noDNS, isPluginV2)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, endChan, "local", true)
+		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, endChan, "local", true, noDNS, isPluginV2)
 		if err != nil {
 			return err
 		}
@@ -61,9 +61,10 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 	return <-endChan
 }
 
-func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
+func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, noDNS bool, isPluginV2 bool) (net.Listener, error) {
 	name := strings.TrimSuffix(path.Base(address), ".sock")
-	d, err := netplugin.New(dockerClient, weave, name, scope)
+	// TODO(mp) fix plugin name, as it is used to determine whether network is our
+	d, err := netplugin.New(dockerClient, weave, name, scope, noDNS, isPluginV2)
 	if err != nil {
 		return nil, err
 	}

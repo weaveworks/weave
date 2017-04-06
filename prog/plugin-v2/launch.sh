@@ -16,6 +16,8 @@ echo "Starting launch.sh"
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
 
+# TODO(mp) add wait for swarm
+
 SWARM_MANAGER_PEERS=$(/usr/bin/weaveutil swarm-manager-peers)
 ! /usr/bin/weaveutil is-swarm-manager || IS_SWARM_MANAGER=1
 # Prevent from restoring from a persisted peers list
@@ -39,10 +41,9 @@ if [ "$(/home/weave/weave --local bridge-type)" = "bridge" ]; then
 fi
 
 if [ -z "$IPALLOC_INIT" ]; then
-    if [ $IS_SWARM_MANAGER == "1" ]; then
+    IPALLOC_INIT="observer"
+    if [ "$IS_SWARM_MANAGER" == "1" ]; then
         IPALLOC_INIT="consensus=$(echo $SWARM_MANAGER_PEERS | wc -l)"
-    else
-        IPALLOC_INIT="observer"
     fi
 fi
 
@@ -54,6 +55,6 @@ exec /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
     --nickname "$(hostname)" \
     --log-level=debug \
     --db-prefix="$WEAVE_DIR/weave" \
-    --plugin \
+    --plugin-v2 \
     --plugin-mesh-socket='' \
     $(echo $SWARM_MANAGER_PEERS | tr '\n' ' ')
