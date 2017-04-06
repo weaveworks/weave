@@ -11,7 +11,7 @@ The following topics are discussed:
 ## <a name="domain-search-path"></a>Configuring the domain search paths
 
 If you don't supply a domain search path (with `--dns-search=`), Weave
-Net (via the [proxy](/site/weave-docker-api.md) or via `weave run`)
+Net (via the [proxy](/site/weave-docker-api.md) or via `weave attach`)
 tells a container to look for "bare" hostnames, like `pingme`, in its
 own domain (or in `weave.local` if it has no domain).
 

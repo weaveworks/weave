@@ -64,4 +64,3 @@ route, add the `--no-multicast-route` flag to `weave launch-proxy`.
 
  * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api.md)
  * [Securing Docker Communications With TLS](/site/weave-docker-api/securing-proxy.md)
- * [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md)

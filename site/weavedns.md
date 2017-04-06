@@ -39,7 +39,7 @@ the hostname is not in the weaveDNS domain, the container is *not*
 registered, but it will still use weaveDNS for resolution.
 
 To disable an application container's use of weaveDNS, add the
-`--without-dns` option to `weave run` or `weave launch-proxy`. To
+`--without-dns` option to `weave launch-proxy`. To
 disable weaveDNS itself, launch weave with the `--no-dns` option.
 
 **See Also**
