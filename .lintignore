@@ -16,7 +16,6 @@ prog/weave-kube/launch.sh
 prog/weaveexec/symlink
 test/*_test.sh
 test/600_proxy_docker_py.sh
-test/840_*
 test/assert.sh
 test/config.sh
 test/gce.sh
