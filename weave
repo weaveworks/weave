@@ -2009,8 +2009,12 @@ EOF
         NO_MULTICAST_ROUTE=
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
+        WITHOUT_DNS=
         while [ $# -gt 0 ]; do
             case "$1" in
+                --without-dns)
+                    WITHOUT_DNS=1
+                    ;;
                 --rewrite-hosts)
                     REWRITE_HOSTS=1
                     ;;
@@ -2036,7 +2040,7 @@ EOF
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
         attach $ALL_CIDRS >/dev/null
-        when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
+        [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
     detach)
