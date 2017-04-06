@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"github.com/vishvananda/netlink"
@@ -80,5 +81,9 @@ func WithNetNSByPid(pid int, cmd string, args ...string) ([]byte, error) {
 }
 
 func NSPathByPid(pid int) string {
-	return fmt.Sprintf("/proc/%d/ns/net", pid)
+	return NSPathByPidWithRoot("/", pid)
+}
+
+func NSPathByPidWithRoot(root string, pid int) string {
+	return filepath.Join(root, fmt.Sprintf("/proc/%d/ns/net", pid))
 }
