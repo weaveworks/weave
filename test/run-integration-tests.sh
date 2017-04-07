@@ -65,7 +65,7 @@ function print_vars() {
 }
 
 function verify_dependencies() {
-    local deps=(python terraform ansible-playbook)
+    local deps=(python terraform ansible-playbook gcloud)
     for dep in "${deps[@]}"; do
         if [ ! "$(which "$dep")" ]; then
             echo >&2 "$dep is not installed or not in PATH."
