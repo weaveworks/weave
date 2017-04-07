@@ -16,10 +16,16 @@ echo "Starting launch.sh"
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
 
-# TODO(mp) add wait for swarm
+STATUS=0
+/usr/bin/weaveutil is-swarm-manager 2>/dev/null || STATUS=$?
+if [ $STATUS -eq 0 ]; then
+    IS_SWARM_MANAGER=1
+elif [ $STATUS -eq 20 ]; then
+    echo "Host swarm is not \"active\"; exiting." >&2
+    exit 1
+fi
 
 SWARM_MANAGER_PEERS=$(/usr/bin/weaveutil swarm-manager-peers)
-! /usr/bin/weaveutil is-swarm-manager || IS_SWARM_MANAGER=1
 # Prevent from restoring from a persisted peers list
 rm -f "/restart.sentinel"
 

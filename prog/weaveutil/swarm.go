@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/pkg/errors"
 )
@@ -14,6 +16,11 @@ func isSwarmManager(args []string) error {
 	info, err := dockerInfo()
 	if err != nil {
 		return err
+	}
+
+	// hack-y way to denote that a node does not belong to any swarm
+	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive {
+		os.Exit(20)
 	}
 
 	if !info.Swarm.ControlAvailable {
