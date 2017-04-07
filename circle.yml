@@ -11,7 +11,7 @@ machine:
   environment:
     GOPATH: /home/ubuntu:$GOPATH
     SRCDIR: /home/ubuntu/src/github.com/weaveworks/weave
-    PATH: $PATH:$HOME/.local/bin
+    PATH: $PATH:$HOME/.local/bin:/opt/google-cloud-sdk/bin
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
     STATE: /home/ubuntu/state.env
     # Base name of VMs for integration tests:
