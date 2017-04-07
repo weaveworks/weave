@@ -123,7 +123,7 @@ PLUGIN_IMAGE=$(DOCKERHUB_USER)/net-plugin
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
 
-PLUGIN_WORK_DIR="prog/plugin-v2/rootfs"
+PLUGIN_WORK_DIR="prog/net-plugin/rootfs"
 PLUGIN_BUILD_IMG="plugin-builder"
 
 PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
@@ -267,20 +267,20 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	touch $@
 
 # Builds Docker plugin.
-$(PLUGIN_UPTODATE): prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(WEAVER_UPTODATE)
+$(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAVER_UPTODATE)
 	-$(SUDO) docker rm -f $(PLUGIN_BUILD_IMG) 2>/dev/null
 	$(SUDO) docker create --name=$(PLUGIN_BUILD_IMG) $(WEAVER_IMAGE) true
 	rm -rf $(PLUGIN_WORK_DIR)
 	mkdir $(PLUGIN_WORK_DIR)
 	docker export $(PLUGIN_BUILD_IMG) | tar -x -C $(PLUGIN_WORK_DIR)
 	docker rm -f $(PLUGIN_BUILD_IMG)
-	cp prog/plugin-v2/launch.sh $(PLUGIN_WORK_DIR)/home/weave/launch.sh
+	cp prog/net-plugin/launch.sh $(PLUGIN_WORK_DIR)/home/weave/launch.sh
 	-docker plugin disable $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
 	-docker plugin rm $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
-	docker plugin create $(PLUGIN_IMAGE):$(WEAVE_VERSION) prog/plugin-v2
+	docker plugin create $(PLUGIN_IMAGE):$(WEAVE_VERSION) prog/net-plugin
 	-docker plugin disable $(PLUGIN_IMAGE):latest 2>/dev/null
 	-docker plugin rm $(PLUGIN_IMAGE):latest 2>/dev/null
-	docker plugin create $(PLUGIN_IMAGE):latest prog/plugin-v2
+	docker plugin create $(PLUGIN_IMAGE):latest prog/net-plugin
 	touch $@
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)

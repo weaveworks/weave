@@ -70,4 +70,4 @@ test/coverage.*
 *qemu-*-static
 terraform.tfstate
 terraform.tfstate.backup
-prog/plugin-v2/rootfs/
+prog/net-plugin/rootfs/

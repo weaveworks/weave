@@ -14,7 +14,7 @@ setup_master() {
     # Build plugin-v2 on $HOST1, because Circle "CI" runs only ancient
     # version of Docker which does not support v2 plugins.
     build_plugin_img="buildpluginv2-ci"
-    rsync -az -e "$SSH" "$(dirname $0)/../prog/plugin-v2" $HOST1:~/
+    rsync -az -e "$SSH" "$(dirname $0)/../prog/net-plugin" $HOST1:~/
     $SSH $HOST1<<EOF
         docker rmi $build_plugin_img 2>/dev/null
         docker plugin disable $PLUGIN_NAME >/dev/null
@@ -25,8 +25,8 @@ setup_master() {
 
         docker create --name=$build_plugin_img weaveworks/weave true
         docker export $build_plugin_img | tar -x -C \${WORK_DIR}/rootfs
-        cp \${HOME}/plugin-v2/launch.sh \${WORK_DIR}/rootfs/home/weave/launch.sh
-        cp \${HOME}/plugin-v2/config.json \${WORK_DIR}
+        cp \${HOME}/net-plugin/launch.sh \${WORK_DIR}/rootfs/home/weave/launch.sh
+        cp \${HOME}/net-plugin/config.json \${WORK_DIR}
         docker plugin create $PLUGIN_NAME \${WORK_DIR}
 
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
