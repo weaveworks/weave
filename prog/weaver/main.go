@@ -253,7 +253,7 @@ func main() {
 		}
 	}
 
-	name := peerName(routerName, dbPrefix, hostRoot)
+	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
 
 	bridgeConfig.Mac = name.String()
 	bridgeType, err := weavenet.CreateBridge(&bridgeConfig)
@@ -351,14 +351,14 @@ func main() {
 		var t tracker.LocalRangeTracker
 		if bridgeConfig.IsAWSVPC {
 			Log.Infoln("Creating AWSVPC LocalRangeTracker")
-			t, err = tracker.NewAWSVPCTracker(weavenet.WeaveBridgeName)
+			t, err = tracker.NewAWSVPCTracker(bridgeConfig.WeaveBridgeName)
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
 			trackerName = "awsvpc"
 		}
 
-		preClaims, err := findExistingAddresses(dockerCli, weavenet.WeaveBridgeName)
+		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
 		checkFatal(err)
 
 		allocator, defaultSubnet = createAllocator(router, ipamConfig, preClaims, db, t, isKnownPeer)
@@ -590,9 +590,9 @@ func determinePassword(password string) []byte {
 	return []byte(password)
 }
 
-func peerName(routerName, dbPrefix, hostRoot string) mesh.PeerName {
+func peerName(routerName, bridgeName, dbPrefix, hostRoot string) mesh.PeerName {
 	if routerName == "" {
-		iface, err := net.InterfaceByName(weavenet.WeaveBridgeName)
+		iface, err := net.InterfaceByName(bridgeName)
 		if err == nil {
 			routerName = iface.HardwareAddr.String()
 		} else {
