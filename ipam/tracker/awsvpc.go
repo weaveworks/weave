@@ -30,7 +30,6 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/weaveworks/weave/common"
-	wnet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -42,7 +41,7 @@ type AWSVPCTracker struct {
 }
 
 // NewAWSVPCTracker creates and initialises AWS VPC based tracker.
-func NewAWSVPCTracker() (*AWSVPCTracker, error) {
+func NewAWSVPCTracker(bridgeName string) (*AWSVPCTracker, error) {
 	var (
 		err     error
 		session = session.New()
@@ -69,9 +68,9 @@ func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 	t.routeTableID = *routeTableID
 
 	// Detect Weave bridge link index
-	link, err := netlink.LinkByName(wnet.WeaveBridgeName)
+	link, err := netlink.LinkByName(bridgeName)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find \"%s\" interface: %s", wnet.WeaveBridgeName, err)
+		return nil, fmt.Errorf("cannot find \"%s\" interface: %s", bridgeName, err)
 	}
 	t.linkIndex = link.Attrs().Index
 
