@@ -259,9 +259,30 @@ func initBridgePrep(config *BridgeConfig) error {
 	if config.MTU == 0 {
 		config.MTU = 65535
 	}
-	linkAttrs.MTU = config.MTU // TODO this probably doesn't work - see weave script
-	if err = netlink.LinkAdd(&netlink.Bridge{LinkAttrs: linkAttrs}); err != nil {
+	link := &netlink.Bridge{LinkAttrs: linkAttrs}
+	if err = netlink.LinkAdd(link); err != nil {
 		return errors.Wrapf(err, "creating bridge %q", config.WeaveBridgeName)
+	}
+	if err := netlink.LinkSetHardwareAddr(link, mac); err != nil {
+		return errors.Wrapf(err, "setting bridge %q mac %v", config.WeaveBridgeName, mac)
+	}
+	// Attempting to set the bridge MTU to a high value directly
+	// fails. Bridges take the lowest MTU of their interfaces. So
+	// instead we create a temporary interface with the desired MTU,
+	// attach that to the bridge, and then remove it again.
+	dummy := &netlink.Dummy{LinkAttrs: netlink.NewLinkAttrs()}
+	dummy.LinkAttrs.Name = "vethwedu"
+	if err = netlink.LinkAdd(dummy); err != nil {
+		return errors.Wrap(err, "creating dummy interface")
+	}
+	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
+		return errors.Wrapf(err, "setting dummy interface mtu to %d", config.MTU)
+	}
+	if err := netlink.LinkSetMaster(dummy, link); err != nil {
+		return errors.Wrap(err, "setting dummy interface master")
+	}
+	if err := netlink.LinkDel(dummy); err != nil {
+		return errors.Wrap(err, "deleting dummy interface")
 	}
 
 	return nil
