@@ -4,7 +4,7 @@ menu_order: 100
 ---
 
 
-###Enabling Multi-Cloud Networking
+### Enabling Multi-Cloud Networking
 
 Before multi-cloud networking can be enabled, you must configure the network to allow 
 connections through Weave Net's control and data ports on the Docker hosts. By default, the 
@@ -20,7 +20,7 @@ port and UDP 9000/9001 for its data port.
 the same setting.
 
 
-###Multi-hop routing
+### Multi-hop routing
 
 A network of containers across more than two hosts can be 
 established even when there is only partial connectivity 

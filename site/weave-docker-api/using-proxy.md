@@ -12,7 +12,7 @@ When they are started via the Weave Net proxy, containers are
 [automatically assigned IP addresses](/site/ipam.md) and connected to the
 Weave network.  
 
-###Creating and Starting Containers with the Weave Net Proxy
+### Creating and Starting Containers with the Weave Net Proxy
 
 To create and start a container via the Weave Net proxy run:
 
@@ -33,7 +33,7 @@ variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
 
-###Returning Weave Network Settings Instead of Docker Network Settings
+### Returning Weave Network Settings Instead of Docker Network Settings
 
 The Docker NetworkSettings (including IP address, MacAddress, and
 IPPrefixLen), are still returned when `docker inspect` is run. If you want
@@ -46,13 +46,13 @@ only includes one of them.
 
     host1$ weave launch-router && weave launch-proxy --rewrite-inspect
 
-###Multicast Traffic and Launching the Weave Proxy
+### Multicast Traffic and Launching the Weave Proxy
 
 By default, multicast traffic is routed over the Weave network.
 To turn this off, for example, because you want to configure your own multicast
 route, add the `--no-multicast-route` flag to `weave launch-proxy`.
 
-###Other Weave Proxy options
+### Other Weave Proxy options
 
  * `--without-dns` -- stop telling containers to use [WeaveDNS](/site/weavedns.md)
  * `--log-level=debug|info|warning|error` -- controls how much

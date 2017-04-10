@@ -11,7 +11,7 @@ This section contains the following topics:
  * [What Happens When The Topology is Out of Date?](#out-of-date-topology)
 
 
-###<a name="topology"></a>Communicating Topology Among Peers
+### <a name="topology"></a>Communicating Topology Among Peers
 
 Topology messages capture which peers are connected to other peers. 
 Weave peers communicate their knowledge of the topology
@@ -49,7 +49,7 @@ improved update containing them is gossiped.
 If the update mentions a peer that the receiver does not know, then
 the entire update is ignored.
 
-####<a name="messages"></a>How Messages Are Formed
+#### <a name="messages"></a>How Messages Are Formed
 
 Every gossip message is structured as follows:
 
@@ -120,14 +120,14 @@ which the structure is:
     | Connection N: Established         |
     +-----------------------------------+
 
-####<a name="removing-peers"></a>Removing Peers
+#### <a name="removing-peers"></a>Removing Peers
 
 If a peer, after receiving a topology update, sees that another peer
 no longer has any connections within the network, it drops all
 knowledge of that second peer.
 
 
-####<a name="out-of-date-topology"></a>What Happens When The Topology is Out of Date?
+#### <a name="out-of-date-topology"></a>What Happens When The Topology is Out of Date?
 
 The propagation of topology changes to all peers is not instantaneous.
 Therefore, it is very possible for a node elsewhere in the network to have an

@@ -19,7 +19,7 @@ To start a container without connecting it to the Weave network, pass
 
     host1$ docker run -ti -e WEAVE_CIDR=none weaveworks/ubuntu
 
-###Disabling Automatic IP Address Allocation
+### Disabling Automatic IP Address Allocation
 
 If you do not want an IP to be assigned by default, the proxy needs to
 be passed the `--no-default-ipalloc` flag, for example:
