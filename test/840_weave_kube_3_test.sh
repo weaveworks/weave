@@ -4,11 +4,7 @@
 
 tear_down_kubeadm() {
     for host in $HOSTS; do
-        # If we don't stop kubelet, it will restart all the containers we're trying to kill
-        run_on $host "sudo systemctl stop kubelet"
-        rm_containers $host $(docker_on $host ps -aq)
-        run_on $host "test ! -d /var/lib/kubelet || sudo find /var/lib/kubelet -execdir findmnt -n -t tmpfs -o TARGET -T {} \; | uniq | xargs -r sudo umount"
-        run_on $host "sudo rm -r -f /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/cni /opt/cni/bin/*weave*"
+        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
     done
 }
 
@@ -16,10 +12,12 @@ howmany() { echo $#; }
 
 start_suite "Test weave-kube image with Kubernetes"
 
-TOKEN=112233.445566778899000
+TOKEN=112233.4455667788990000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
 NUM_HOSTS=$(howmany $HOSTS)
 SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
+KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
+KUBE_PORT=6443
 
 tear_down_kubeadm
 
@@ -35,13 +33,14 @@ for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
     else
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
     fi
 done
 
 [ -n "$COVERAGE" ] && COVERAGE_ARGS="\\n          env:\\n            - name: EXTRA_ARGS\\n              value: \"-test.coverprofile=/home/weave/cover.prof --\""
 
-sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirname "$0")/../prog/weave-kube/weave-daemonset.yaml" | run_on $HOST1 "kubectl apply -f -"
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.6.yaml" \
+	| run_on $HOST1 "$KUBECTL apply -f -"
 
 sleep 5
 
@@ -73,11 +72,11 @@ assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
 # See if we can get some pods running that connect to the network
-run_on $HOST1 "kubectl run hello --image=weaveworks/hello-world --replicas=3"
+run_on $HOST1 "$KUBECTL run hello --image=weaveworks/hello-world --replicas=3"
 
 wait_for_pods() {
     for i in $(seq 1 45); do
-        if run_on $HOST1 "kubectl get pods | grep 'hello.*Running'" ; then
+        if run_on $HOST1 "$KUBECTL get pods | grep 'hello.*Running'" ; then
             return
         fi
         echo "Waiting for pods"
