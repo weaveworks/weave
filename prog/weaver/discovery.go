@@ -55,7 +55,7 @@ func do(verb string, discoveryEndpoint, token string, request interface{}, respo
 		return nil
 	}
 	err = json.NewDecoder(resp.Body).Decode(response)
-	Log.Printf("peer discovery result: (%s) %v", err, response)
+	Log.Printf("peer discovery result: (%v) %v", err, response)
 	return err
 }
 
