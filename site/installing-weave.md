@@ -5,7 +5,7 @@ menu_order: 30
 
 
 Ensure you are running Linux (kernel 3.8 or later) and have Docker
-(version 1.6.0 or later) installed. 
+(version 1.10.0 or later) installed.
 
 Install Weave Net by running the following:
 
