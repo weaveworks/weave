@@ -53,7 +53,7 @@ type dnsConfig struct {
 func (c *ipamConfig) Enabled() bool {
 	var (
 		hasPeerCount = c.PeerCount > 0
-		hasMode      = len(c.Mode) > 0
+		hasMode      = c.HasMode()
 		hasRange     = c.IPRangeCIDR != ""
 		hasSubnet    = c.IPSubnetCIDR != ""
 	)
@@ -73,6 +73,10 @@ func (c *ipamConfig) Enabled() bool {
 		}
 	}
 	return true
+}
+
+func (c ipamConfig) HasMode() bool {
+	return len(c.Mode) > 0
 }
 
 func (c *ipamConfig) parseMode() error {
