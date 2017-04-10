@@ -26,10 +26,15 @@ var (
 
 const (
 	NameIdent = "peername"
-	FileName  = "data.db"
+	fileName  = "data.db"
 )
 
-func NewBoltDB(dbPathname string) (*BoltDB, error) {
+func Pathname(dbPrefix string) string {
+	return dbPrefix + fileName
+}
+
+func NewBoltDB(dbPrefix string) (*BoltDB, error) {
+	dbPathname := Pathname(dbPrefix)
 	db, err := bolt.Open(dbPathname, 0660, nil)
 	if err != nil {
 		return nil, fmt.Errorf("[boltDB] Unable to open %s: %s", dbPathname, err)
@@ -38,8 +43,9 @@ func NewBoltDB(dbPathname string) (*BoltDB, error) {
 	return &BoltDB{db: db}, err
 }
 
-func NewBoltDBReadOnly(dbPathname string) (*BoltDB, error) {
+func NewBoltDBReadOnly(dbPrefix string) (*BoltDB, error) {
 	options := bolt.Options{Timeout: time.Millisecond * 50, ReadOnly: true}
+	dbPathname := Pathname(dbPrefix)
 	db, err := bolt.Open(dbPathname, 0660, &options)
 	if err != nil {
 		return nil, fmt.Errorf("[boltDB] Unable to open %s: %s", dbPathname, err)

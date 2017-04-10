@@ -36,8 +36,8 @@ func getSystemUUID(hostRoot string) ([]byte, error) {
 	return append(machineid, uuid...), nil
 }
 
-func getPersistedPeerName(pathName string) (mesh.PeerName, error) {
-	d, err := db.NewBoltDBReadOnly(pathName)
+func getPersistedPeerName(dbPrefix string) (mesh.PeerName, error) {
+	d, err := db.NewBoltDBReadOnly(dbPrefix)
 	if err != nil {
 		return mesh.UnknownPeerName, err
 	}
@@ -56,9 +56,8 @@ func getPersistedPeerName(pathName string) (mesh.PeerName, error) {
 func GetSystemPeerName(dbPrefix, hostRoot string) (string, error) {
 	// Check if we have a persisted name that matches the old-style ID for this host
 	if oldUUID, err := getOldStyleSystemUUID(); err == nil {
-		pathName := dbPrefix + db.FileName
-		if _, err := os.Stat(pathName); err == nil {
-			persistedPeerName, err := getPersistedPeerName(pathName)
+		if _, err := os.Stat(db.Pathname(dbPrefix)); err == nil {
+			persistedPeerName, err := getPersistedPeerName(dbPrefix)
 			if err != nil && !os.IsNotExist(err) {
 				return "", err
 			}

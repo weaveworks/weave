@@ -260,7 +260,7 @@ func main() {
 		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
 	}
 
-	db, err := db.NewBoltDB(dbPrefix + db.FileName)
+	db, err := db.NewBoltDB(dbPrefix)
 	checkFatal(err)
 	defer db.Close()
 
