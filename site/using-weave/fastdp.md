@@ -10,13 +10,13 @@ When Weave Net cannot use the fast data path between two hosts, it falls back to
 
 See [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
 
-###Disabling Fast Datapath
+### Disabling Fast Datapath
 
 You can disable fastdp by enabling the `WEAVE_NO_FASTDP` environment variable at `weave launch`:
 
     $ WEAVE_NO_FASTDP=true weave launch
 
-###Fast Datapath and Encryption
+### Fast Datapath and Encryption
 
 Fast datapath implements encryption using IPsec which is configured with IP
 transformation framework (XFRM) provided by the Linux kernel.
@@ -28,7 +28,7 @@ Cloud Platform denies ESP packets by default.
 See [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
 for more details for the fastdp encryption.
 
-###Viewing Connection Mode Fastdp or Sleeve
+### Viewing Connection Mode Fastdp or Sleeve
 
 Weave Net automatically uses the fastest datapath for every connection unless it encounters a situation that prevents it from working. To ensure that Weave Net can use the fast datapath:
 
@@ -48,7 +48,7 @@ Where fastdp indicates that fast datapath is being used on a connection. If fast
     $ weave status connections
     <- 192.168.122.25:54782  established sleeve 8a:50:4c:23:11:ae(ubuntu1204)
 
-###<a name="mtu"></a>Packet size (MTU)
+### <a name="mtu"></a>Packet size (MTU)
 
 The Maximum Transmission Unit, or MTU, is the technical term for the
 limit on how big a single packet can be on the network. Weave Net

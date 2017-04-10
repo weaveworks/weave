@@ -34,7 +34,7 @@ which a helper is provided in the Weave script:
     # ping foo
 
 
-###<a name="launching"></a>Launching Weave Net and Running Containers Using the Plugin
+### <a name="launching"></a>Launching Weave Net and Running Containers Using the Plugin
 
 Just launch the Weave Net router onto each host and make a peer connection with the other hosts:
 
@@ -55,7 +55,7 @@ then run your containers using the Docker command-line:
     64 bytes from 10.32.0.2: icmp_seq=2 ttl=64 time=0.052 ms
 
 
-###<a name="multi"></a>Creating multiple Docker Networks
+### <a name="multi"></a>Creating multiple Docker Networks
 
 Docker enables you to create multiple independent networks and attach
 different sets of containers to each network. However, coordinating
@@ -79,7 +79,7 @@ Containers attached to different Docker Networks are
 [isolated through subnets](https://www.weave.works/docs/net/latest/using-weave/application-isolation/).
 
 
-###<a name="restarting"></a>Restarting the Plugin
+### <a name="restarting"></a>Restarting the Plugin
 
 The plugin, like all Weave Net components, is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
 
@@ -90,7 +90,7 @@ If you are using `systemd` with Docker 1.9, it is advised that you modify the Do
     TimeoutStartSec=0
 
 
-###<a name="configuring"></a>Configuring the Plugin
+### <a name="configuring"></a>Configuring the Plugin
 
 The plugin accepts a number of configuration parameters. To supply
 these, instead of running `weave launch`, start the router and plugin

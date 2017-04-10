@@ -16,7 +16,7 @@ on which they live.
 
 ![Weave Net AWS-VPC Mode](weave-net-awsvpc-1007x438.png)
 
-###Configuring EC2 Instances to use Weave AWS-VPC Mode
+### Configuring EC2 Instances to use Weave AWS-VPC Mode
 
 First, your AWS instances need to be given write access to the route
 table via its
@@ -59,7 +59,7 @@ addresses will flow over the AWS network unmodified.
 Finally, since Weave will be operating with IP addresses outside of the 
 range allocated by Amazon, you must disable "Source/Destination check" on each machine.
 
-###Using AWS-VPC Mode
+### Using AWS-VPC Mode
 
 Launch Weave Net with the `--awsvpc` flag:
 
@@ -68,7 +68,7 @@ Launch Weave Net with the `--awsvpc` flag:
  >>**Note:** You will still need to supply the names or IP addresses of other hosts in
 your cluster.
 
-###Present Limitations
+### Present Limitations
 
 - AWS-VPC mode does not inter-operate with other Weave Net modes; it
   is all or nothing.  In this mode, all hosts in a cluster must be AWS
@@ -85,7 +85,7 @@ your cluster.
 - All of your containers must be on the same network, with no subnet
   isolation. (We hope to ease this limitation in future.)
 
-###Packet size (MTU)
+### Packet size (MTU)
 
 The Maximum Transmission Unit, or MTU, is the technical term for the
 limit on how big a single packet can be on the network. Weave Net

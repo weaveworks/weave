@@ -34,7 +34,7 @@ them to be owned by host1. The name "host3" is resolved via the
 'nickname' feature of Weave Net, which defaults to the local host
 name. Alternatively, you can supply a peer name as shown in `weave status`.
 
-###<a name="caution-rmpeer"></a>Caution###
+### <a name="caution-rmpeer"></a>Caution###
 
 You cannot call `weave rmpeer` on more than one host. The address
 space, which was owned by the stale peer cannot be left dangling, and

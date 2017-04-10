@@ -23,7 +23,7 @@ hosts run:
 Any other existing hosts on the Weave network will attempt to
 establish connections to the new host as well.
 
-###Instructing Peers to Forget a Host
+### Instructing Peers to Forget a Host
 
 To instruct a peer to forget a particular host specified to it via
 `weave launch` or `weave connect` run:
@@ -34,14 +34,14 @@ This prevents the peer from reconnecting to that host once
 connectivity to it is lost, and can be used to administratively remove
 any decommissioned peers from the network.
 
-###Bulk Replacing Hosts
+### Bulk Replacing Hosts
 
 Hosts can also be bulk-replaced. All existing hosts will be forgotten,
 and the new hosts added:
 
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
 
-###Restarting Docker and Weave Net
+### Restarting Docker and Weave Net
 
 If Weave Net is restarted by Docker it automatically remembers any
 previous connect and forget operations, however if you stop it

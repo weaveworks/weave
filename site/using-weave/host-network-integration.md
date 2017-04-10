@@ -22,7 +22,7 @@ And you can also ping the `a1` netcat application container residing on `$HOST1`
 
     host2$ ping $(weave dns-lookup a1)
 
-###Exposing Multiple Subnets
+### Exposing Multiple Subnets
 
 Multiple subnet addresses can be exposed or hidden using a single command:
 
@@ -31,14 +31,14 @@ Multiple subnet addresses can be exposed or hidden using a single command:
     host2$ weave hide   net:default net:10.2.2.0/24
     10.2.1.132 10.2.2.130
 
-###Adding Exposed Addresses to weaveDNS
+### Adding Exposed Addresses to weaveDNS
 
 Exposed addresses can also be added to weaveDNS by supplying fully qualified domain names:
 
     host2$ weave expose -h exposed.weave.local
     10.2.1.132
 
-###<a name="routing"></a>Routing from Another Host
+### <a name="routing"></a>Routing from Another Host
 
 After running `weave expose`, you can use Linux routing to provide
 access to the Weave network from hosts that are not running Weave Net:

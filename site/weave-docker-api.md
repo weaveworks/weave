@@ -9,7 +9,7 @@ network when they are started using the ordinary Docker
 or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
 instead of `weave run`.
 
-###<a name="attaching-containers"></a>Attaching Containers to a Weave Network
+### <a name="attaching-containers"></a>Attaching Containers to a Weave Network
 
 There are three ways to attach containers to a Weave network (which method to use is 
 entirely up to you):
@@ -34,7 +34,7 @@ See [Integrating Docker via the Network Plugin](/site/plugin.md).
 does not use the Weave Docker API Proxy. 
 See [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md). 
 
-###<a name="weave-api-proxy"></a>Setting Up The Weave Net Docker API Proxy
+### <a name="weave-api-proxy"></a>Setting Up The Weave Net Docker API Proxy
 
 The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can

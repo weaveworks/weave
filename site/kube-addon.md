@@ -13,7 +13,7 @@ The following topics are discussed:
  * [Changing Configuration Options](#configuration-options)
 
 
-##<a name="install"></a> Installation
+## <a name="install"></a> Installation
 
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
@@ -64,7 +64,7 @@ to the YAML file for the [latest release](https://github.com/weaveworks/weave/re
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
 
-##<a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
+## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
 In version 1.6, Kubernetes has increased security, so we need to
 create a special service account to run Weave Net. This is done in
@@ -79,7 +79,7 @@ annotation to a field on the DaemonSet spec object.
 If you have edited the Weave Net DaemonSet from a previous release,
 you will need to re-make your changes against the new version.
 
-###<a name="daemon-sets"></a> Upgrading the Daemon Sets
+### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 
 Kubernetes does not currently support rolling upgrades of daemon sets,
 and so you will need to perform the procedure manually:
@@ -91,7 +91,7 @@ and so you will need to perform the procedure manually:
   lose track of IP address range ownership, possibly leading to
   duplicate IP addresses if you then start a new copy of Weave Net.
 
-##<a name="npc"></a>Network Policy Controller
+## <a name="npc"></a>Network Policy Controller
 
 The addon also supports the [Kubernetes policy
 API](http://kubernetes.io/docs/user-guide/networkpolicies/) so that
@@ -109,7 +109,7 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
   all multicast traffic) by adding `--allow-mcast` as an argument to
   `weave-npc` in the YAML configuration.
 
-###<a name="blocked-connections"></a> Troubleshooting Blocked Connections
+### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, the first thing to do is check the `weave-npc` container's logs.
 
@@ -141,7 +141,7 @@ TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 ```
 
-###<a name="configuration-options"></a> Changing Configuration Options
+### <a name="configuration-options"></a> Changing Configuration Options
 
 The default configuration settings can be changed by saving and editing the
 addon YAML before running `kubectl apply`. Additional arguments may be

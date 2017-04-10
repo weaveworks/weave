@@ -15,7 +15,7 @@ application containers.  CNI is supported by
 and 
 [others](https://github.com/containernetworking/cni#who-is-using-cni).
 
-###Installing the Weave Net CNI plugin
+### Installing the Weave Net CNI plugin
 
 If your machine has the directories normally used to host CNI plugins, 
 then the Weave Net CNI plugin is installed when you run `weave setup`.
@@ -29,7 +29,7 @@ Then run:
 
     weave setup
 
-####Launching Weave Net
+#### Launching Weave Net
 
 To create a network that spans multiple hosts, the Weave peers must be connected to each other.  
 This is accomplished by specifying the other hosts during `weave launch` or via
@@ -40,7 +40,7 @@ for a discussion on peer connections.
 
     weave launch <peer hosts>
 
-####Using the CNI network configuration file
+#### Using the CNI network configuration file
 
 All CNI plugins are configured by a JSON file in the directory
 `/etc/cni/net.d/`.  `weave setup` installs a minimal configuration
@@ -64,9 +64,9 @@ The following other fields in the spec are supported:
 - `ipam / subnet` - default is to use Weave's IPAM default subnet
 - `ipam / gateway` - default is to use the Weave bridge IP address (allocated by `weave expose`)
 
-###Using the Weave Net CNI plugin
+### Using the Weave Net CNI plugin
 
-####Configuring Kubernetes to use the CNI Plugin
+#### Configuring Kubernetes to use the CNI Plugin
 
 After you've launched Weave and peered your hosts, you can configure
 Kubernetes to use Weave, by adding the following options to the
@@ -79,7 +79,7 @@ for more details.
 
 Now, whenever Kubernetes starts a pod, it will be attached to the Weave network.
 
-####Configuring Mesos to use the CNI plugin
+#### Configuring Mesos to use the CNI plugin
 
 To use the CNI plugin, the Mesos Agent must be started with reference
 to the CNI configuration and binary directories:
@@ -105,7 +105,7 @@ connected to the weave network)"
 For more information, see the 
 [Mesos documentation](http://mesos.apache.org/documentation/cni/).
 
-###Caveats
+### Caveats
 
 - The Weave Net router container must be running for CNI to allocate addresses
 - The CNI plugin does not add entries to weaveDNS.

@@ -27,7 +27,7 @@ menu_order: 20
 
 For step-by-step instructions on how to use Weave Net, see [Using Weave Net](/site/using-weave.md).
 
-###<a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
+### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
 Weave Net creates a virtual network that connects Docker containers
 deployed across multiple hosts.
@@ -46,7 +46,7 @@ over Weave Net.
 To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md) 
 and [Using Weave Net](/site/using-weave.md).
 
-###<a name="fast-data-path"></a>Fast Datapath
+### <a name="fast-data-path"></a>Fast Datapath
 
 Weave Net automatically chooses the fastest available method to 
 transport data between peers. The best performing of these 
@@ -55,7 +55,7 @@ transport data between peers. The best performing of these
 See [Using Fast Datapath](/site/using-weave/fastdp.md) and
 [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
-###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
+### <a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
 Weave Net includes a [Docker API Proxy](/site/weave-docker-api.md), which can be 
 used to start containers using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/), and attach them to the Weave network before they begin execution.
@@ -73,7 +73,7 @@ policy, are re-attached to the Weave network by the `Weave Docker API Proxy`.
 See [Integrating Docker via the API Proxy](/site/weave-docker-api.md).
 
 
-###<a name="plugin"></a>Weave Network Docker Plugin
+### <a name="plugin"></a>Weave Network Docker Plugin
 
 Weave Net can also be used as a [Docker plugin](https://docs.docker.com/engine/extend/plugins_network/).  A Docker network 
 named `weave` is created by `weave launch`, which is used as follows:
@@ -88,14 +88,14 @@ when there are network connectivity problems.
 See [Integrating Docker via the Network Plugin](/site/plugin.md) for more details.
 
 
-###<a name="cniplugin"></a>Weave Network CNI Plugin
+### <a name="cniplugin"></a>Weave Network CNI Plugin
 
 Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes and Mesosphere.
 
 See [Integrating Kubernetes and Mesos via the CNI Plugin](/site/cni-plugin.md) for more details.
 
 
-###<a name="addressing"></a>IP Address Management (IPAM)
+### <a name="addressing"></a>IP Address Management (IPAM)
  
 Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave, run `weave ps`.
 
@@ -106,7 +106,7 @@ For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Managemen
 [the basics of IP addressing](/site/how-it-works/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
-###<a name="naming-and-discovery"></a>Naming and Discovery
+### <a name="naming-and-discovery"></a>Naming and Discovery
  
 Named containers are automatically registered in [weaveDNS](/site/weavedns.md), 
 and are discoverable by using standard, simple name lookups:
@@ -119,7 +119,7 @@ WeaveDNS also supports [load balancing](/site/weavedns/load-balance-fault-weaved
 
 See [Discovering Containers with WeaveDNS](/site/weavedns.md).
  
-###<a name="application-isolation"></a>Application Isolation
+### <a name="application-isolation"></a>Application Isolation
 
 A single Weave network can host multiple, isolated 
 applications, with each application's containers being able 
@@ -136,13 +136,13 @@ See [Isolating Applications](/site/using-weave/application-isolation.md)
 for information on how to use the isolation-through-subnets 
 technique with Weave Net.
 
-###<a name="network-policy"></a>Network Policy
+### <a name="network-policy"></a>Network Policy
 
 The Weave [Kubernetes Addon](/site/kube-addon.md) includes a network
 policy controller that implements [Kubernetes Network
 Policies](http://kubernetes.io/docs/user-guide/networkpolicies/).
 
-###<a name="dynamic-network-attachment"></a>Dynamic Network Attachment
+### <a name="dynamic-network-attachment"></a>Dynamic Network Attachment
 
 At times, you may not know the application network for a 
 given container in advance. In these cases, you can take 
@@ -153,7 +153,7 @@ See [Dynamically Attaching and Detaching Containers](/site/using-weave/dynamical
 for details. 
 
 
-###<a name="security"></a>Security
+### <a name="security"></a>Security
 
 In keeping with our ease-of-use philosophy, the cryptography 
 in Weave Net is intended to satisfy a particular user requirement: 
@@ -179,14 +179,14 @@ and, additionally in the case of encrypted fast datapath using [the cryptography
 For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/site/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 
 
-###<a name="host-network-integration"></a>Host Network Integration
+### <a name="host-network-integration"></a>Host Network Integration
 
 Weave Net application networks can be integrated with a host's network, and establish connectivity between the host and 
 application containers anywhere.
 
 See [Integrating with the Host Network](/site/using-weave/host-network-integration.md).
 
-###<a name="services"></a>Managing Services: Exporting, Importing, Binding and Routing
+### <a name="services"></a>Managing Services: Exporting, Importing, Binding and Routing
  
  * **Exporting Services** - Services running in containers on a Weave network can be made accessible to the outside world or to other networks.
  * **Importing Services** - Applications can run anywhere, and yet still be made accessible by specific application containers or services.
@@ -195,7 +195,7 @@ See [Integrating with the Host Network](/site/using-weave/host-network-integrati
 
 See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md) for instructions on how to manage services on a Weave container network. 
 
-###<a name="multi-cloud-networking"></a>Multi-Cloud Networking
+### <a name="multi-cloud-networking"></a>Multi-Cloud Networking
 
 Weave can network containers hosted in different cloud providers 
 or data centers. For example, you can run an application consisting 
@@ -206,7 +206,7 @@ of containers that run on [Google Compute Engine](https://cloud.google.com/compu
 See [Enabling Multi-Cloud networking and Muti-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
 
 
-###<a name="multi-hop-routing"></a>Multi-Hop Routing
+### <a name="multi-hop-routing"></a>Multi-Hop Routing
 
 A network of containers across more than two hosts can be established 
 even when there is only partial connectivity between the hosts. Weave Net
@@ -216,14 +216,14 @@ of connected hosts between them.
 See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
 
 
-###<a name="dynamic-topologies"></a>Dynamic Topologies
+### <a name="dynamic-topologies"></a>Dynamic Topologies
 
 Hosts can be added to or removed from a Weave network without stopping
 or reconfiguring the remaining hosts. See [Adding and Removing Hosts
 Dynamically.](/site/using-weave/finding-adding-hosts-dynamically.md)
 
 
-###<a name="container-mobility"></a>Container Mobility
+### <a name="container-mobility"></a>Container Mobility
 
 Containers can be moved between hosts without requiring any 
 reconfiguration or, in many cases, restarts of other containers. 
@@ -233,7 +233,7 @@ with the same IP address as it was given originally.
 See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md), in particular, Routing Services for more information on container mobility. 
 
 
-###<a name="fault-tolerance"></a>Fault Tolerance
+### <a name="fault-tolerance"></a>Fault Tolerance
 
 Weave Net peers continually exchange topology information, and 
 monitor and (re)establish network connections to other peers. 

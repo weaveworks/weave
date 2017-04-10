@@ -18,18 +18,18 @@ The following concepts are described:
     * [Observers](#observers)
  * [Persistence](#persistence)
 
-##<a name="host"></a>Host
+## <a name="host"></a>Host
 
 For the purposes of this documentation a host is an
 installation of the Linux operating system that is running an
 instance of the Docker Engine. The host may be executing directly on bare
 hardware or inside a virtual machine.
 
-##<a name="peer"></a>Peer
+## <a name="peer"></a>Peer
 
 A peer is a running instance of Weave Net, typically one per host.
 
-##<a name="peer-name"></a>Peer Name
+## <a name="peer-name"></a>Peer Name
 
 Weave Net peers are identified by a 48-bit value formatted like an
 ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
@@ -66,14 +66,14 @@ The appropriate strategy for assigning peer names depends on the type
 and method of your particular deployment and is discussed in more
 detail below.
 
-##<a name="peer-discovery"></a>Peer Discovery
+## <a name="peer-discovery"></a>Peer Discovery
 
 Peer discovery is a mechanism that allows peers to learn about new
 Weave Net hosts from existing peers without being explicitly told. Peer
 discovery is
 [enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
 
-##<a name="network-partition"></a>Network Partition
+## <a name="network-partition"></a>Network Partition
 
 A network partition is a transient condition whereby some arbitrary
 subsets of peers are unable to communicate with each other for the
@@ -82,7 +82,7 @@ optic line severed. Weave Net is designed to allow peers and their
 containers to make maximum safe progress under conditions of
 partition, healing automatically once the partition is over.
 
-##<a name="ip-address-manager"></a>IP Address Manager (IPAM)
+## <a name="ip-address-manager"></a>IP Address Manager (IPAM)
 
 [IPAM](/site/ipam.md) is the subsystem responsible for dividing up a
 large contiguous block of IP addresses (known as the IP allocation
@@ -116,7 +116,7 @@ scenarios:
 
 * [Uniform Dynamic Cluster](/site/operational-guide/uniform-dynamic-cluster.md)
 
-###<a name="consensus"></a>Consensus
+### <a name="consensus"></a>Consensus
 
 Alternatively, when a new network is formed for the first time, peers
 can be configured to co-ordinate amongst themselves to automatically
@@ -132,7 +132,7 @@ scenarios:
 * [Interactive Deployment](/site/operational-guide/interactive.md)
 * [Uniform Fixed Cluster](/site/operational-guide/uniform-fixed-cluster.md)
 
-###<a name="observers"></a>Observers
+### <a name="observers"></a>Observers
 
 Finally, an option is provided to start a peer as an _observer_. Such
 peers do not require a seed peer name list or an initial peer
@@ -146,7 +146,7 @@ scenarios:
 
 * [Autoscaling](/site/operational-guide/autoscaling.md)
 
-##<a name="persistence"></a>Persistence
+## <a name="persistence"></a>Persistence
 
 Certain information is remembered between launches of Weave Net (for
 example across reboots):

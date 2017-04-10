@@ -12,7 +12,7 @@ The following administrative tasks are discussed:
 * [Resetting Persisted Data](#reset)
 
 
-##<a name="start-on-boot"></a>Configuring Weave Net to Start Automatically on Boot
+## <a name="start-on-boot"></a>Configuring Weave Net to Start Automatically on Boot
 
 `weave launch` runs all of Weave Net's containers with a Docker restart
 policy set to `always`.  If you have launched Weave Net manually at least
@@ -23,7 +23,7 @@ If you are aiming for a non-interactive installation, use
 [systemd](/site/installing-weave/systemd.md) or a similar init system to
 launch Weave using the `--no-restart` flag after Docker has been started.
 
-##<a name="detect-reclaim-ipam"></a>Detecting and Reclaiming Lost IP Address Space
+## <a name="detect-reclaim-ipam"></a>Detecting and Reclaiming Lost IP Address Space
 
 The recommended method of removing a peer is to run `weave reset` on that
 peer before the underlying host is decommissioned or repurposed. This
@@ -56,7 +56,7 @@ range managed by peer and also identifies the names of unreachable peers. If you
 that the peer is truly gone, rather than temporarily unreachable due to a
 partition, you can reclaim their space manually.
 
-###<a name="manually-reclaim-address-space"></a>Manually Reclaiming Address Space
+### <a name="manually-reclaim-address-space"></a>Manually Reclaiming Address Space
 
 When a peer dies unexpectedly the remaining peers will consider its
 address space to be unavailable even after it has remained unreachable
@@ -70,7 +70,7 @@ command is provided to perform this task, and must
 be executed on _one_ of the remaining peers. That peer will then take
 ownership of the freed address space.
 
-##<a name="cluster-upgrade"></a>Upgrading a Cluster
+## <a name="cluster-upgrade"></a>Upgrading a Cluster
 
 Protocol versioning and feature negotiation are employed in Weave Net
 to enable incremental rolling upgrades. Each major maintains
@@ -102,7 +102,7 @@ To minimize downtime while the new script is pulling the new container images:
 there are any special caveats or deviations from the standard
 procedure.
 
-##<a name="reset"></a>Resetting Persisted Data
+## <a name="reset"></a>Resetting Persisted Data
 
 Weave Net persists information in a data volume container named
 `weavedb`. If you wish to start from a completely clean slate (for
