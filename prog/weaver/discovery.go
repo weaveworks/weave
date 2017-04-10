@@ -23,6 +23,7 @@ type PeerUpdateRequest struct {
 
 type PeerUpdateResponse struct {
 	Addresses []string `json:"addresses"`
+	PeerCount int      `json:"peercount"`
 }
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
@@ -58,7 +59,7 @@ func do(verb string, discoveryEndpoint, token string, request interface{}, respo
 	return err
 }
 
-func peerDiscoveryUpdate(discoveryEndpoint, token, peername, nickname string, addresses []string) ([]string, error) {
+func peerDiscoveryUpdate(discoveryEndpoint, token, peername, nickname string, addresses []string) ([]string, int, error) {
 	request := PeerUpdateRequest{
 		Name:      peername,
 		Nickname:  nickname,
@@ -66,7 +67,7 @@ func peerDiscoveryUpdate(discoveryEndpoint, token, peername, nickname string, ad
 	}
 	var updateResponse PeerUpdateResponse
 	err := do("POST", discoveryEndpoint, token, request, &updateResponse)
-	return updateResponse.Addresses, err
+	return updateResponse.Addresses, updateResponse.PeerCount, err
 }
 
 func peerDiscoveryDelete(discoveryEndpoint, token, peername string) error {

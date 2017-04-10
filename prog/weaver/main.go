@@ -278,8 +278,11 @@ func main() {
 		} else {
 			addresses = strings.Split(advertiseAddress, ",")
 		}
-		discoveredPeers, err := peerDiscoveryUpdate(discoveryEndpoint, token, name.String(), nickName, addresses)
+		discoveredPeers, count, err := peerDiscoveryUpdate(discoveryEndpoint, token, name.String(), nickName, addresses)
 		checkFatal(err)
+		if !ipamConfig.HasMode() {
+			ipamConfig.PeerCount = len(peers) + count
+		}
 		peers = append(peers, discoveredPeers...)
 	} else if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
