@@ -20,7 +20,7 @@ where,
 
 >Note If you are using the Weave Docker API proxy, it will have modified `DOCKER_HOST` to point to the proxy and therefore you will have to pass `-e WEAVE_CIDR=none` to start a container that _doesn't_ get automatically attached to the weave network for the purposes of this example.
 
-###Dynamically Detaching Containers
+### Dynamically Detaching Containers
 
 A container can be detached from a subnet, by using the `weave detach` command:
 

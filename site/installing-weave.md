@@ -20,13 +20,13 @@ After your VM is setup with Docker Machine, Weave Net can be launched directly f
 
 With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Using Weave Net](/site/using-weave.md).
 
-###Quick Start Screencast
+### Quick Start Screencast
 
 <a href="https://youtu.be/kihQCCT1ykE" target="_blank">
   <img src="hello-screencast.png" alt="Click to watch the screencast" />
 </a>
 
-###Checkpoint
+### Checkpoint
 
 Weave Net [periodically contacts Weaveworks servers for available
 versions](https://github.com/weaveworks/go-checkpoint).  New versions
@@ -45,7 +45,7 @@ To disable this check, run the following before launching Weave Net:
 
     export CHECKPOINT_DISABLE=1
 
-###Guides for Specific Platforms
+### Guides for Specific Platforms
 
 CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreos/) for an example of installing Weave using cloud-config.
 

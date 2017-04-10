@@ -21,7 +21,7 @@ When weaveDNS is queried for a name in a domain other than
 `.weave.local`, it queries the host's configured nameserver, which is
 the standard behaviour for Docker containers.
 
-###Specifying a Different Docker Bridge Device
+### Specifying a Different Docker Bridge Device
 
 So that containers can connect to a stable and always routable IP
 address, weaveDNS listens on port 53 to the Docker bridge device, which

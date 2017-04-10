@@ -13,7 +13,7 @@ This section contains the following topics:
  * [Starting the Netcat Service](#start-netcat)
 
 
-###<a name="launching"></a>Launching Weave Net
+### <a name="launching"></a>Launching Weave Net
 
 Before launching Weave Net and deploying your apps, ensure that Docker is [installed](https://docs.docker.com/engine/installation/) on both hosts. 
 
@@ -57,7 +57,7 @@ You can also preload the images by running `weave setup`. Preloaded images are u
 If you are deploying an application that consists of more than one container to the same host, launch them one after another using `docker run`, as appropriate.  
 
 
-###<a name="peer-connections"></a>Creating Peer Connections Between Hosts
+### <a name="peer-connections"></a>Creating Peer Connections Between Hosts
 
 To launch Weave Net on an additional host and create a peer connection, run the following:
 
@@ -73,7 +73,7 @@ You can also peer with other hosts by specifying the IP address, and a `:port` b
 
 There are a number of different ways that you can specify peers on a Weave network. You can launch Weave Net on `$HOST1` and then peer with `$HOST2`, or you can launch on `$HOST2` and peer with `$HOST1` or you can tell both hosts about each other at launch. The order in which peers are specified is not important. Weave Net automatically (re)connects to peers when they become available. 
 
-####Specifying Multiple Peers at Launch
+#### Specifying Multiple Peers at Launch
 
 To specify multiple peers, supply a list of addresses to which you want to connect, all separated by spaces. 
 
@@ -83,7 +83,7 @@ For example:
 
 Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md) for more information.
 
-####Restricting Access
+#### Restricting Access
 
 By default Weave Net listens on all host IPs (i.e. 0.0.0.0). This
 can be altered with the `--host` parameter to `weave launch`, for example, 
@@ -95,7 +95,7 @@ Weave Net control and data ports.
 For communication across untrusted networks, connections can be
 [encrypted](/site/using-weave/security-untrusted-networks.md).
 
-###<a name="testing"></a>Testing Container Communications
+### <a name="testing"></a>Testing Container Communications
 
 With two containers running on separate hosts, test that both containers are able to find and communicate with one another using ping. 
 
@@ -116,7 +116,7 @@ Similarly, in the container started on `$HOST2`...
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms
 
-###<a name="start-netcat"></a>Starting the Netcat Service
+### <a name="start-netcat"></a>Starting the Netcat Service
 
 The `netcat` service can be started using the following commands:  
 

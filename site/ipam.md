@@ -112,7 +112,7 @@ peers. This can be useful to add peers to an existing fixed cluster
 (for example in response to a scale-out event) without worrying about
 adjusting initial peer counts accordingly.
 
-####<a name="quorum"></a> `--ipalloc-init consensus=` and How Quorum is Achieved
+#### <a name="quorum"></a> `--ipalloc-init consensus=` and How Quorum is Achieved
 
 Normally it isn't a problem to over-estimate the value supplied to
 `--ipalloc-init consensus=`, but if you supply a number that is too

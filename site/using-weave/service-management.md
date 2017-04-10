@@ -13,7 +13,7 @@ This section contains the following topics:
 
 
 
-###<a name="exporting"></a>Exporting Services
+### <a name="exporting"></a>Exporting Services
 
 Services running in containers on a Weave network can be made
 accessible to the outside world (and, more generally, to other networks)
@@ -43,7 +43,7 @@ With the above in place, you can connect to the 'nc' service from anywhere using
 
 Similar NAT rules to the above can be used to expose services not just to the outside world but also to other, internal, networks.
 
-###<a name="importing"></a>Importing Services
+### <a name="importing"></a>Importing Services
 
 Applications running in containers on a Weave network can be given access to services, which are only reachable from certain 
 Weave hosts, regardless of where the actual application containers are located.
@@ -73,7 +73,7 @@ You can now connect to it from the application container running on `$HOST2` usi
 
 Note that you should be able to run this command from any application container.
 
-###<a name="binding"></a>Binding Services
+### <a name="binding"></a>Binding Services
 
 Importing a service provides a degree of indirection that allows late and dynamic binding, similar to what can be achieved with a proxy. 
 
@@ -81,7 +81,7 @@ Referring back to the [netcat services example that is running on three hosts](#
 
 You can point application containers to another service location by changing the above NAT rule, without altering the applications.
 
-###<a name="routing"></a>Routing Services
+### <a name="routing"></a>Routing Services
 
 You can combine the service export and service import features to establish connectivity between applications and services residing on disjointed networks, even if those networks are separated by firewalls and have overlapping IP ranges. 
 
@@ -103,7 +103,7 @@ Now any host on the same network as `$HOST2` is able to access the service:
 
     echo 'Hello, world.' | nc $HOST2 4433
 
-###<a name="change-location"></a>Dynamically Changing Service Locations
+### <a name="change-location"></a>Dynamically Changing Service Locations
 
 Furthermore, as explained in Binding Services, service locations can be dynamically altered without having to change any of the applications that access them.  
 

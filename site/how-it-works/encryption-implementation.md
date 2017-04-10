@@ -13,7 +13,7 @@ This section describes some details of Weave Net's built-in
 
 
 
-####<a name="ephemeral-key"></a>Establishing the Ephemeral Session Key
+#### <a name="ephemeral-key"></a>Establishing the Ephemeral Session Key
 
 For every connection between peers, a fresh public/private key pair is
 created at both ends, using NaCl's `GenerateKey` function. The public
@@ -48,7 +48,7 @@ not be able to form valid ephemeral session keys.
 The same ephemeral session key is used for both TCP and UDP traffic
 between two peers.
 
-###<a name="csprng"></a> Key Generation and The Linux CSPRNG
+### <a name="csprng"></a> Key Generation and The Linux CSPRNG
 
 Generating fresh keys for every connection
 provides forward secrecy at the cost of placing a demand on the Linux
@@ -84,7 +84,7 @@ Weave Net's demand on `/dev/urandom` is causing you problems with blocking
 `/dev/random` reads, please get in touch with us - we'd love to hear
 about your use case.
 
-####<a name="tcp"></a>Encypting and Decrypting TCP Messages
+#### <a name="tcp"></a>Encypting and Decrypting TCP Messages
 
 TCP connection are only used to exchange topology information between
 peers, via a message-based protocol. Encryption of each message is
@@ -105,9 +105,9 @@ polarity. As a result the receiver will only be able to decrypt a
 message if it has the expected sequence number. This prevents replay
 attacks.
 
-####<a name="udp"></a>Encrypting and Decrypting UDP Packets
+#### <a name="udp"></a>Encrypting and Decrypting UDP Packets
 
-#####Sleeve
+##### Sleeve
 
 UDP connections carry captured traffic between peers. For a UDP packet
 sent between peers that are using crypto, the encapsulation looks as
@@ -181,7 +181,7 @@ contained in the set. The window spans at least 2^20 message sequence
 numbers, and hence any re-ordering between the most recent ~1 million
 messages is handled without dropping messages.
 
-#####Fast Datapath
+##### Fast Datapath
 
 Encryption in fastdp uses [the ESP protocol of IPsec](https://tools.ietf.org/html/rfc2406)
 in the transport mode. Each VXLAN packet is encrypted with
