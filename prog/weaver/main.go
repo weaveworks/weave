@@ -275,7 +275,7 @@ func main() {
 			addresses = strings.Split(advertiseAddress, ",")
 		}
 		discoveredPeers, err := peerDiscoveryUpdate(discoveryEndpoint, token, name.String(), nickName, addresses)
-		checkFatal(err) // TODO: what if it is a transient error, and we are restarting?
+		checkFatal(err)
 		peers = append(peers, discoveredPeers...)
 	} else if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
