@@ -53,7 +53,7 @@ type dnsConfig struct {
 func (c *ipamConfig) Enabled() bool {
 	var (
 		hasPeerCount = c.PeerCount > 0
-		hasMode      = len(c.Mode) > 0
+		hasMode      = c.HasMode()
 		hasRange     = c.IPRangeCIDR != ""
 		hasSubnet    = c.IPSubnetCIDR != ""
 	)
@@ -73,6 +73,10 @@ func (c *ipamConfig) Enabled() bool {
 		}
 	}
 	return true
+}
+
+func (c ipamConfig) HasMode() bool {
+	return len(c.Mode) > 0
 }
 
 func (c *ipamConfig) parseMode() error {
@@ -143,6 +147,9 @@ func main() {
 		trustedSubnetStr   string
 		dbPrefix           string
 		isAWSVPC           bool
+		discoveryEndpoint  string
+		token              string
+		advertiseAddress   string
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -184,6 +191,9 @@ func main() {
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
 	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
+	mflag.StringVar(&discoveryEndpoint, []string{"-peer-discovery-url"}, "https://cloud.weave.works/api/net", "url for peer discovery")
+	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
+	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -257,7 +267,24 @@ func main() {
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
 	Log.Println("Our name is", router.Ourself)
 
-	if peers, err = router.InitialPeers(resume, peers); err != nil {
+	if token != "" {
+		var addresses []string
+		if advertiseAddress == "" {
+			localAddrs, err := weavenet.LocalAddresses()
+			checkFatal(err)
+			for _, addr := range localAddrs {
+				addresses = append(addresses, addr.IP.String())
+			}
+		} else {
+			addresses = strings.Split(advertiseAddress, ",")
+		}
+		discoveredPeers, count, err := peerDiscoveryUpdate(discoveryEndpoint, token, name.String(), nickName, addresses)
+		checkFatal(err)
+		if !ipamConfig.HasMode() {
+			ipamConfig.PeerCount = len(peers) + count
+		}
+		peers = append(peers, discoveredPeers...)
+	} else if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
 
@@ -352,6 +379,7 @@ func main() {
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
 		Log.Println("Listening for HTTP control messages on", httpAddr)
@@ -376,7 +404,7 @@ func options() map[string]string {
 	mflag.Visit(func(f *mflag.Flag) {
 		value := f.Value.String()
 		name := canonicalName(f)
-		if name == "password" {
+		if name == "password" || name == "token" {
 			value = "<redacted>"
 		}
 		options[name] = value
