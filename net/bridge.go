@@ -61,7 +61,8 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 		return Fastdp
 	case isDatapath(datapath) && isBridge(bridge):
 		return BridgedFastdp
-	// TODO: AWSVPC
+		// We cannot detect AWSVPC here; it looks just like Bridge.
+		// Anyone who cares will have to know some other way.
 	default:
 		return Inconsistent
 	}
@@ -177,6 +178,7 @@ type BridgeConfig struct {
 	DatapathName     string
 	NoFastdp         bool
 	NoBridgedFastdp  bool
+	IsAWSVPC         bool
 	ExpectNPC        bool
 	MTU              int
 	Mac              string
@@ -221,6 +223,10 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 		if err = configureIPTables(config); err != nil {
 			return bridgeType, err
 		}
+	}
+
+	if config.IsAWSVPC {
+		bridgeType = AWSVPC
 	}
 
 	if bridgeType == Bridge {
