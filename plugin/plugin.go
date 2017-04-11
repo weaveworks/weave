@@ -18,6 +18,8 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
+const pluginV2Name = "net-plugin"
+
 var Log = common.Log
 
 func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, dns bool, isPluginV2 bool) {
@@ -62,9 +64,19 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 }
 
 func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, dns bool, isPluginV2 bool) (net.Listener, error) {
-	name := strings.TrimSuffix(path.Base(address), ".sock")
-	// TODO(mp) fix plugin name, as it is used to determine whether network is our
-	d, err := netplugin.New(dockerClient, weave, name, scope, dns, isPluginV2)
+	var isNetworkOur func(string) bool
+	if isPluginV2 {
+		isNetworkOur = func(driverName string) bool {
+			return strings.Contains(driverName, pluginV2Name)
+		}
+	} else {
+		name := strings.TrimSuffix(path.Base(address), ".sock")
+		isNetworkOur = func(driverName string) bool {
+			return driverName == name
+		}
+	}
+
+	d, err := netplugin.New(dockerClient, weave, scope, dns, isPluginV2, isNetworkOur)
 	if err != nil {
 		return nil, err
 	}

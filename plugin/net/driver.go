@@ -28,23 +28,23 @@ type network struct {
 }
 
 type driver struct {
-	name       string
-	scope      string
-	docker     *docker.Client
-	dns        bool
-	isPluginV2 bool
 	sync.RWMutex
-	networks map[string]network
+	scope        string
+	docker       *docker.Client
+	dns          bool
+	isPluginV2   bool
+	networks     map[string]network
+	isNetworkOur func(driverName string) bool
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, name, scope string, dns, isPluginV2 bool) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, scope string, dns, isPluginV2 bool, isNetworkOur func(string) bool) (skel.Driver, error) {
 	driver := &driver{
-		name:       name,
-		scope:      scope,
-		docker:     client,
-		dns:        dns,
-		isPluginV2: isPluginV2,
-		networks:   make(map[string]network),
+		scope:        scope,
+		docker:       client,
+		dns:          dns,
+		isPluginV2:   isPluginV2,
+		networks:     make(map[string]network),
+		isNetworkOur: isNetworkOur,
 	}
 
 	_, err := NewWatcher(client, weave, driver)
@@ -193,7 +193,7 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 	if err != nil {
 		return network, err
 	}
-	return driver.setupNetworkInfo(id, info.Driver == driver.name, info.Options)
+	return driver.setupNetworkInfo(id, driver.isNetworkOur(info.Driver), info.Options)
 }
 
 func (driver *driver) setupNetworkInfo(id string, isOurs bool, options map[string]string) (network, error) {
