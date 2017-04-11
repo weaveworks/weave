@@ -407,7 +407,7 @@ func main() {
 	}
 
 	if enablePlugin || enablePluginV2 {
-		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, noDNS, enablePluginV2)
+		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)

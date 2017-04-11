@@ -41,7 +41,7 @@ func (w *watcher) ContainerStarted(id string) {
 			continue
 		}
 		if network.isOurs {
-			if !w.driver.noDNS {
+			if w.driver.dns {
 				fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
 				if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
 					w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
