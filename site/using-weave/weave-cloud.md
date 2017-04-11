@@ -20,7 +20,9 @@ Weave Net, you must sign up to Weave Cloud and create an "Instance".
 
 The instance will have a Service Token which is a 32-character string
 used to uniquely identify it.  Get hold of the Service Token for your
-Instance.
+Instance, as shown below:
+
+![UI to get a Service Token](weave-cloud-token.png)
 
 For the purpose of these instructions we will use a dummy Service
 Token `dk6hz1acdd58aea6b75migoy4axqasdf`.
