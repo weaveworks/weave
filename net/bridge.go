@@ -17,6 +17,8 @@ type BridgeType int
 const (
 	WeaveBridgeName = "weave"
 	DatapathName    = "datapath"
+	BridgeIfName    = "vethwe-bridge"
+	PcapIfaceName   = "vethwe-pcap"
 
 	None BridgeType = iota
 	Bridge
@@ -214,7 +216,7 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 	return bridgeType, nil
 }
 
-func initBridge(config *BridgeConfig) error {
+func initBridgePrep(config *BridgeConfig) error {
 	mac, err := net.ParseMAC(config.Mac)
 	if err != nil {
 		return err
@@ -225,6 +227,19 @@ func initBridge(config *BridgeConfig) error {
 	linkAttrs.HardwareAddr = mac
 	linkAttrs.MTU = config.MTU // TODO this probably doesn't work - see weave script
 	if err = netlink.LinkAdd(&netlink.Bridge{LinkAttrs: linkAttrs}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func initBridge(config *BridgeConfig) error {
+	if err := initBridgePrep(config); err != nil {
+		return err
+	}
+	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfaceName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+		return netlink.LinkSetUp(veth)
+	}); err != nil {
 		return err
 	}
 
@@ -243,7 +258,7 @@ func initBridgedFastdp(config *BridgeConfig) error {
 	if err := initFastdp(config); err != nil {
 		return err
 	}
-	if err := initBridge(config); err != nil {
+	if err := initBridgePrep(config); err != nil {
 		return err
 	}
 	if _, err := CreateAndAttachVeth("vethwe-bridge", "vethwe-datapath", config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
