@@ -191,6 +191,10 @@ publish() {
         make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
+        echo "== Building and pushing plugin"
+        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
+        echo "** Plugin built and pushed"
+
         echo "== Publishing pre-release on GitHub"
 
         github-release publish \
@@ -222,6 +226,10 @@ publish() {
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
         make PUBLISH_WEAVEDB=$IS_MAINLINE UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
+
+        echo "== Building and pushing plugin"
+        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
+        echo "** Plugin built and pushed"
 
         echo "== Publishing release on GitHub"
 

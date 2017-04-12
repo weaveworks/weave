@@ -25,6 +25,7 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/plugin"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -150,6 +151,10 @@ func main() {
 		discoveryEndpoint  string
 		token              string
 		advertiseAddress   string
+		pluginSocket       string
+		pluginMeshSocket   string
+		enablePlugin       bool
+		enablePluginV2     bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -194,6 +199,11 @@ func main() {
 	mflag.StringVar(&discoveryEndpoint, []string{"-peer-discovery-url"}, "https://cloud.weave.works/api/net", "url for peer discovery")
 	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
 	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
+
+	mflag.BoolVar(&enablePlugin, []string{"-plugin"}, false, "enable Docker plugin (v1)")
+	mflag.BoolVar(&enablePluginV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
+	mflag.StringVar(&pluginSocket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
+	mflag.StringVar(&pluginMeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -394,6 +404,10 @@ func main() {
 		statusMux.Handle("/", muxRouter)
 		Log.Println("Listening for metrics requests on", statusAddr)
 		go listenAndServeHTTP(statusAddr, statusMux)
+	}
+
+	if enablePlugin || enablePluginV2 {
+		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)

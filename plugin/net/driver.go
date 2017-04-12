@@ -28,19 +28,23 @@ type network struct {
 }
 
 type driver struct {
-	name   string
-	scope  string
-	docker *docker.Client
 	sync.RWMutex
-	networks map[string]network
+	scope        string
+	docker       *docker.Client
+	dns          bool
+	isPluginV2   bool
+	networks     map[string]network
+	isNetworkOur func(driverName string) bool
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, name, scope string) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, scope string, dns, isPluginV2 bool, isNetworkOur func(string) bool) (skel.Driver, error) {
 	driver := &driver{
-		name:     name,
-		scope:    scope,
-		docker:   client,
-		networks: make(map[string]network),
+		scope:        scope,
+		docker:       client,
+		dns:          dns,
+		isPluginV2:   isPluginV2,
+		networks:     make(map[string]network),
+		isNetworkOur: isNetworkOur,
 	}
 
 	_, err := NewWatcher(client, weave, driver)
@@ -61,10 +65,25 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 	return caps, nil
 }
 
+// In Swarm mode, CreateNetwork is called on each Swarm node when a new service
+// is created.
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 	driver.logReq("CreateNetwork", create, create.NetworkID)
 	_, err := driver.setupNetworkInfo(create.NetworkID, true, stringOptions(create))
 	return err
+}
+
+// NetworkAllocate is called on a Swarm node (master) which creates the network.
+// The returned options are passed to CreateNetwork.
+func (driver *driver) NetworkAllocate(alloc *api.AllocateNetworkRequest) (*api.AllocateNetworkResponse, error) {
+	driver.logReq("NetworkAllocate", alloc, alloc.NetworkID)
+	return &api.AllocateNetworkResponse{Options: alloc.Options}, nil
+}
+
+// NetworkFree is called on a Swarm master node which created the network.
+func (driver *driver) NetworkFree(free *api.FreeNetworkRequest) (*api.FreeNetworkResponse, error) {
+	driver.logReq("NetworkFree", free, free.NetworkID)
+	return nil, nil
 }
 
 // Deal with excessively-generic way the options get decoded from JSON
@@ -85,6 +104,7 @@ func stringOptions(create *api.CreateNetworkRequest) map[string]string {
 	return nil
 }
 
+// In Swarm mode, DeleteNetwork is called after a service has been removed.
 func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
 	driver.logReq("DeleteNetwork", delreq, delreq.NetworkID)
 	driver.Lock()
@@ -173,7 +193,7 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 	if err != nil {
 		return network, err
 	}
-	return driver.setupNetworkInfo(id, info.Driver == driver.name, info.Options)
+	return driver.setupNetworkInfo(id, driver.isNetworkOur(info.Driver), info.Options)
 }
 
 func (driver *driver) setupNetworkInfo(id string, isOurs bool, options map[string]string) (network, error) {

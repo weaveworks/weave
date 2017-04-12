@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all exes testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin clean-work-dir prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -93,36 +93,38 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
-PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 MANIFEST_TOOL_DIR=vendor/github.com/estesp/manifest-tool
 MANIFEST_TOOL_EXE=$(MANIFEST_TOOL_DIR)/manifest-tool
 TEST_TLS_EXE=test/tls/tls
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver$(ARCH_EXT).uptodate
 WEAVEEXEC_UPTODATE=.weaveexec$(ARCH_EXT).uptodate
-PLUGIN_UPTODATE=.plugin$(ARCH_EXT).uptodate
+PLUGIN_UPTODATE=.net-plugin$(ARCH_EXT).uptodate
 WEAVEKUBE_UPTODATE=.weavekube$(ARCH_EXT).uptodate
 WEAVENPC_UPTODATE=.weavenpc$(ARCH_EXT).uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE)
 
 # The names of the images. Note that the images for other architectures than amd64 have a suffix in the image name.
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave$(ARCH_EXT)
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec$(ARCH_EXT)
-PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin$(ARCH_EXT)
 WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube$(ARCH_EXT)
 WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc$(ARCH_EXT)
 BUILD_IMAGE=weaveworks/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
+PLUGIN_IMAGE=$(DOCKERHUB_USER)/net-plugin
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
+
+PLUGIN_WORK_DIR="prog/net-plugin/rootfs"
+PLUGIN_BUILD_IMG="plugin-builder"
 
 PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
 PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_plugin push_ml_weave-kube push_ml_weave-npc
@@ -152,12 +154,12 @@ testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVER_EXE): api/*.go plugin/*.go plugin/*/*
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go plugin/net/*.go plugin/ipam/*.go db/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
 $(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
-$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(RUNNER_EXE): tools/runner/*.go
 $(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/*.go
@@ -187,7 +189,7 @@ else
 
 exes: $(EXES)
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
+$(WEAVER_EXE) $(WEAVEPROXY_EXE):
 ifeq ($(COVERAGE),true)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | grep -v "^$(PACKAGE_BASE)/vendor/" | paste -s -d,))
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
@@ -264,8 +266,21 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
-$(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVER_UPTODATE)
-	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
+# Builds Docker plugin.
+$(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAVER_UPTODATE)
+	-$(SUDO) docker rm -f $(PLUGIN_BUILD_IMG) 2>/dev/null
+	$(SUDO) docker create --name=$(PLUGIN_BUILD_IMG) $(WEAVER_IMAGE) true
+	rm -rf $(PLUGIN_WORK_DIR)
+	mkdir $(PLUGIN_WORK_DIR)
+	$(SUDO) docker export $(PLUGIN_BUILD_IMG) | tar -x -C $(PLUGIN_WORK_DIR)
+	$(SUDO) docker rm -f $(PLUGIN_BUILD_IMG)
+	cp prog/net-plugin/launch.sh $(PLUGIN_WORK_DIR)/home/weave/launch.sh
+	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
+	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
+	$(SUDO) docker plugin create $(PLUGIN_IMAGE):$(WEAVE_VERSION) prog/net-plugin
+	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):latest 2>/dev/null
+	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):latest 2>/dev/null
+	$(SUDO) docker plugin create $(PLUGIN_IMAGE):latest prog/net-plugin
 	touch $@
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
@@ -292,6 +307,13 @@ tools/.git $(MANIFEST_TOOL_DIR)/.git:
 	git submodule update --init
 
 # CODE FOR PUBLISHING THE IMAGES
+
+# Push plugin
+plugin_publish: $(PLUGIN_UPTODATE)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):$(WEAVE_VERSION)
+ifneq ($(UPDATE_LATEST),false)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):latest
+endif
 
 # This target first runs "make publish" for each architecture
 # Then it pushes the manifest lists
@@ -345,13 +367,16 @@ ifneq ($(UPDATE_LATEST),false)
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
 endif
 
+clean-work-dir:
+	rm -rf $(PLUGIN_WORK_DIR)
+
 clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	find prog -type f -name "Dockerfile.*" -not -name "Dockerfile.template" -print | xargs rm -f
 	find prog -type f -name "*qemu-*" -print | xargs rm -f
 	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
 
-clean: clean-bin
+clean: clean-bin clean-work-dir
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
 	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE) $(MANIFEST_TOOL_EXE)
 

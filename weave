@@ -49,6 +49,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--no-restart] [--resume] [--no-discovery] [--no-dns]
                       [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
+                      [--plugin]
                       [--log-level=debug|info|warning|error]
                       <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
@@ -57,8 +58,6 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
-                      [--log-level=debug|info|warning|error]
-      launch-plugin [--no-restart] [--no-multicast-route]
                       [--log-level=debug|info|warning|error]
 
 weave prime
@@ -90,7 +89,6 @@ weave status        [targets | connections | peers | dns | ipam]
 weave stop
       stop-router
       stop-proxy
-      stop-plugin
 
 weave reset         [--force]
       rmpeer        <peer_id> ...
@@ -163,7 +161,6 @@ exec_remote() {
         -e WEAVE_MTU \
         -e WEAVE_NO_FASTDP \
         -e WEAVE_NO_BRIDGED_FASTDP \
-        -e WEAVE_NO_PLUGIN \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
@@ -262,15 +259,13 @@ fi
 # main (remote and --local) - settings
 ######################################################################
 
-# Default restart policy for router/proxy/plugin
+# Default restart policy for router/proxy
 RESTART_POLICY="--restart=always"
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 
-BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
-PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
-PLUGIN_CONTAINER_NAME=weaveplugin
+PLUGIN_NAME="$DOCKERHUB_USER/net-plugin"
 CNI_PLUGIN_NAME="weave-plugin-$IMAGE_VERSION"
 CNI_PLUGIN_DIR=${WEAVE_CNI_PLUGIN_DIR:-$HOST_ROOT/opt/cni/bin}
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
@@ -291,6 +286,7 @@ HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-127.0.0.1:6782}
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
+PROC_PATH="/proc"
 COVERAGE_ARGS=""
 [ -n "$COVERAGE" ] && COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
 
@@ -372,9 +368,9 @@ delete_iptables_rule() {
 # makes containers react more quickly to a change in the MAC address
 # associated with an IP address.
 configure_arp_cache() {
-    $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
-              echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
-              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
+    $2 sh -c "echo 5 >$PROC_PATH/sys/net/ipv4/neigh/$1/base_reachable_time &&
+              echo 2 >$PROC_PATH/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
+              echo 1 >$PROC_PATH/sys/net/ipv4/neigh/$1/ucast_solicit"
 }
 
 # Send out an ARP announcement
@@ -655,8 +651,10 @@ init_bridge_prep() {
     # Running this from 'weave --local' when weaveexec is not on the
     # path will run it as a Docker container that does not have access
     # to /etc/machine-id, so will not give the full range of persistent IDs
-    WEAVEDB_PATH=$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)
-    MAC=$(util_op unique-id "$HOST_ROOT/$WEAVEDB_PATH/weave" "$HOST_ROOT")
+    if [ -z "$WEAVEDB_DIR_PATH" ]; then
+        WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
+    fi
+    MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
 
     ip link set dev $BRIDGE address $MAC
 
@@ -809,6 +807,25 @@ attach() {
 ######################################################################
 # functions for interacting with containers
 ######################################################################
+
+# Docker Plugin V1 runs in a Docker container.
+is_plugin_v1_enabled() {
+    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME 2>/dev/null | grep -q -- "--plugin"
+}
+
+# The presence of Docker Plugin V2 can be checked only via 'docker plugin',
+# as v2 plugins do not run as regular containers.
+is_plugin_v2_enabled() {
+    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
+}
+
+# Check that plugin (v2) is not running.
+check_not_running_plugin_v2() {
+    if is_plugin_v2_enabled; then
+        echo "Docker plugin \"$PLUGIN_NAME\" is running; Aborting." >&2
+        return 1
+    fi
+}
 
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
@@ -1527,6 +1544,10 @@ launch_router() {
                 AWSVPC_ARGS="--awsvpc"
                 AWSVPC=1
                 ;;
+            --plugin)
+                PLUGIN_ARGS="--plugin"
+                ENABLE_PLUGIN=1
+                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1589,6 +1610,7 @@ launch_router() {
         --pid=host \
         --volumes-from $DB_CONTAINER_NAME \
         -v $RESOLV_CONF_DIR:/var/run/weave/etc \
+        -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1598,6 +1620,7 @@ launch_router() {
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
         $AWSVPC_ARGS \
+        $PLUGIN_ARGS \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
@@ -1605,6 +1628,11 @@ launch_router() {
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     setup_awsvpc
     populate_router
+
+    if [ -n "$ENABLE_PLUGIN" ]; then
+        wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME plugin-status.sock
+        util_op create-plugin-network weave weavemesh $IPRANGE
+    fi
 }
 
 setup_awsvpc() {
@@ -1612,11 +1640,11 @@ setup_awsvpc() {
         # Set proxy_arp on the bridge, so that it could accept packets destined
         # to containers within the same subnet but running on remote hosts.
         # Without it, exact routes on each container are required.
-        echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        echo 1 >$PROC_PATH/sys/net/ipv4/conf/$BRIDGE/proxy_arp
         # Avoid delaying the first ARP request. Also, setting it to 0 avoids
         # placing the request into a bounded queue as it can be seen:
         # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
-        echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
+        echo 0 >$PROC_PATH/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
         expose_ip
     fi
 }
@@ -1639,6 +1667,7 @@ populate_router() {
 }
 
 stop_router() {
+    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
 }
@@ -1680,53 +1709,9 @@ stop_proxy() {
     stop $PROXY_CONTAINER_NAME "Proxy"
 }
 
-launch_plugin_if_not_running() {
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            --no-restart)
-                RESTART_POLICY=
-                ;;
-            *)
-                break
-                ;;
-        esac
-        shift
-    done
-
-    retval=0
-    check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE || retval=$?
-    # If an existing plugin is running (we start it with restart=always), return its ID
-    [ $retval = 1 ] && PLUGIN_CONTAINER=$(container_id $PLUGIN_CONTAINER_NAME) && return 0
-    # Any other kind of error code from check_not_running is a failure.
-    [ $retval -gt 0 ] && return $retval
-
-    if ! PLUGIN_CONTAINER=$(docker run -d --name=$PLUGIN_CONTAINER_NAME \
-        $(docker_run_options) \
-        $RESTART_POLICY \
-        --pid=host \
-        -v /run/docker/plugins:/run/docker/plugins \
-        -e WEAVE_HTTP_ADDR \
-        $WEAVEPLUGIN_DOCKER_ARGS $PLUGIN_IMAGE $COVERAGE_ARGS \
-        "$@") ; then
-        return 1
-    fi
-    wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
-    WEAVE_IPAM_SUBNET=$(call_weave GET /ipinfo/defaultsubnet)
-    util_op create-plugin-network weave weavemesh $WEAVE_IPAM_SUBNET
-}
-
-plugin_disabled() {
-    [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
-}
-
-stop_plugin() {
-    util_op remove-plugin-network weave || true
-    stop $PLUGIN_CONTAINER_NAME "Plugin"
-}
-
 protect_against_docker_hang() {
     # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
-    if ! check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+    if ! is_plugin_v2_enabled 2>/dev/null ; then
         rm -f /run/docker/plugins/weave.sock /run/docker/plugins/weavemesh.sock
     fi
 }
@@ -1842,7 +1827,7 @@ handle_help_arg "$1"
 
 case "$COMMAND" in
     setup)
-        for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE $WEAVEDB_IMAGE ; do
+        for img in $IMAGE $EXEC_IMAGE $WEAVEDB_IMAGE ; do
             docker pull $img
         done
         setup_cni
@@ -1854,11 +1839,26 @@ case "$COMMAND" in
         [ $# -eq 0 ] || usage
         ask_version $CONTAINER_NAME $IMAGE || true
         ask_version $PROXY_CONTAINER_NAME $EXEC_IMAGE --entrypoint=/home/weave/weaveproxy || true
-        ask_version $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE || true
         ;;
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --proc-path=*)
+                    PROC_PATH="${1#*=}"
+                    shift
+                    ;;
+                --weavedb-dir-path=*)
+                    WEAVEDB_DIR_PATH="${1#*=}"
+                    shift
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
+
         if [ "$1" != "--force" ] ; then
             cat 1>&2 <<EOF
 WARNING: 'weave create-bridge' is deprecated. Instead use 'weave attach-bridge'
@@ -1880,6 +1880,7 @@ EOF
         else
             shift 1
         fi
+
         create_bridge --without-ethtool "$@"
         ;;
     attach-bridge)
@@ -1898,15 +1899,15 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
-        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+        check_not_running_plugin_v2
         COMMON_ARGS=$(common_launch_args "$@")
-        launch_router "$@"
+        launch_router --plugin "$@"
         launch_proxy  $COMMON_ARGS
-        plugin_disabled || launch_plugin_if_not_running $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME $BASE_IMAGE
+        check_not_running_plugin_v2
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -1924,16 +1925,9 @@ EOF
     launch-proxy)
         deprecation_warnings "$@"
         check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
+        check_not_running_plugin_v2
         launch_proxy "$@"
         echo $PROXY_CONTAINER
-        ;;
-    launch-plugin)
-        if ! check_running $CONTAINER_NAME 2>/dev/null ; then
-            echo "ERROR:" $CONTAINER_NAME "container must be running before plugin can be launched" >&2
-            exit 1
-        fi
-        launch_plugin_if_not_running "$@"
-        echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
@@ -1976,10 +1970,14 @@ EOF
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
         fi
-        if [ -z "$SUB_STATUS" ] && check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+        if [ -z "$SUB_STATUS" ] && is_plugin_v1_enabled ; then
             echo
-            echo "        Service: plugin"
+            echo "        Service: plugin (v1)"
             echo "     DriverName: weave"
+        elif [ -z "$SUB_STATUS" ] && is_plugin_v2_enabled ; then
+            echo
+            echo "        Service: plugin (v2)"
+            echo "     DriverName: $PLUGIN_NAME"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
@@ -2119,7 +2117,6 @@ EOF
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        plugin_disabled || stop_plugin
         stop_router
         stop_proxy
         ;;
@@ -2131,13 +2128,9 @@ EOF
         [ $# -eq 0 ] || usage
         stop_proxy
         ;;
-    stop-plugin)
-        [ $# -eq 0 ] || usage
-        stop_plugin
-        ;;
     reset)
         [ $# -eq 0 ] || [ $# -eq 1 -a "$1" = "--force" ] || usage
-        plugin_disabled || util_op remove-plugin-network weave || true
+        ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
         warn_if_stopping_proxy_in_env
         res=0
         [ "$1" = "--force" ] || check_running $CONTAINER_NAME 2>/dev/null || res=$?
@@ -2155,7 +2148,7 @@ EOF
                 exit 1
                 ;;
         esac
-        for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
+        for NAME in $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
         done

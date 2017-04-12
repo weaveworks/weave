@@ -41,11 +41,19 @@ func (w *watcher) ContainerStarted(id string) {
 			continue
 		}
 		if network.isOurs {
-			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
-			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-				w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+			if w.driver.dns {
+				fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
+				if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
+					w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+				}
 			}
-			if _, err := weavenet.WithNetNSByPid(info.State.Pid, "configure-arp", weavenet.VethName); err != nil {
+			rootDir := "/"
+			if w.driver.isPluginV2 {
+				// We bind mount host's /proc to /host/proc for plugin-v2
+				rootDir = "/host"
+			}
+			netNSPath := weavenet.NSPathByPidWithRoot(rootDir, info.State.Pid)
+			if _, err := weavenet.WithNetNS(netNSPath, "configure-arp", weavenet.VethName); err != nil {
 				w.driver.warn("ContainerStarted", "unable to configure interfaces: %s", err)
 			}
 		}

@@ -3,7 +3,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-IMAGE="joffrey/docker-py:1.8.1"
+IMAGE="joffrey/docker-py:1.9.0-rc2"
 
 docker_py_test() {
     SHARD=$1
