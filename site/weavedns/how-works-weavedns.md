@@ -6,7 +6,7 @@ menu_order: 10
 
 The weaveDNS service running on every host acts as the nameserver for
 containers on that host. It learns about hostnames for local containers
-from the proxy and from the `weave run` command.  
+from the proxy and from the `weave attach` command.  
 
 If a hostname is in the `.weave.local` domain, then weaveDNS records the association of that
 name with the container's Weave Net IP address(es) in its in-memory
@@ -37,7 +37,7 @@ In the event that weaveDNS is launched in this way, it's important that
 other calls to `weave` also specify the bridge device:
 
 ```
-$ sudo DOCKER_BRIDGE=someother weave run ...
+$ sudo DOCKER_BRIDGE=someother weave attach ...
 ```
 
 **See Also**

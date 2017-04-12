@@ -7,7 +7,7 @@ menu_order: 70
 Weave Net automatically assigns containers a unique IP address
 across the network, and also releases that address when the container
 exits. Unless you explicitly specify an address, this occurs for all
-invocations of the `run`, `start`,
+invocations of the
 `attach`, `detach`, `expose`, and `hide` commands. Weave Net can also assign
 addresses in multiple subnets.
 

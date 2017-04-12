@@ -20,6 +20,22 @@ where,
 
 >Note If you are using the Weave Docker API proxy, it will have modified `DOCKER_HOST` to point to the proxy and therefore you will have to pass `-e WEAVE_CIDR=none` to start a container that _doesn't_ get automatically attached to the weave network for the purposes of this example.
 
+If `weave attach` sees the container has a hostname with a
+domain-name, it will add those into WeaveDNS (unless you turn this off
+with the `--without-dns` argument).
+
+    host1$ docker run -dti --name=c1 --hostname=c1.weave.local weaveworks/ubuntu
+    host1$ weave attach c1
+    10.32.0.1
+    host1$ weave dns-lookup c1
+    10.32.0.1
+
+If you would like `/etc/hosts` to contain the Weave Net address (the
+same way [the proxy does](/site/weave-docker-api/name-resolution-proxy.md)),
+specify `--rewrite-hosts` when running `weave attach`:
+
+    host1$ weave attach --rewrite-hosts c1
+
 ### Dynamically Detaching Containers
 
 A container can be detached from a subnet, by using the `weave detach` command:

@@ -62,7 +62,7 @@ assert_equal() {
     assert "echo $result" "$expected"
 }
 
-start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr arguments"
+start_suite "Weave attach/detach/expose/hide with multiple cidr arguments"
 
 # also check that these commands understand all address flavours
 
@@ -73,15 +73,8 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 weave_on $HOST1 launch-router --ipalloc-range 10.2.3.0/24
 
 # Run container with three cidrs
-CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME)
-assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
-
-# Stop the container
-docker_on              $HOST1 stop -t 1 $CID
-assert_ips_and_dns     $HOST1 $CID $NAME.
-
-# Restart with three IPs
-weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
+CID=$(docker_on  $HOST1 run --name=multicidr -h $NAME -dt $SMALL_IMAGE /bin/sh)
+weave_on         $HOST1 attach            10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Remove two of them

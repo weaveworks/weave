@@ -34,8 +34,4 @@ assert_expected_fqdn "$HOSTNAME"     -h $HOSTNAME         --name=$NAME
 assert_expected_fqdn "$HOSTNAME"     --hostname=$HOSTNAME --name=$NAME
 assert_expected_fqdn "$HOSTNAME"     --hostname $HOSTNAME --name=$NAME
 
-# Ensure we can launch a container with a name that is too long for hostname derivation
-SIXTY_FIVE_CHARS=01234567890123456789012345678901234567890123456789012345678901234
-assert_raises "start_container $HOST1 --name=$SIXTY_FIVE_CHARS"
-
 end_suite

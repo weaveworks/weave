@@ -46,6 +46,15 @@ DOCKER_PORT=2375
 
 CHECKPOINT_DISABLE=true
 
+# The regexp here is far from precise, but good enough. (taken from weave script)
+IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+CIDR_REGEXP="(ip:|net:)?$IP_REGEXP/[0-9]{1,2}"
+
+is_cidr() {
+    [ $1 = "net:default" ] && return
+    echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
+}
+
 upload_executable() {
     host=$1
     file=$2
@@ -140,16 +149,54 @@ exec_on() {
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
 
+# Look through 'docker run' args and try to make the hostname match the name
+dns_args() {
+    local host=$1 NAME_ARG="" HOSTNAME_SPECIFIED=""
+    shift
+    weave_on $host dns-args "$@"
+    while [ $# -gt 0 ] ; do
+        case "$1" in
+            --name)
+                NAME_ARG="$2"
+                shift
+                ;;
+            --name=*)
+                NAME_ARG="${1#*=}"
+                ;;
+            -h|--hostname|--hostname=*)
+                HOSTNAME_SPECIFIED=1
+                ;;
+        esac
+        shift
+    done
+    if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
+        echo " --hostname=$NAME_ARG.weave.local"
+    fi
+}
+
+start_container_image() {
+    local image=$1 host=$2 cidr="" weave_dns_args="" container
+    shift 2
+    if [ "$1" = "--without-dns" ] ; then
+        shift
+    else
+        weave_dns_args=$(dns_args $host "$@")
+    fi
+    is_cidr $1 && { cidr=$1; shift; }
+    container=$(docker_on $host run $weave_dns_args $name_args "$@" -dt $image /bin/sh)
+    if ! weave_on $host attach $cidr $container >/dev/null ; then
+        docker_on $host rm -f $container
+        return 1
+    fi
+    echo $container
+}
+
 start_container() {
-    host=$1
-    shift 1
-    weave_on $host run "$@" -t $SMALL_IMAGE /bin/sh
+    start_container_image $SMALL_IMAGE "$@"
 }
 
 start_container_with_dns() {
-    host=$1
-    shift 1
-    weave_on $host run "$@" -t $DNS_IMAGE /bin/sh
+    start_container_image $DNS_IMAGE "$@"
 }
 
 start_container_local_plugin() {
