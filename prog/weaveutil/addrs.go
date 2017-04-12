@@ -27,10 +27,25 @@ func containerAddrs(args []string) error {
 		return err
 	}
 
+	containerArgs := []string{}
+	for _, cid := range args[1:] {
+		if cid == "weave:allids" { // expand to all container IDs
+			all, err := client.ListContainers(docker.ListContainersOptions{All: true})
+			if err != nil {
+				return err
+			}
+			for _, c := range all {
+				containerArgs = append(containerArgs, c.ID)
+			}
+		} else {
+			containerArgs = append(containerArgs, cid)
+		}
+	}
+
 	var containerIDs []string
 	containers := make(map[string]*docker.Container)
 
-	for _, cid := range args[1:] {
+	for _, cid := range containerArgs {
 		if cid == "weave:expose" {
 			netDev, err := weavenet.GetBridgeNetDev(bridgeName)
 			if err != nil {
