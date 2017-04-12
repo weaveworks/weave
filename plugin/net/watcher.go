@@ -53,7 +53,7 @@ func (w *watcher) ContainerStarted(id string) {
 				rootDir = "/host"
 			}
 			netNSPath := weavenet.NSPathByPidWithRoot(rootDir, info.State.Pid)
-			if _, err := weavenet.WithNetNS(netNSPath, "configure-arp", weavenet.VethName); err != nil {
+			if _, err := weavenet.WithNetNS(netNSPath, "configure-arp", weavenet.VethName, rootDir); err != nil {
 				w.driver.warn("ContainerStarted", "unable to configure interfaces: %s", err)
 			}
 		}

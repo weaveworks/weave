@@ -17,8 +17,8 @@ func detectBridgeType(args []string) error {
 }
 
 func createBridge(args []string) error {
-	if len(args) != 9 {
-		cmdUsage("create-bridge", "<docker-bridge-name> <weave-bridge-name> <datapath-name> <mtu> <port> <mac> <no-fastdp> <no-bridged-fastdp> <expect-npc>")
+	if len(args) != 10 {
+		cmdUsage("create-bridge", "<docker-bridge-name> <weave-bridge-name> <datapath-name> <mtu> <port> <mac> <no-fastdp> <no-bridged-fastdp> <proc-path> <expect-npc>")
 	}
 
 	mtu, err := strconv.Atoi(args[3])
@@ -38,9 +38,10 @@ func createBridge(args []string) error {
 		Mac:              args[5],
 		NoFastdp:         args[6] != "",
 		NoBridgedFastdp:  args[7] != "",
-		ExpectNPC:        args[8] == "--expect-npc",
+		ExpectNPC:        args[9] == "--expect-npc",
 	}
-	bridgeType, err := weavenet.CreateBridge(&config)
+	procPath := args[8]
+	bridgeType, err := weavenet.CreateBridge(procPath, &config)
 	fmt.Println(bridgeType.String())
 	return err
 }

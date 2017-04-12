@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
@@ -71,7 +72,7 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 var ErrSetBridgeMac = errors.New("Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)")
 
 func EnforceAddrAssignType(bridgeName string) error {
-	sysctlFilename := fmt.Sprintf("/sys/class/net/%s/addr_assign_type", bridgeName)
+	sysctlFilename := filepath.Join("/sys/class/net/", bridgeName, "/addr_assign_type")
 	addrAssignType, err := ioutil.ReadFile(sysctlFilename)
 	if err != nil {
 		return errors.Wrapf(err, "reading %q", sysctlFilename)
@@ -186,7 +187,7 @@ type BridgeConfig struct {
 	Port             int
 }
 
-func CreateBridge(config *BridgeConfig) (BridgeType, error) {
+func CreateBridge(procPath string, config *BridgeConfig) (BridgeType, error) {
 	bridgeType := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
 
 	if bridgeType == None {
@@ -231,13 +232,13 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 		// Set proxy_arp on the bridge, so that it could accept packets destined
 		// to containers within the same subnet but running on remote hosts.
 		// Without it, exact routes on each container are required.
-		if err := sysctl("net/ipv4/conf/"+config.WeaveBridgeName+"/proxy_arp", "1"); err != nil {
+		if err := sysctl(procPath, "net/ipv4/conf/"+config.WeaveBridgeName+"/proxy_arp", "1"); err != nil {
 			return bridgeType, errors.Wrap(err, "setting proxy_arp")
 		}
 		// Avoid delaying the first ARP request. Also, setting it to 0 avoids
 		// placing the request into a bounded queue as it can be seen:
 		// https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
-		if err := sysctl("net/ipv4/neigh/"+config.WeaveBridgeName+"/proxy_delay", "0"); err != nil {
+		if err := sysctl(procPath, "net/ipv4/neigh/"+config.WeaveBridgeName+"/proxy_delay", "0"); err != nil {
 			return bridgeType, errors.Wrap(err, "setting proxy_arp")
 		}
 	}
@@ -252,7 +253,7 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 		return bridgeType, err
 	}
 
-	if err := ConfigureARPCache(config.WeaveBridgeName); err != nil {
+	if err := ConfigureARPCache(procPath, config.WeaveBridgeName); err != nil {
 		return bridgeType, errors.Wrapf(err, "configuring ARP cache on bridge %q", config.WeaveBridgeName)
 	}
 

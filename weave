@@ -429,7 +429,7 @@ try_create_bridge() {
         WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
     fi
     MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$1")
+    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
     # Set some variables that are expected by code that comes later
     [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
