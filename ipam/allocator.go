@@ -265,6 +265,10 @@ func (alloc *Allocator) tryPendingOps() {
 	alloc.tryOps(&alloc.pendingAllocates)
 }
 
+func (alloc *Allocator) havePendingOps() bool {
+	return len(alloc.pendingPrimes)+len(alloc.pendingClaims)+len(alloc.pendingAllocates) > 0
+}
+
 func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range) {
 	for i := 0; i < len(alloc.pendingClaims); {
 		claim := alloc.pendingClaims[i].(*claim)
@@ -696,8 +700,12 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func(), stopChan <-chan stru
 			// Retry things in case messages got lost between here and recipients
 			if alloc.awaitingConsensus {
 				alloc.propose()
-			} else {
-				alloc.tryPendingOps()
+			} else if alloc.havePendingOps() {
+				if alloc.ring.Empty() {
+					alloc.establishRing()
+				} else {
+					alloc.tryPendingOps()
+				}
 			}
 			alloc.removeDeadContainers()
 		}
