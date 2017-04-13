@@ -170,6 +170,7 @@ func main() {
 	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
 	mflag.StringVar(&bridgeConfig.WeaveBridgeName, []string{"-weave-bridge"}, "weave", "name of weave bridge")
 	mflag.StringVar(&bridgeConfig.DockerBridgeName, []string{"-docker-bridge"}, "", "name of Docker bridge")
+	mflag.BoolVar(&bridgeConfig.ExpectNPC, []string{"-expect-npc"}, false, "set up iptables rules for npc")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
