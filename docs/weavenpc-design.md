@@ -77,8 +77,10 @@ iptables -A WEAVE-NPC -m state --state NEW -j WEAVE-NPC-INGRESS
 
 To direct traffic into the policy engine:
 
+```
 iptables -A FORWARD -o weave -m physdev ! --physdev-out vethwe-bridge -j WEAVE-NPC
 iptables -A FORWARD -o weave -m physdev ! --physdev-out vethwe-bridge -j DROP
+```
 
 Note this only affects traffic which egresses the bridge on a physical
 port which is not the Weave Net router - in other words, it is
