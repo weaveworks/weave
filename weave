@@ -1866,17 +1866,6 @@ to link the docker and weave bridges after both docker and weave have been
 started. Note that, unlike 'weave create-bridge', 'weave attach-bridge' is
 compatible with fast data path.
 EOF
-            # This subcommand may be run without the docker daemon, but
-            # fastdp needs to run the router container to setup the ODP
-            # bridge, hence:
-            if [ -z "$WEAVE_NO_FASTDP" ] ; then
-                cat 1>&2 <<EOF
-
-ERROR: 'weave create-bridge' is not compatible with fast data path. If you
-really want to do this please set the WEAVE_NO_FASTDP environment variable.
-EOF
-                exit 1
-            fi
         else
             shift 1
         fi
