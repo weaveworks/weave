@@ -126,8 +126,8 @@ IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $
 PLUGIN_WORK_DIR="prog/net-plugin/rootfs"
 PLUGIN_BUILD_IMG="plugin-builder"
 
-PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
-PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_plugin push_ml_weave-kube push_ml_weave-npc
+PUBLISH=publish_weave publish_weaveexec publish_weave-kube publish_weave-npc
+PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_weave-kube push_ml_weave-npc
 
 WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
 
