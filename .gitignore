@@ -70,3 +70,6 @@ test/coverage.*
 *qemu-*-static
 terraform.tfstate
 terraform.tfstate.backup
+
+# Website
+site-build
