@@ -136,7 +136,7 @@ exec_options() {
             ;;
         # All the other commands that may create the bridge and need machine id files.
         # We don't mount '/' to avoid recursive mounts of '/var'
-        create-bridge|attach-router|run|start|attach|restart|expose|hide)
+        create-bridge|attach-router|attach|expose|hide)
             echo -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus -e HOST_ROOT=/host
             ;;
     esac
@@ -799,7 +799,7 @@ ask_version() {
 attach() {
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
-    # Relying on AWSVPC being set in 'ipam_cidrs allocate', except for 'weave restart'
+    # Relying on AWSVPC being set in 'ipam_cidrs allocate'
     [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
