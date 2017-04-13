@@ -1990,7 +1990,7 @@ EOF
             call_weave GET /report -H 'Accept: application/json'
         fi
         ;;
-    run|start|restart)
+    run|start|restart|launch-plugin|stop-plugin)
         echo "The 'weave $COMMAND' command has been removed as of Weave Net version 2.0" >&2
         echo "Please see release notes for further information" >&2
         exit 1
