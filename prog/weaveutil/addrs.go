@@ -30,7 +30,7 @@ func containerAddrs(args []string) error {
 	containerArgs := []string{}
 	for _, cid := range args[1:] {
 		if cid == "weave:allids" { // expand to all container IDs
-			all, err := client.ListContainers(docker.ListContainersOptions{All: true})
+			all, err := client.ListContainers(docker.ListContainersOptions{})
 			if err != nil {
 				return err
 			}
