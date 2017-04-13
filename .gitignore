@@ -71,3 +71,6 @@ test/coverage.*
 terraform.tfstate
 terraform.tfstate.backup
 prog/net-plugin/rootfs/
+
+# Website
+site-build
