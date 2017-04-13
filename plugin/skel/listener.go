@@ -146,7 +146,7 @@ func (listener *listener) createEndpoint(w http.ResponseWriter, r *http.Request)
 func (listener *listener) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	var delete api.DeleteEndpointRequest
 	if err := json.NewDecoder(r.Body).Decode(&delete); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.DeleteEndpoint(&delete))
@@ -155,7 +155,7 @@ func (listener *listener) deleteEndpoint(w http.ResponseWriter, r *http.Request)
 func (listener *listener) infoEndpoint(w http.ResponseWriter, r *http.Request) {
 	var req api.EndpointInfoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	info, err := listener.d.EndpointInfo(&req)
@@ -165,7 +165,7 @@ func (listener *listener) infoEndpoint(w http.ResponseWriter, r *http.Request) {
 func (listener *listener) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	var join api.JoinRequest
 	if err := json.NewDecoder(r.Body).Decode(&join); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	res, err := listener.d.JoinEndpoint(&join)
@@ -195,7 +195,7 @@ func (listener *listener) networkFree(w http.ResponseWriter, r *http.Request) {
 func (listener *listener) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	var l api.LeaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&l); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.LeaveEndpoint(&l))
@@ -204,7 +204,7 @@ func (listener *listener) leaveEndpoint(w http.ResponseWriter, r *http.Request) 
 func (listener *listener) discoverNew(w http.ResponseWriter, r *http.Request) {
 	var disco api.DiscoveryNotification
 	if err := json.NewDecoder(r.Body).Decode(&disco); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.DiscoverNew(&disco))
@@ -213,7 +213,7 @@ func (listener *listener) discoverNew(w http.ResponseWriter, r *http.Request) {
 func (listener *listener) discoverDelete(w http.ResponseWriter, r *http.Request) {
 	var disco api.DiscoveryNotification
 	if err := json.NewDecoder(r.Body).Decode(&disco); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.DiscoverDelete(&disco))
