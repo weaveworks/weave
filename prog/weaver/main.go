@@ -384,6 +384,9 @@ func main() {
 		ns.Start()
 		defer ns.Stop()
 		dnsserver.ActivateAndServe()
+		if dockerCli != nil {
+			populateDNS(ns, dockerCli, name, bridgeConfig.WeaveBridgeName)
+		}
 		defer dnsserver.Stop()
 	}
 

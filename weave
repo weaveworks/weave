@@ -1417,7 +1417,6 @@ launch_router() {
         "$@")
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     setup_awsvpc
-    populate_router
 
     if [ -n "$ENABLE_PLUGIN" ]; then
         wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME plugin-status.sock
@@ -1435,17 +1434,6 @@ setup_awsvpc() {
 fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
-}
-
-populate_dns_for_one_container() {
-    [ -z "$4" ] || with_container_fqdn $1 put_dns_fqdn $4
-}
-
-populate_router() {
-    if [ -z "$NO_DNS_OPT" ] ; then
-        # Tell the newly-started weaveDNS about existing weave IPs
-        with_container_addresses populate_dns_for_one_container weave:allids
-    fi
 }
 
 stop_router() {
@@ -1673,7 +1661,6 @@ EOF
         fetch_router_args
         wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
         setup_awsvpc
-        populate_router
         ;;
     launch-proxy)
         deprecation_warnings "$@"
