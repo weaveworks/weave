@@ -1625,22 +1625,6 @@ case "$COMMAND" in
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --proc-path=*)
-                    PROC_PATH="${1#*=}"
-                    shift
-                    ;;
-                --weavedb-dir-path=*)
-                    WEAVEDB_DIR_PATH="${1#*=}"
-                    shift
-                    ;;
-                *)
-                    break
-                    ;;
-            esac
-        done
-
         if [ "$1" != "--force" ] ; then
             cat 1>&2 <<EOF
 WARNING: 'weave create-bridge' is deprecated. Instead use 'weave attach-bridge'

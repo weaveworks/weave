@@ -29,22 +29,11 @@ SWARM_MANAGER_PEERS=$(/usr/bin/weaveutil swarm-manager-peers)
 # Prevent from restoring from a persisted peers list
 rm -f "/restart.sentinel"
 
-/home/weave/weave --local create-bridge \
-    --proc-path=/host/proc \
-    --weavedb-dir-path=$WEAVE_DIR \
-    --force
-
-BRIDGE_OPTIONS="--datapath=datapath"
-if [ "$(/home/weave/weave --local bridge-type)" = "bridge" ]; then
-    # TODO: Call into weave script to do this
-    if ! ip link show vethwe-pcap >/dev/null 2>&1; then
-        ip link add name vethwe-bridge type veth peer name vethwe-pcap
-        ip link set vethwe-bridge up
-        ip link set vethwe-pcap up
-        ip link set vethwe-bridge master weave
-    fi
-    BRIDGE_OPTIONS="--iface=vethwe-pcap"
-fi
+router_bridge_opts() {
+    echo --datapath=datapath
+    [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
+    [ -z "$WEAVE_NO_FASTDP" ] || echo --no-fastdp
+}
 
 if [ -z "$IPALLOC_INIT" ]; then
     IPALLOC_INIT="observer"
@@ -53,7 +42,9 @@ if [ -z "$IPALLOC_INIT" ]; then
     fi
 fi
 
-exec /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
+exec /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
+    --host-root=/host \
+    --proc-path=/host/proc \
     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR \
     --no-dns \
     --ipalloc-range=$IPALLOC_RANGE \
