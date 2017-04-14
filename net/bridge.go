@@ -25,6 +25,7 @@ const (
 	Bridge
 	Fastdp
 	BridgedFastdp
+	AWSVPC
 	Inconsistent
 )
 
@@ -39,6 +40,8 @@ func (t BridgeType) String() string {
 		return "fastdp"
 	case BridgedFastdp:
 		return "bridged_fastdp"
+	case AWSVPC:
+		return "AWSVPC"
 	case Inconsistent:
 		return "inconsistent"
 	}
@@ -58,6 +61,7 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 		return Fastdp
 	case isDatapath(datapath) && isBridge(bridge):
 		return BridgedFastdp
+	// TODO: AWSVPC
 	default:
 		return Inconsistent
 	}
