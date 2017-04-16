@@ -1,6 +1,7 @@
 package address
 
 import (
+	"net"
 	"testing"
 	"testing/quick"
 
@@ -66,4 +67,16 @@ func TestCIDRStartAndEnd(t *testing.T) {
 	cidr, _ := ParseCIDR("10.0.0.0/24")
 	require.Equal(t, ip("10.0.0.0"), cidr.Start(), "")
 	require.Equal(t, ip("10.0.1.0"), cidr.End(), "")
+}
+
+func TestConversions(t *testing.T) {
+	addrStr := "10.2.3.0"
+	cidrStr := addrStr + "/24"
+	addr := ip(addrStr)
+	require.Equal(t, addr.String(), addrStr)
+	require.Equal(t, addr.IP4(), net.ParseIP(addrStr).To4())
+	cidr, _ := ParseCIDR(cidrStr)
+	require.Equal(t, cidr.String(), cidrStr)
+	_, ipnet, _ := net.ParseCIDR(cidrStr)
+	require.Equal(t, cidr.IPNet(), ipnet)
 }
