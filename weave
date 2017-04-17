@@ -1024,9 +1024,6 @@ dns_args() {
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
-            --with-dns)
-                echo "Warning: $1 is deprecated; it is on by default" >&2
-                ;;
             --without-dns)
                 WITHOUT_DNS=1
                 ;;
@@ -1712,51 +1709,14 @@ deprecation_warning() {
 deprecation_warnings() {
     while [ $# -gt 0 ]; do
         case "$1" in
-            -password|-password=*)
-                deprecation_warning $1 "--password"
-                [ "$1" = "-password" ] && shift
-                ;;
-            --password)
+            # Flags that have a following argument which should not be inspected
+            --password|--nickname|--ipalloc-range|--ipalloc-default-subnet)
                 shift
-                ;;
-            -nickname|-nickname=*)
-                deprecation_warning $1 "--nickname"
-                [ "$1" = "-nickname" ] && shift
-                ;;
-            --nickname)
-                shift
-                ;;
-            -nodiscovery|--nodiscovery)
-                deprecation_warning $1 "--no-discovery"
-                ;;
-            -iprange|--iprange|-iprange=*|--iprange=*)
-                deprecation_warning $1 "--ipalloc-range"
-                [ ${1#--} = "iprange" ] && shift
-                ;;
-            --ipalloc-range)
-                shift
-                ;;
-            -ipsubnet|--ipsubnet|-ipsubnet=*|--ipsubnet=*)
-                deprecation_warning $1 "--ipalloc-default-subnet"
-                [ ${1#--} = "ipsubnet" ] && shift
-                ;;
-            --ipalloc-default-subnet)
-                shift
-                ;;
-            -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
-                deprecation_warning $1 "--ipalloc-init consensus=<count>"
-                [ ${1#--} = "initpeercount" ] && shift
                 ;;
             --init-peer-count|--init-peer-count=*)
                 deprecation_warning $1 "--ipalloc-init consensus=<count>"
                 [ ${1#--} = "init-peer-count" ] && shift
                 shift
-                ;;
-            -no-default-ipam|--no-default-ipam)
-                deprecation_warning $1 "--no-default-ipalloc"
-                ;;
-            --with-dns)
-                echo "Warning: $1 has been removed; DNS is on by default" >&2
                 ;;
         esac
         shift
@@ -1903,15 +1863,13 @@ EOF
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
-    env|proxy-env)
-        [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
+    env)
         if PROXY_ADDR=$(proxy_addr) ; then
             [ "$PROXY_ADDR" = "$DOCKER_CLIENT_HOST" ] || RESTORE="ORIG_DOCKER_HOST=$DOCKER_CLIENT_HOST"
             echo "export DOCKER_HOST=$PROXY_ADDR $RESTORE"
         fi
         ;;
-    config|proxy-config)
-        [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
+    config)
         PROXY_ADDR=$(proxy_addr) && echo "-H=$PROXY_ADDR"
         ;;
     connect)
