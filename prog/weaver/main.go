@@ -430,7 +430,23 @@ func main() {
 		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
 	}
 
+	if bridgeConfig.IsAWSVPC {
+		// Run this on its own goroutine because the allocator can block
+		// We remove the default route installed by the kernel,
+		// because awsvpc has installed it as well
+		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.IsAWSVPC)
+	}
+
 	signals.SignalHandlerLoop(common.Log, router)
+}
+
+func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool) {
+	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
+	checkFatal(err)
+	cidr := address.MakeCIDR(subnet, addr)
+	err = weavenet.AddBridgeAddr(bridgeName, cidr.IPNet(), removeDefaultRoute)
+	checkFatal(err)
+	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
 }
 
 func options() map[string]string {

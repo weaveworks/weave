@@ -474,12 +474,6 @@ expose_ip() {
         if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
             ip addr add dev $BRIDGE $CIDR
             arp_update $BRIDGE $CIDR || true
-            # Remove a default route installed by the kernel, because awsvpc
-            # has installed it as well
-            if [ -n "$AWSVPC" ]; then
-                RCIDR=$(ip route list exact $CIDR proto kernel | head -n1 | cut -d' ' -f1)
-                [ -n "$RCIDR" ] && ip route del dev $BRIDGE proto kernel $RCIDR
-            fi
         fi
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
@@ -1416,17 +1410,10 @@ launch_router() {
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
         "$@")
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-    setup_awsvpc
 
     if [ -n "$ENABLE_PLUGIN" ]; then
         wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME plugin-status.sock
         util_op create-plugin-network weave weavemesh $IPRANGE
-    fi
-}
-
-setup_awsvpc() {
-    if [ -n "$AWSVPC" ]; then
-        expose_ip
     fi
 }
 
@@ -1660,7 +1647,6 @@ EOF
         ! docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--awsvpc" || AWSVPC=1
         fetch_router_args
         wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-        setup_awsvpc
         ;;
     launch-proxy)
         deprecation_warnings "$@"
