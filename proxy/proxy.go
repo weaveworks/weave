@@ -408,11 +408,6 @@ func containerShouldAttach(container *docker.Container) bool {
 	return len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveWaitEntrypoint[0]
 }
 
-func containerIsWeaveRouter(container *docker.Container) bool {
-	return container.Name == weaveContainerName &&
-		len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveEntrypoint
-}
-
 func (proxy *Proxy) createWait(r *http.Request, ident string) {
 	proxy.Lock()
 	proxy.waiters[r] = &wait{ident: ident, ch: make(chan error, 1)}
@@ -488,10 +483,6 @@ func (proxy *Proxy) attach(containerID string) error {
 			Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", containerID, err)
 		}
 		return nil
-	}
-	if containerIsWeaveRouter(container) {
-		Log.Infof("Attaching weave router container: %s", container.ID)
-		return callWeaveAttach(container, []string{"attach-router"})
 	}
 	if !containerShouldAttach(container) || !container.State.Running {
 		return nil

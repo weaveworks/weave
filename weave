@@ -136,7 +136,7 @@ exec_options() {
             ;;
         # All the other commands that may create the bridge and need machine id files.
         # We don't mount '/' to avoid recursive mounts of '/var'
-        create-bridge|attach-router|attach|expose|hide)
+        create-bridge|attach|expose|hide)
             echo -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus -e HOST_ROOT=/host
             ;;
     esac
@@ -1417,12 +1417,6 @@ launch_router() {
     fi
 }
 
-# Recreate the parameter values that are set when the router is first launched
-fetch_router_args() {
-    CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
-    NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
-}
-
 stop_router() {
     ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
     stop $CONTAINER_NAME "Weave"
@@ -1639,14 +1633,6 @@ EOF
         check_not_running_plugin_v2
         launch_router "$@"
         echo $ROUTER_CONTAINER
-        ;;
-    attach-router)
-        check_running $CONTAINER_NAME
-        enforce_docker_bridge_addr_assign_type
-        # We cannot use detect_awsvpc here, because HTTP server might not be started
-        ! docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--awsvpc" || AWSVPC=1
-        fetch_router_args
-        wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
         ;;
     launch-proxy)
         deprecation_warnings "$@"
