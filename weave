@@ -1559,17 +1559,6 @@ if ! command_exists ip ; then
     exit 1
 fi
 
-if ! ip netns list >/dev/null 2>&1 ; then
-    echo "ERROR: $(ip -V) does not support network namespaces." >&2
-    echo "       Please install iproute2-ss111010 or later." >&2
-    exit 1
-fi
-
-if ! command_exists nsenter ; then
-    echo "ERROR: nsenter utility missing. Please install it." >&2
-    exit 1
-fi
-
 [ $# -gt 0 ] || usage
 COMMAND=$1
 shift 1
