@@ -388,10 +388,6 @@ EOF
     fi
 }
 
-enforce_docker_bridge_addr_assign_type() {
-    util_op enforce-addr-assign "$DOCKER_BRIDGE" || true
-}
-
 # Detect the current bridge/datapath state. When invoked, the values of
 # $BRIDGE and $DATAPATH are expected to be distinct. $BRIDGE_TYPE and
 # $DATAPATH are set correctly on success; failure indicates that the
