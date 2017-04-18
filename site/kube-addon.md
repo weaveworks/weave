@@ -31,7 +31,6 @@ network.
 - add `sudo`,
 - add `--kubeconfig /etc/kubernetes/admin.conf` (or equivalent),
 
-to the above `kubectl version` command.
 
 **Note:** This command requires Kubernetes 1.4 or later.
 
@@ -57,6 +56,31 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 
 Then relaunch Kubernetes and install the addon as described
 above.
+
+**Note:** You can customise the generated YAML file by passing Weave-Kube options, arguments and environment variables as query parameters:
+  - `version`: Weave-Kube's version. Default: latest release.
+  - `known-peers`: comma-separated list of hosts. Default: empty.
+  - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
+  - `disable-npc`: boolean (`true|false`). Default: `false`.
+  - `enable-encryption`: boolean (`true|false`). Default: `false`.
+  - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
+
+Example:
+```
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.MTU=1337"
+```
+This command generates a YAML file containing, among others:
+
+```
+[...]
+          containers:
+            - name: weave
+[...]
+              env:
+                - name: MTU
+                  value: '1337'
+[...]
+```
 
 **Note:** URLs [git.io/weave-kube](https://git.io/weave-kube) and [git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point respectively to [cloud.weave.works/k8s/v1.5/net](https://cloud.weave.works/k8s/v1.5/net) and [cloud.weave.works/k8s/v1.6/net](https://cloud.weave.works/k8s/v1.6/net).
 In the past, these URLs were pointing to static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml)
