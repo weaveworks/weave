@@ -21,16 +21,8 @@ The following topics are discussed:
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
-* Kubernetes versions `1.6` and above:
-
 ```
-$ kubectl apply -f https://git.io/weave-kube-1.6
-```
-
-* Kubernetes versions up to `1.5`:
-
-```
-$ kubectl apply -f https://git.io/weave-kube
+$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
 After a few seconds, a Weave Net pod should be running on each
@@ -63,10 +55,20 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-The URLs [https://git.io/weave-kube](https://git.io/weave-kube) and [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point
-to the YAML file for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon.
-Historic versions are archived on our [GitHub release
-page](https://github.com/weaveworks/weave/releases).
+**Note:** The URLs:
+
+- [https://git.io/weave-kube](https://git.io/weave-kube), and
+- [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6)
+
+point to:
+
+- [https://cloud.weave.works/k8s/v1.5/net](https://cloud.weave.works/k8s/v1.5/net), and
+- [https://cloud.weave.works/k8s/v1.6/net](https://cloud.weave.works/k8s/v1.6/net).
+
+In the past, these URLs pointed to the static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively:
+
+- [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and
+- [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml).
 
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
@@ -205,21 +207,16 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 
 ### <a name="configuration-options"></a> Changing Configuration Options
 
-The default configuration settings can be changed by saving and editing the
-addon YAML before running `kubectl apply`. Additional arguments may be
-supplied to the Weave router process by adding them to the `command:`
-array in the YAML file.
+#### Using `cloud.weave.works`
 
-Some parameters are changed by environment variables; these can be
-inserted into the YAML file like this:
+If the YAML file is from `cloud.weave.works` as described above, then you can customise it by passing some of Weave Net's options, arguments and environment variables as query parameters:
 
-```
-      containers:
-        - name: weave
-          env:
-            - name: IPALLOC_RANGE
-              value: 10.0.0.0/16
-```
+  - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time from `cloud.weave.works`.
+  - `known-peers`: comma-separated list of hosts. Default: empty.
+  - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
+  - `disable-npc`: boolean (`true|false`). Default: `false`.
+  - `enable-encryption`: boolean (`true|false`). Default: `false`.
+  - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
 
 The list of variables you can set is:
 
@@ -241,3 +238,41 @@ The list of variables you can set is:
   a larger size for better performance if your network supports jumbo
   frames - see [here](/site/using-weave/fastdp.md#mtu) for more
   details.
+
+Example:
+```
+$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
+```
+This command -- notice `&env.WEAVE_MTU=1337` at the end of the URL -- generates a YAML file containing, among others:
+
+```
+[...]
+          containers:
+            - name: weave
+[...]
+              env:
+                - name: WEAVE_MTU
+                  value: '1337'
+[...]
+```
+
+**Note**: The YAML file can also be saved for later use or manual editing by using, for example:
+```
+$ curl -fsSLo weave-daemonset.yaml "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+```
+
+#### Manually editing the YAML file
+
+Whether you saved the YAML file served from `cloud.weave.works` or downloaded a static YAML file from our [releases page](https://github.com/weaveworks/weave/releases), you can manually edit it to suit your needs.
+
+For example,
+- additional arguments may be supplied to the Weave router process by adding them to the `command:` array in the YAML file,
+- additional parameters can be set via the environment variables listed above; these can be inserted into the YAML file like this:
+
+```
+      containers:
+        - name: weave
+          env:
+            - name: IPALLOC_RANGE
+              value: 10.0.0.0/16
+```
