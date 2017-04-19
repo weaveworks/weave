@@ -21,6 +21,7 @@ func init() {
 		"detect-bridge-type":       detectBridgeType,
 		"create-datapath":          createDatapath,
 		"delete-datapath":          deleteDatapath,
+		"check-datapath":           checkDatapath,
 		"add-datapath-interface":   addDatapathInterface,
 		"create-plugin-network":    createPluginNetwork,
 		"remove-plugin-network":    removePluginNetwork,

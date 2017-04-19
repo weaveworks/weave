@@ -442,7 +442,8 @@ validate_bridge_type() {
     detect_bridge_type || return 0
 
     if [ -n "$LAUNCHING_ROUTER" ] ; then
-        if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] ; then
+        if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] &&
+               util_op check-datapath 2>/dev/null ; then
             cat <<EOF >&2
 WEAVE_NO_FASTDP is not set, but there is already a bridge present of
 the wrong type for fast datapath.  Please do 'weave reset' to remove
