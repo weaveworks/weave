@@ -11,8 +11,14 @@ func detectBridgeType(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("detect-bridge-type", "<weave-bridge-name> <datapath-name>")
 	}
-	bridgeType := weavenet.DetectBridgeType(args[0], args[1])
-	fmt.Println(bridgeType.String())
+	bridgeType, err := weavenet.DetectBridgeType(args[0], args[1])
+	if err != nil {
+		return err
+	} else if bridgeType == nil {
+		fmt.Println("none")
+	} else {
+		fmt.Println(bridgeType.String())
+	}
 	return nil
 }
 

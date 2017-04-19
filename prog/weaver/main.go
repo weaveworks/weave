@@ -491,32 +491,32 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(bridgeType weavenet.BridgeType, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	var ignoreSleeve bool
 
-	switch bridgeType {
-	case weavenet.AWSVPC:
+	switch {
+	case config.AWSVPC:
 		vpc := weave.NewAWSVPC()
 		overlay.Add("awsvpc", vpc)
 		bridge = weave.NullBridge{}
 		// Currently, we do not support any overlay with AWSVPC
 		ignoreSleeve = true
-	case weavenet.Fastdp, weavenet.BridgedFastdp:
+	case bridgeType == nil:
+		bridge = weave.NullBridge{}
+	case bridgeType.IsFastdp():
 		iface, err := weavenet.EnsureInterface(config.DatapathName)
 		checkFatal(err)
 		fastdp, err := weave.NewFastDatapath(iface, port, enableEncryption)
 		checkFatal(err)
 		bridge = fastdp.Bridge()
 		overlay.Add("fastdp", fastdp.Overlay())
-	case weavenet.Bridge:
+	case !bridgeType.IsFastdp():
 		iface, err := weavenet.EnsureInterface(weavenet.PcapIfName)
 		checkFatal(err)
 		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
-	default:
-		bridge = weave.NullBridge{}
 	}
 
 	if !ignoreSleeve {

@@ -11,8 +11,6 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
-
-	"github.com/weaveworks/weave/common/odp"
 )
 
 // create and attach a veth to the Weave bridge
@@ -40,22 +38,17 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bo
 		return nil, fmt.Errorf(format, a...)
 	}
 
-	switch bridgeType := DetectBridgeType(bridgeName, DatapathName); bridgeType {
-	case Bridge, BridgedFastdp:
-		if err := netlink.LinkSetMasterByIndex(veth, bridge.Attrs().Index); err != nil {
-			return cleanup(`unable to set master of %s: %s`, name, err)
+	bridgeType, err := DetectBridgeType(bridgeName, DatapathName)
+	if err != nil {
+		return cleanup("detect bridge type: %s", err)
+	}
+	if err := bridgeType.attach(veth); err != nil {
+		return cleanup("attaching veth %q to %q: %s", name, bridgeName, err)
+	}
+	if !bridgeType.IsFastdp() && !keepTXOn {
+		if err := EthtoolTXOff(veth.PeerName); err != nil {
+			return cleanup(`unable to set tx off on %q: %s`, peerName, err)
 		}
-		if bridgeType == Bridge && !keepTXOn {
-			if err := EthtoolTXOff(peerName); err != nil {
-				return cleanup(`unable to set tx off on %q: %s`, peerName, err)
-			}
-		}
-	case Fastdp:
-		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
-			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
-		}
-	default:
-		return cleanup(`invalid bridge configuration`)
 	}
 
 	if init != nil {

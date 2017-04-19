@@ -401,10 +401,6 @@ detect_bridge_type() {
         fastdp)
             DATAPATH="$BRIDGE"
             ;;
-        inconsistent)
-            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again." >&2
-            exit 1
-            ;;
         *)
             return 1
             ;;

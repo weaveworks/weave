@@ -15,8 +15,6 @@ import (
 	"github.com/weaveworks/weave/common/odp"
 )
 
-type BridgeType int
-
 /* This code implements three possible configurations to connect
    containers to the Weave Net overlay:
 
@@ -55,51 +53,47 @@ const (
 	DatapathIfName  = "vethwe-datapath"
 	BridgeIfName    = "vethwe-bridge"
 	PcapIfName      = "vethwe-pcap"
-
-	None BridgeType = iota
-	Bridge
-	Fastdp
-	BridgedFastdp
-	AWSVPC
-	Inconsistent
 )
 
-// Returns a string that is consistent with the weave script
-func (t BridgeType) String() string {
-	switch t {
-	case None:
-		return "none"
-	case Bridge:
-		return "bridge"
-	case Fastdp:
-		return "fastdp"
-	case BridgedFastdp:
-		return "bridged_fastdp"
-	case AWSVPC:
-		return "AWSVPC"
-	case Inconsistent:
-		return "inconsistent"
-	}
-	return "unknown"
+type Bridge interface {
+	init(config *BridgeConfig) error // create and initialise bridge device(s)
+	attach(veth *netlink.Veth) error // attach veth to bridge
+	IsFastdp() bool                  // does this bridge use fastdp?
+	String() string                  // human-readable type string
 }
 
-func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
+type bridgeImpl struct{ bridge netlink.Link }
+type fastdpImpl struct{ datapathName string }
+type bridgedFastdpImpl struct {
+	bridgeImpl
+	fastdpImpl
+}
+
+// Returns a string that is consistent with the weave script
+func (bridgeImpl) String() string        { return "bridge" }
+func (fastdpImpl) String() string        { return "fastdp" }
+func (bridgedFastdpImpl) String() string { return "bridged_fastdp" }
+
+// Used to decide whether to manage ODP tunnels
+func (bridgeImpl) IsFastdp() bool        { return false }
+func (fastdpImpl) IsFastdp() bool        { return true }
+func (bridgedFastdpImpl) IsFastdp() bool { return true }
+
+func DetectBridgeType(weaveBridgeName, datapathName string) (Bridge, error) {
 	bridge, _ := netlink.LinkByName(weaveBridgeName)
 	datapath, _ := netlink.LinkByName(datapathName)
 
 	switch {
 	case bridge == nil && datapath == nil:
-		return None
+		return nil, nil
 	case isBridge(bridge) && datapath == nil:
-		return Bridge
+		return bridgeImpl{bridge: bridge}, nil
 	case isDatapath(bridge) && datapath == nil:
-		return Fastdp
+		return fastdpImpl{datapathName: datapathName}, nil
 	case isDatapath(datapath) && isBridge(bridge):
-		return BridgedFastdp
-		// We cannot detect AWSVPC here; it looks just like Bridge.
-		// Anyone who cares will have to know some other way.
+		return bridgedFastdpImpl{bridgeImpl{bridge: bridge}, fastdpImpl{datapathName: datapathName}}, nil
 	default:
-		return Inconsistent
+		return nil, errors.New("Inconsistent bridge state detected. Please do 'weave reset' and try again")
 	}
 }
 
@@ -219,48 +213,37 @@ type BridgeConfig struct {
 	Port             int
 }
 
-func CreateBridge(procPath string, config *BridgeConfig) (BridgeType, error) {
-	bridgeType := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
+func CreateBridge(procPath string, config *BridgeConfig) (Bridge, error) {
+	bridgeType, err := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
+	if err != nil {
+		return nil, err
+	}
 
-	if bridgeType == None {
-		bridgeType = Bridge
+	if bridgeType == nil {
+		bridgeType = bridgeImpl{}
 		if !config.NoFastdp {
-			bridgeType = BridgedFastdp
+			bridgeType = bridgedFastdpImpl{}
 			if config.NoBridgedFastdp {
-				bridgeType = Fastdp
+				bridgeType = fastdpImpl{}
 				config.DatapathName = config.WeaveBridgeName
 			}
 			odpSupported, err := odp.CreateDatapath(config.DatapathName)
 			if err != nil {
-				return None, errors.Wrapf(err, "creating datapath %q", config.DatapathName)
+				return nil, errors.Wrapf(err, "creating datapath %q", config.DatapathName)
 			}
 			if !odpSupported {
-				bridgeType = Bridge
+				bridgeType = bridgeImpl{}
 			}
 		}
-
-		var err error
-		switch bridgeType {
-		case Bridge:
-			err = initBridge(config)
-		case Fastdp:
-			err = initFastdp(config)
-		case BridgedFastdp:
-			err = initBridgedFastdp(config)
-		default:
-			err = fmt.Errorf("Cannot initialise bridge type %v", bridgeType)
+		if err := bridgeType.init(config); err != nil {
+			return nil, err
 		}
-		if err != nil {
-			return None, err
-		}
-
-		if err = configureIPTables(config); err != nil {
+		if err := configureIPTables(config); err != nil {
 			return bridgeType, errors.Wrap(err, "configuring iptables")
 		}
 	}
 
 	if config.AWSVPC {
-		bridgeType = AWSVPC
 		// Set proxy_arp on the bridge, so that it could accept packets destined
 		// to containers within the same subnet but running on remote hosts.
 		// Without it, exact routes on each container are required.
@@ -275,12 +258,6 @@ func CreateBridge(procPath string, config *BridgeConfig) (BridgeType, error) {
 		}
 	}
 
-	if bridgeType == Bridge {
-		if err := EthtoolTXOff(config.WeaveBridgeName); err != nil {
-			return bridgeType, errors.Wrap(err, "setting tx off")
-		}
-	}
-
 	if err := linkSetUpByName(config.WeaveBridgeName); err != nil {
 		return bridgeType, err
 	}
@@ -292,7 +269,7 @@ func CreateBridge(procPath string, config *BridgeConfig) (BridgeType, error) {
 	return bridgeType, nil
 }
 
-func initBridgePrep(config *BridgeConfig) error {
+func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	mac, err := net.ParseMAC(config.Mac)
 	if err != nil {
 		return errors.Wrapf(err, "parsing bridge MAC %q", config.Mac)
@@ -304,11 +281,11 @@ func initBridgePrep(config *BridgeConfig) error {
 	if config.MTU == 0 {
 		config.MTU = 65535
 	}
-	link := &netlink.Bridge{LinkAttrs: linkAttrs}
-	if err = netlink.LinkAdd(link); err != nil {
+	b.bridge = &netlink.Bridge{LinkAttrs: linkAttrs}
+	if err = netlink.LinkAdd(b.bridge); err != nil {
 		return errors.Wrapf(err, "creating bridge %q", config.WeaveBridgeName)
 	}
-	if err := netlink.LinkSetHardwareAddr(link, mac); err != nil {
+	if err := netlink.LinkSetHardwareAddr(b.bridge, mac); err != nil {
 		return errors.Wrapf(err, "setting bridge %q mac %v", config.WeaveBridgeName, mac)
 	}
 	// Attempting to set the bridge MTU to a high value directly
@@ -323,7 +300,7 @@ func initBridgePrep(config *BridgeConfig) error {
 	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
 		return errors.Wrapf(err, "setting dummy interface mtu to %d", config.MTU)
 	}
-	if err := netlink.LinkSetMaster(dummy, link); err != nil {
+	if err := netlink.LinkSetMasterByIndex(dummy, b.bridge.Attrs().Index); err != nil {
 		return errors.Wrap(err, "setting dummy interface master")
 	}
 	if err := netlink.LinkDel(dummy); err != nil {
@@ -333,8 +310,8 @@ func initBridgePrep(config *BridgeConfig) error {
 	return nil
 }
 
-func initBridge(config *BridgeConfig) error {
-	if err := initBridgePrep(config); err != nil {
+func (b bridgeImpl) init(config *BridgeConfig) error {
+	if err := b.initPrep(config); err != nil {
 		return err
 	}
 	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
@@ -342,15 +319,19 @@ func initBridge(config *BridgeConfig) error {
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
 	}
+	if err := EthtoolTXOff(config.WeaveBridgeName); err != nil {
+		return errors.Wrap(err, "setting tx off")
+	}
 
 	return nil
 }
 
-func initFastdp(config *BridgeConfig) error {
+func (f fastdpImpl) init(config *BridgeConfig) error {
 	datapath, err := netlink.LinkByName(config.DatapathName)
 	if err != nil {
 		return errors.Wrapf(err, "finding datapath %q", config.DatapathName)
 	}
+	f.datapathName = config.DatapathName
 	if config.MTU == 0 {
 		/* GCE has the lowest underlay network MTU we're likely to encounter on
 		   a local network, at 1460 bytes.  To get the overlay MTU from that we
@@ -366,11 +347,11 @@ func initFastdp(config *BridgeConfig) error {
 	return nil
 }
 
-func initBridgedFastdp(config *BridgeConfig) error {
-	if err := initFastdp(config); err != nil {
+func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
+	if err := bf.fastdpImpl.init(config); err != nil {
 		return err
 	}
-	if err := initBridgePrep(config); err != nil {
+	if err := bf.bridgeImpl.initPrep(config); err != nil {
 		return err
 	}
 	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
@@ -390,6 +371,18 @@ func initBridgedFastdp(config *BridgeConfig) error {
 	}
 
 	return nil
+}
+
+func (b bridgeImpl) attach(veth *netlink.Veth) error {
+	return netlink.LinkSetMasterByIndex(veth, b.bridge.Attrs().Index)
+}
+
+func (bf bridgedFastdpImpl) attach(veth *netlink.Veth) error {
+	return bf.bridgeImpl.attach(veth)
+}
+
+func (f fastdpImpl) attach(veth *netlink.Veth) error {
+	return odp.AddDatapathInterface(f.datapathName, veth.Attrs().Name)
 }
 
 func configureIPTables(config *BridgeConfig) error {
