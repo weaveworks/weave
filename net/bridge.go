@@ -17,11 +17,44 @@ import (
 
 type BridgeType int
 
+/* This code implements three possible configurations to connect
+   containers to the Weave Net overlay:
+
+1. Bridge
+                 +-------+
+(container-veth)-+ weave +-(vethwe-bridge)--(vethwe-pcap)
+                 +-------+
+
+"weave" is a Linux bridge. "vethwe-pcap" (end of veth pair) is used
+to capture and inject packets, by router/pcap.go.
+
+2. BridgedFastdp
+
+                 +-------+                                    /----------\
+(container-veth)-+ weave +-(vethwe-bridge)--(vethwe-datapath)-+ datapath +
+                 +-------+                                    \----------/
+
+"weave" is a Linux bridge and "datapath" is an Open vSwitch datapath;
+they are connected via a veth pair. Packet capture and injection use
+the "datapath" device, via "router/fastdp.go:fastDatapathBridge"
+
+3. Fastdp
+
+                 /-------\
+(container-veth)-+ weave +
+                 \-------/
+
+"weave" is an Open vSwitch datapath, and capture/injection are as in
+BridgedFastdp. Not used by default due to missing conntrack support in
+datapath of old kernel versions (https://github.com/weaveworks/weave/issues/1577).
+*/
+
 const (
 	WeaveBridgeName = "weave"
 	DatapathName    = "datapath"
+	DatapathIfName  = "vethwe-datapath"
 	BridgeIfName    = "vethwe-bridge"
-	PcapIfaceName   = "vethwe-pcap"
+	PcapIfName      = "vethwe-pcap"
 
 	None BridgeType = iota
 	Bridge
@@ -70,13 +103,11 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 	}
 }
 
-var ErrSetBridgeMac = errors.New("Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)")
-
-func EnforceAddrAssignType(bridgeName string) error {
+func EnforceAddrAssignType(bridgeName string) (setAddr bool, err error) {
 	sysctlFilename := filepath.Join("/sys/class/net/", bridgeName, "/addr_assign_type")
 	addrAssignType, err := ioutil.ReadFile(sysctlFilename)
 	if err != nil {
-		return errors.Wrapf(err, "reading %q", sysctlFilename)
+		return false, errors.Wrapf(err, "reading %q", sysctlFilename)
 	}
 
 	// From include/uapi/linux/netdevice.h
@@ -88,21 +119,21 @@ func EnforceAddrAssignType(bridgeName string) error {
 	if addrAssignType[0] != '3' {
 		link, err := netlink.LinkByName(bridgeName)
 		if err != nil {
-			return errors.Wrapf(err, "EnforceAddrAssignType finding bridge %s", bridgeName)
+			return false, errors.Wrapf(err, "EnforceAddrAssignType finding bridge %s", bridgeName)
 		}
 
 		mac, err := RandomMAC()
 		if err != nil {
-			return errors.Wrap(err, "creating random MAC")
+			return false, errors.Wrap(err, "creating random MAC")
 		}
 
 		if err := netlink.LinkSetHardwareAddr(link, mac); err != nil {
-			return errors.Wrapf(err, "setting bridge %s address to %v", bridgeName, mac)
+			return false, errors.Wrapf(err, "setting bridge %s address to %v", bridgeName, mac)
 		}
-		return ErrSetBridgeMac
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 func isBridge(link netlink.Link) bool {
@@ -181,8 +212,8 @@ type BridgeConfig struct {
 	DatapathName     string
 	NoFastdp         bool
 	NoBridgedFastdp  bool
-	IsAWSVPC         bool
-	ExpectNPC        bool
+	AWSVPC           bool
+	NPC              bool
 	MTU              int
 	Mac              string
 	Port             int
@@ -228,7 +259,7 @@ func CreateBridge(procPath string, config *BridgeConfig) (BridgeType, error) {
 		}
 	}
 
-	if config.IsAWSVPC {
+	if config.AWSVPC {
 		bridgeType = AWSVPC
 		// Set proxy_arp on the bridge, so that it could accept packets destined
 		// to containers within the same subnet but running on remote hosts.
@@ -306,7 +337,7 @@ func initBridge(config *BridgeConfig) error {
 	if err := initBridgePrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfaceName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
 		return netlink.LinkSetUp(veth)
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
@@ -342,7 +373,7 @@ func initBridgedFastdp(config *BridgeConfig) error {
 	if err := initBridgePrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth("vethwe-bridge", "vethwe-datapath", config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
@@ -399,9 +430,11 @@ func configureIPTables(config *BridgeConfig) error {
 		}
 	}
 
-	if config.ExpectNPC {
+	if config.NPC {
 		// Steer traffic via the NPC
-		ipt.NewChain("filter", "WEAVE-NPC") // ignoring errors such as 'chain already exists'
+		if err = ipt.ClearChain("nat", "WEAVE-NPC"); err != nil {
+			return errors.Wrap(err, "clearing WEAVE-NPC chain")
+		}
 		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
 			return err
 		}
@@ -428,7 +461,9 @@ func configureIPTables(config *BridgeConfig) error {
 	}
 
 	// create a chain for masquerading
-	ipt.NewChain("nat", "WEAVE") // ignoring errors such as 'chain already exists'
+	if err = ipt.ClearChain("nat", "WEAVE"); err != nil {
+		return errors.Wrap(err, "clearing WEAVE chain")
+	}
 	if err = ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
 		return err
 	}

@@ -38,10 +38,13 @@ func createBridge(args []string) error {
 		Mac:              args[5],
 		NoFastdp:         args[6] != "",
 		NoBridgedFastdp:  args[7] != "",
-		ExpectNPC:        args[9] == "--expect-npc",
+		NPC:              args[9] == "--expect-npc",
 	}
 	procPath := args[8]
 	bridgeType, err := weavenet.CreateBridge(procPath, &config)
+	if err != nil {
+		return err
+	}
 	fmt.Println(bridgeType.String())
-	return err
+	return nil
 }

@@ -1,9 +1,11 @@
 package net
 
-import "path/filepath"
-import "fmt"
-import "io"
-import "os"
+import (
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+)
 
 // Configure the ARP cache parameters for the given interface.  This
 // makes containers react more quickly to a change in the MAC address
