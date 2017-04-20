@@ -38,10 +38,16 @@ for host in $HOSTS; do
     fi
 done
 
-[ -n "$COVERAGE" ] && COVERAGE_ARGS="\\n          env:\\n            - name: EXTRA_ARGS\\n              value: \"-test.coverprofile=/home/weave/cover.prof --\""
+if [ -n "$COVERAGE" ]; then
+    COVERAGE_ARGS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+else
+    COVERAGE_ARGS="env: []"
+fi
 
-sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.6.yaml" \
-	| run_on $HOST1 "$KUBECTL apply -f -"
+# Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
+    -e "s%env: \[\]%$COVERAGE_ARGS%" \
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.6.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
 
