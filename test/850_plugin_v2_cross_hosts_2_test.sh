@@ -59,6 +59,7 @@ cleanup() {
         $SSH $h<<EOF
             sudo sed -i '/weave-ci-registry/d' /etc/hosts
             docker service rm $SERVICE || true
+            docker rm -f c3 || true
             docker swarm leave --force || true
             docker network rm $NETWORK || true
             docker plugin disable -f $PLUGIN_NAME || true
@@ -105,7 +106,7 @@ echo "Creating network and service..."
 # Create network and service
 $SSH $HOST1<<EOF
     docker plugin ls
-    docker network create --driver="${PLUGIN_NAME}:latest" $NETWORK || true
+    docker network create --driver="${PLUGIN_NAME}:latest" --attachable $NETWORK || true
     # Otherwise no containers will be scheduled on host2
     sleep 20
     docker service create --name=$SERVICE --network=$NETWORK --replicas=2 nginx || true
@@ -121,6 +122,10 @@ assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
 
 # We do not test "weave {status,launch}", because the weave script does not detect
 # plugin-v2 if its name is prefixed with a registry name.
+
+# Attach a non-service container to the network
+docker_on $HOST1 run -dti --name=c3 --network=$NETWORK $SMALL_IMAGE /bin/sh
+assert_raises "exec_on $HOST1 c3 $PING $C2_IP"
 
 # Failing to cleanup will make the rest of the tests to fail
 cleanup $HOST1 $HOST2
