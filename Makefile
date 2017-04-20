@@ -311,7 +311,8 @@ tools/.git $(MANIFEST_TOOL_DIR)/.git:
 # Push plugin
 plugin_publish: $(PLUGIN_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):$(WEAVE_VERSION)
-ifneq ($(UPDATE_LATEST),false)
+# "latest" means "stable release" here, so only push that if explicitly told to
+ifeq ($(UPDATE_LATEST),true)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):latest
 endif
 
