@@ -274,6 +274,8 @@ $(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAV
 	mkdir $(PLUGIN_WORK_DIR)
 	$(SUDO) docker export $(PLUGIN_BUILD_IMG) | tar -x -C $(PLUGIN_WORK_DIR)
 	$(SUDO) docker rm -f $(PLUGIN_BUILD_IMG)
+# get rid of a few bulky things we don't need in the v2 plugin image
+	rm $(PLUGIN_WORK_DIR)/home/weave/weaveproxy $(PLUGIN_WORK_DIR)/home/weave/sigproxy $(PLUGIN_WORK_DIR)/usr/bin/docker
 	cp prog/net-plugin/launch.sh $(PLUGIN_WORK_DIR)/home/weave/launch.sh
 	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
 	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
