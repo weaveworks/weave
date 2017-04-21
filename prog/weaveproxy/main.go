@@ -16,7 +16,7 @@ var version = "unreleased"
 
 var Log = common.Log
 
-func getenv(key, defaultVal string) string {
+func getenvOrDefault(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
@@ -60,9 +60,9 @@ func main() {
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
 
-	c.Image = getenv("EXEC_IMAGE", "weaveworks/weaveexec")
-	c.DockerBridge = getenv("DOCKER_BRIDGE", "docker0")
-	c.DockerHost = getenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+	c.Image = getenvOrDefault("EXEC_IMAGE", "weaveworks/weaveexec")
+	c.DockerBridge = getenvOrDefault("DOCKER_BRIDGE", "docker0")
+	c.DockerHost = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
