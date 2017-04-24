@@ -111,23 +111,6 @@ If you are using `systemd` with Docker 1.9, it is advised that you modify the Do
     TimeoutStartSec=0
 
 
-### <a name="configuring"></a>Configuring the Plugin
-
-The plugin accepts a number of configuration parameters. To supply
-these, instead of running `weave launch`, start the router and plugin
-separately with:
-
-    $ weave launch-router [other peers]
-    $ weave launch-plugin [plugin parameters]
-
-The plugin configuration parameters are:
-
- * `--log-level=debug|info|warning|error` --tells the plugin
-   how much information to emit for debugging.
- * `--no-restart` -- remove the default policy of `--restart=always`, if
-   you want to control start-up of the plugin yourself
-
-
 **See Also**
 
  * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)
