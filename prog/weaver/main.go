@@ -267,10 +267,10 @@ func main() {
 
 	config.Password = determinePassword(password)
 
-	overlay, bridge := createOverlay(bridgeType, bridgeConfig, config.Host, config.Port, bufSzMB, config.Password != nil)
-	networkConfig.Bridge = bridge
+	overlay, injectorConsumer := createOverlay(bridgeType, bridgeConfig, config.Host, config.Port, bufSzMB, config.Password != nil)
+	networkConfig.InjectorConsumer = injectorConsumer
 
-	if bridge != nil {
+	if injectorConsumer != nil {
 		if err := weavenet.DetectHairpin(weavenet.BridgeIfName, Log); err != nil {
 			Log.Errorf("DetectHairpin failed: %s", err)
 		}
@@ -491,31 +491,31 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.InjectorConsumer) {
 	overlay := weave.NewOverlaySwitch()
-	var bridge weave.Bridge
+	var injectorConsumer weave.InjectorConsumer
 	var ignoreSleeve bool
 
 	switch {
 	case config.AWSVPC:
 		vpc := weave.NewAWSVPC()
 		overlay.Add("awsvpc", vpc)
-		bridge = weave.NullBridge{}
+		injectorConsumer = weave.NullInjectorConsumer{}
 		// Currently, we do not support any overlay with AWSVPC
 		ignoreSleeve = true
 	case bridgeType == nil:
-		bridge = weave.NullBridge{}
+		injectorConsumer = weave.NullInjectorConsumer{}
 	case bridgeType.IsFastdp():
 		iface, err := weavenet.EnsureInterface(config.DatapathName)
 		checkFatal(err)
 		fastdp, err := weave.NewFastDatapath(iface, port, enableEncryption)
 		checkFatal(err)
-		bridge = fastdp.Bridge()
+		injectorConsumer = fastdp.InjectorConsumer()
 		overlay.Add("fastdp", fastdp.Overlay())
 	case !bridgeType.IsFastdp():
 		iface, err := weavenet.EnsureInterface(weavenet.PcapIfName)
 		checkFatal(err)
-		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
+		injectorConsumer, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
 	}
 
@@ -525,7 +525,7 @@ func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, hos
 		overlay.SetCompatOverlay(sleeve)
 	}
 
-	return overlay, bridge
+	return overlay, injectorConsumer
 }
 
 func createAllocator(router *weave.NetworkRouter, config ipamConfig, preClaims []ipam.PreClaim, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {

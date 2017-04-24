@@ -5,13 +5,13 @@ import (
 )
 
 // Interface to packet handling on the local virtual bridge
-type Bridge interface {
+type InjectorConsumer interface {
 	// Inject a packet to be delivered locally
 	InjectPacket(PacketKey) FlowOp
 
 	// Start consuming packets from the bridge.  Injected packets
 	// should not be included.
-	StartConsumingPackets(BridgeConsumer) error
+	StartConsumingPackets(Consumer) error
 
 	Interface() *net.Interface
 	String() string
@@ -19,26 +19,26 @@ type Bridge interface {
 }
 
 // A function that determines how to handle locally captured packets.
-type BridgeConsumer func(PacketKey) FlowOp
+type Consumer func(PacketKey) FlowOp
 
-type NullBridge struct{}
+type NullInjectorConsumer struct{}
 
-func (NullBridge) InjectPacket(PacketKey) FlowOp {
+func (NullInjectorConsumer) InjectPacket(PacketKey) FlowOp {
 	return nil
 }
 
-func (NullBridge) StartConsumingPackets(BridgeConsumer) error {
+func (NullInjectorConsumer) StartConsumingPackets(Consumer) error {
 	return nil
 }
 
-func (NullBridge) Interface() *net.Interface {
+func (NullInjectorConsumer) Interface() *net.Interface {
 	return nil
 }
 
-func (NullBridge) String() string {
+func (NullInjectorConsumer) String() string {
 	return "no overlay bridge"
 }
 
-func (NullBridge) Stats() map[string]int {
+func (NullInjectorConsumer) Stats() map[string]int {
 	return nil
 }

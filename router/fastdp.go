@@ -209,25 +209,25 @@ func (lock *fastDatapathLock) relock() {
 	}
 }
 
-// Bridge bits
+// InjectorConsumer bits
 
-type fastDatapathBridge struct {
+type fastDatapathInjectorConsumer struct {
 	*FastDatapath
 }
 
-func (fastdp *FastDatapath) Bridge() Bridge {
-	return fastDatapathBridge{fastdp}
+func (fastdp *FastDatapath) InjectorConsumer() InjectorConsumer {
+	return fastDatapathInjectorConsumer{fastdp}
 }
 
-func (fastdp fastDatapathBridge) Interface() *net.Interface {
+func (fastdp fastDatapathInjectorConsumer) Interface() *net.Interface {
 	return fastdp.iface
 }
 
-func (fastdp fastDatapathBridge) String() string {
+func (fastdp fastDatapathInjectorConsumer) String() string {
 	return fmt.Sprint(fastdp.iface.Name, " (via ODP)")
 }
 
-func (fastdp fastDatapathBridge) Stats() map[string]int {
+func (fastdp fastDatapathInjectorConsumer) Stats() map[string]int {
 	lock := fastdp.startLock()
 	defer lock.unlock()
 
@@ -238,12 +238,12 @@ func (fastdp fastDatapathBridge) Stats() map[string]int {
 
 var routerBridgePortID = bridgePortID{router: true}
 
-func (fastdp fastDatapathBridge) StartConsumingPackets(consumer BridgeConsumer) error {
+func (fastdp fastDatapathInjectorConsumer) StartConsumingPackets(consumer Consumer) error {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
 	if fastdp.sendToPort[routerBridgePortID] != nil {
-		return fmt.Errorf("FastDatapath already has a BridgeConsumer")
+		return fmt.Errorf("FastDatapath already has a Consumer")
 	}
 
 	// set up delivery to the weave router port on the bridge
@@ -257,7 +257,7 @@ func (fastdp fastDatapathBridge) StartConsumingPackets(consumer BridgeConsumer) 
 	return nil
 }
 
-func (fastdp fastDatapathBridge) InjectPacket(key PacketKey) FlowOp {
+func (fastdp fastDatapathInjectorConsumer) InjectPacket(key PacketKey) FlowOp {
 	lock := fastdp.startLock()
 	defer lock.unlock()
 	return fastdp.bridge(routerBridgePortID, key, &lock)

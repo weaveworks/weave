@@ -34,9 +34,9 @@ var (
 )
 
 type NetworkConfig struct {
-	BufSz         int
-	PacketLogging PacketLogging
-	Bridge        Bridge
+	BufSz            int
+	PacketLogging    PacketLogging
+	InjectorConsumer InjectorConsumer
 }
 
 type PacketLogging interface {
@@ -55,8 +55,8 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 	if overlay == nil {
 		overlay = NullNetworkOverlay{}
 	}
-	if networkConfig.Bridge == nil {
-		networkConfig.Bridge = NullBridge{}
+	if networkConfig.InjectorConsumer == nil {
+		networkConfig.InjectorConsumer = NullInjectorConsumer{}
 	}
 
 	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay, common.LogLogger()), NetworkConfig: networkConfig, db: db}
@@ -73,8 +73,8 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 // Start listening for TCP connections, locally captured packets, and
 // forwarded packets.
 func (router *NetworkRouter) Start() {
-	log.Println("Sniffing traffic on", router.Bridge)
-	checkFatal(router.Bridge.StartConsumingPackets(router.handleCapturedPacket))
+	log.Println("Sniffing traffic on", router.InjectorConsumer)
+	checkFatal(router.InjectorConsumer.StartConsumingPackets(router.handleCapturedPacket))
 	checkFatal(router.Overlay.(NetworkOverlay).StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
 	router.Router.Start()
 }
@@ -152,7 +152,7 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	}
 
 	router.PacketLogging.LogForwardPacket("Injecting", key)
-	injectFop := router.Bridge.InjectPacket(key.PacketKey)
+	injectFop := router.InjectorConsumer.InjectPacket(key.PacketKey)
 	dstPeer := router.Macs.Lookup(dstMac)
 	if dstPeer == router.Ourself.Peer {
 		return injectFop

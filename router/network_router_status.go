@@ -23,8 +23,8 @@ type MACStatus struct {
 func NewNetworkRouterStatus(router *NetworkRouter) *NetworkRouterStatus {
 	return &NetworkRouterStatus{
 		mesh.NewStatus(router.Router),
-		router.Bridge.String(),
-		router.Bridge.Stats(),
+		router.InjectorConsumer.String(),
+		router.InjectorConsumer.Stats(),
 		NewMACStatusSlice(router.Macs)}
 }
 

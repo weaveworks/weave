@@ -27,7 +27,7 @@ type Pcap struct {
 	readHandle *pcap.Handle
 }
 
-func NewPcap(iface *net.Interface, bufSz int) (Bridge, error) {
+func NewPcap(iface *net.Interface, bufSz int) (InjectorConsumer, error) {
 	wh, err := newPcapHandle(iface.Name, false, 0, 0)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func NewPcap(iface *net.Interface, bufSz int) (Bridge, error) {
 	return &Pcap{iface: iface, bufSz: bufSz, writeHandle: wh}, nil
 }
 
-func (p *Pcap) StartConsumingPackets(consumer BridgeConsumer) error {
+func (p *Pcap) StartConsumingPackets(consumer Consumer) error {
 	rh, err := newPcapHandle(p.iface.Name, true, 65535, p.bufSz)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (p *Pcap) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	checkWarn(p.writeHandle.WritePacketData(frame))
 }
 
-func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
+func (p *Pcap) sniff(readHandle *pcap.Handle, consumer Consumer) {
 	dec := NewEthernetDecoder()
 
 	for {
