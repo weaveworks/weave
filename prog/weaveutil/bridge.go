@@ -11,7 +11,7 @@ func detectBridgeType(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("detect-bridge-type", "<weave-bridge-name> <datapath-name>")
 	}
-	bridgeType, err := weavenet.DetectBridgeType(args[0], args[1])
+	bridgeType, err := weavenet.ExistingBridgeType(args[0], args[1])
 	if err != nil {
 		return err
 	} else if bridgeType == nil {
@@ -47,7 +47,7 @@ func createBridge(args []string) error {
 		NPC:              args[9] == "--expect-npc",
 	}
 	procPath := args[8]
-	bridgeType, err := weavenet.CreateBridge(procPath, &config)
+	bridgeType, err := weavenet.EnsureBridge(procPath, &config)
 	if err != nil {
 		return err
 	}

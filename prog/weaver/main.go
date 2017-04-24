@@ -261,7 +261,7 @@ func main() {
 	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
 
 	bridgeConfig.Mac = name.String()
-	bridgeType, err := weavenet.CreateBridge(procPath, &bridgeConfig)
+	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
 

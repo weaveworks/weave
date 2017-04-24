@@ -38,7 +38,7 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bo
 		return nil, fmt.Errorf(format, a...)
 	}
 
-	bridgeType, err := DetectBridgeType(bridgeName, DatapathName)
+	bridgeType, err := ExistingBridgeType(bridgeName, DatapathName)
 	if err != nil {
 		return cleanup("detect bridge type: %s", err)
 	}

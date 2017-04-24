@@ -81,7 +81,7 @@ func (bridgeImpl) IsFastdp() bool        { return false }
 func (fastdpImpl) IsFastdp() bool        { return true }
 func (bridgedFastdpImpl) IsFastdp() bool { return true }
 
-func DetectBridgeType(weaveBridgeName, datapathName string) (Bridge, error) {
+func ExistingBridgeType(weaveBridgeName, datapathName string) (Bridge, error) {
 	bridge, _ := netlink.LinkByName(weaveBridgeName)
 	datapath, _ := netlink.LinkByName(datapathName)
 
@@ -226,8 +226,8 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 	}
 }
 
-func CreateBridge(procPath string, config *BridgeConfig) (Bridge, error) {
-	bridgeType, err := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
+func EnsureBridge(procPath string, config *BridgeConfig) (Bridge, error) {
+	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
 	if err != nil {
 		return nil, err
 	}
