@@ -61,7 +61,11 @@ if [ -n "$HOSTNAME" ] ; then
     NICKNAME_ARG="--nickname=$HOSTNAME"
 fi
 
-BRIDGE_OPTIONS="--datapath=datapath"
+router_bridge_opts() {
+    echo --datapath=datapath
+    [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
+    [ -z "$WEAVE_NO_FASTDP" ] || echo --no-fastdp
+}
 
 if [ -z "$KUBE_PEERS" ]; then
     if ! KUBE_PEERS=$(/home/weave/kube-peers) || [ -z "$KUBE_PEERS" ]; then
@@ -105,7 +109,7 @@ post_start_actions() {
 
 post_start_actions &
 
-/home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
+/home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
      --host-root=$HOST_ROOT \
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
