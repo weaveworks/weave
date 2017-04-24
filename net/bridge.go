@@ -228,25 +228,24 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 
 func EnsureBridge(procPath string, config *BridgeConfig) (Bridge, error) {
 	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
-	if err != nil {
-		return nil, err
+	if bridgeType != nil || err != nil {
+		return bridgeType, err
 	}
 
-	if bridgeType == nil {
-		bridgeType = config.configuredBridgeType()
-		for {
-			if err := bridgeType.init(config); err != nil {
-				if err == errBridgeFallback {
-					bridgeType = bridgeImpl{}
-					continue
-				}
-				return nil, err
+	bridgeType = config.configuredBridgeType()
+	for {
+		if err := bridgeType.init(config); err != nil {
+			if err == errBridgeFallback {
+				bridgeType = bridgeImpl{}
+				continue
 			}
-			break
+			return nil, err
 		}
-		if err := configureIPTables(config); err != nil {
-			return bridgeType, errors.Wrap(err, "configuring iptables")
-		}
+		break
+	}
+
+	if err := configureIPTables(config); err != nil {
+		return bridgeType, errors.Wrap(err, "configuring iptables")
 	}
 
 	if config.AWSVPC {
