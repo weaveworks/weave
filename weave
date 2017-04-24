@@ -2103,14 +2103,6 @@ EOF
         done
         [ $res -eq 0 ]
         ;;
-    launch-dns)
-        echo "The 'launch-dns' command has been removed; DNS is launched as part of 'launch' and 'launch-router'." >&2
-        exit 0
-        ;;
-    stop-dns)
-        echo "The 'stop-dns command has been removed; DNS is stopped as part of 'stop' and 'stop-router'." >&2
-        exit 0
-        ;;
     prime)
         call_weave GET /ring
         ;;
