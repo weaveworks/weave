@@ -62,6 +62,8 @@ type Bridge interface {
 	String() string                  // human-readable type string
 }
 
+var errBridgeFallback = errors.New("special error value used to trigger a fallback to bridge type")
+
 type bridgeImpl struct{ bridge netlink.Link }
 type fastdpImpl struct{ datapathName string }
 type bridgedFastdpImpl struct {
@@ -213,6 +215,17 @@ type BridgeConfig struct {
 	Port             int
 }
 
+func (config *BridgeConfig) configuredBridgeType() Bridge {
+	switch {
+	case config.NoFastdp:
+		return bridgeImpl{}
+	case config.NoBridgedFastdp:
+		return fastdpImpl{datapathName: config.WeaveBridgeName}
+	default:
+		return bridgedFastdpImpl{fastdpImpl: fastdpImpl{datapathName: config.DatapathName}}
+	}
+}
+
 func CreateBridge(procPath string, config *BridgeConfig) (Bridge, error) {
 	bridgeType, err := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
 	if err != nil {
@@ -220,23 +233,16 @@ func CreateBridge(procPath string, config *BridgeConfig) (Bridge, error) {
 	}
 
 	if bridgeType == nil {
-		bridgeType = bridgeImpl{}
-		if !config.NoFastdp {
-			bridgeType = bridgedFastdpImpl{}
-			if config.NoBridgedFastdp {
-				bridgeType = fastdpImpl{}
-				config.DatapathName = config.WeaveBridgeName
+		bridgeType = config.configuredBridgeType()
+		for {
+			if err := bridgeType.init(config); err != nil {
+				if err == errBridgeFallback {
+					bridgeType = bridgeImpl{}
+					continue
+				}
+				return nil, err
 			}
-			odpSupported, err := odp.CreateDatapath(config.DatapathName)
-			if err != nil {
-				return nil, errors.Wrapf(err, "creating datapath %q", config.DatapathName)
-			}
-			if !odpSupported {
-				bridgeType = bridgeImpl{}
-			}
-		}
-		if err := bridgeType.init(config); err != nil {
-			return nil, err
+			break
 		}
 		if err := configureIPTables(config); err != nil {
 			return bridgeType, errors.Wrap(err, "configuring iptables")
@@ -327,11 +333,17 @@ func (b bridgeImpl) init(config *BridgeConfig) error {
 }
 
 func (f fastdpImpl) init(config *BridgeConfig) error {
-	datapath, err := netlink.LinkByName(config.DatapathName)
+	odpSupported, err := odp.CreateDatapath(f.datapathName)
 	if err != nil {
-		return errors.Wrapf(err, "finding datapath %q", config.DatapathName)
+		return errors.Wrapf(err, "creating datapath %q", f.datapathName)
 	}
-	f.datapathName = config.DatapathName
+	if !odpSupported {
+		return errBridgeFallback
+	}
+	datapath, err := netlink.LinkByName(f.datapathName)
+	if err != nil {
+		return errors.Wrapf(err, "finding datapath %q", f.datapathName)
+	}
 	if config.MTU == 0 {
 		/* GCE has the lowest underlay network MTU we're likely to encounter on
 		   a local network, at 1460 bytes.  To get the overlay MTU from that we
@@ -342,7 +354,7 @@ func (f fastdpImpl) init(config *BridgeConfig) error {
 		config.MTU = 1376
 	}
 	if err := netlink.LinkSetMTU(datapath, config.MTU); err != nil {
-		return errors.Wrapf(err, "setting datapath %q mtu %d", config.DatapathName, config.MTU)
+		return errors.Wrapf(err, "setting datapath %q mtu %d", f.datapathName, config.MTU)
 	}
 	return nil
 }
@@ -358,15 +370,15 @@ func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
-		if err := odp.AddDatapathInterface(config.DatapathName, veth.Attrs().Name); err != nil {
-			return errors.Wrapf(err, "adding interface %q to datapath %q", veth.Attrs().Name, config.DatapathName)
+		if err := odp.AddDatapathInterface(bf.datapathName, veth.Attrs().Name); err != nil {
+			return errors.Wrapf(err, "adding interface %q to datapath %q", veth.Attrs().Name, bf.datapathName)
 		}
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "creating bridged fastdp veth pair")
 	}
 
-	if err := linkSetUpByName(config.DatapathName); err != nil {
+	if err := linkSetUpByName(bf.datapathName); err != nil {
 		return err
 	}
 
