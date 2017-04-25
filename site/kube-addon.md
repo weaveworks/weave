@@ -36,7 +36,8 @@ After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
 network.
 
-**Note:** This command requires Kubernetes 1.4 or later.
+**Note:** This command requires Kubernetes 1.4 or later, and we
+recommend your master node has at least two CPU cores.
 
 > CNI, the [_Container Network Interface_](https://github.com/containernetworking/cni),
 > is a proposed standard for configuring network interfaces for Linux
@@ -97,21 +98,26 @@ and so you will need to perform the procedure manually:
 
 Kubernetes manages
 [resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-on each node, and will only schedule pods to run on nodes which have
-enough free resources. A typical Kubernetes install will have
-components (etcd, scheduler, api-server, ...) totalling 95% of one
-CPU, leaving very little room to run anything else.  Yet Weave Net
-must run on every node, including master, for all features to work.
+on each node, and only schedules pods to run on nodes that have enough
+free resources.
 
-The best way to resolve this is to use machines with at least two CPU
-cores. However, people installing for the first time will probably not
-know this, so we write into the DaemonSet specification that Weave Net
-only needs 1% CPU for each container, and thus it will start up on a
-single-CPU node.
+The components of a typical Kubernetes installation (with the master
+node running etcd, scheduler, api-server, etc.) take up about 95% of a
+CPU, which leaves little room to run anything else. For all of Weave
+Net's features to work, it must run on every node, including the
+master.
 
-Weave Net will, depending on workload, need more than 1% of CPU, but
-the number in the DaemonSet is a minimum request, not a limit, so
-Weave Net can "burst" above that level.
+The best way to resolve this issue is to use machines with at least
+two CPU cores. However if you are installing Kubernetes and Weave Net
+for the first time, you may not be aware of this requirement. For this
+reason, Weave Net launches as a DaemonSet with a specification that
+reserves at least 1% CPU for each container. This enables Weave Net to
+start up seamlessly on a single-CPU node.
+
+Depending on the workload, Weave Net may need more than 1% of the
+CPU. The percentage set in the DaemonSet is the minimum and not a
+limit. This minimum setting allows Weave Net to take advantage of
+available CPU and "burst" above that limit if it needs to.
 
 ## <a name="eviction"></a>Pod Eviction
 
@@ -121,13 +127,15 @@ one or more pods. It may choose to evict the Weave Net pod, which will
 disrupt pod network operations.
 
 You can reduce the chance of eviction by changing the DaemonSet to
-have a much bigger request, and a limit of the same value. This will
-cause Kubernetes to apply ["guaranteed" rather than "burstable"
-policy](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-qos.md).
-However there is no similar request for disk space, so you should be
-aware of this issue and monitor your resources to stay below 100%.
+have a much bigger request, and a limit of the same value.
 
-Kubernetes will give a notification in the event of an eviction, like this:
+This causes Kubernetes to apply a ["guaranteed" rather than a
+"burstable" policy](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-qos.md).
+However a similar request for disk space can not
+be made, and so please be aware of this issue and monitor your
+resources to ensure that they stay below 100%.
+
+Kubernetes displays a notification in the event of an eviction similar to this:
 
 ```
 pod weave-net-4ozht_kube-system(546acee0-ee25-11e6-8965-068f417b4097) evicted successfully
