@@ -160,6 +160,11 @@ func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Addr.String(), cidr.PrefixLen)
 }
 
+func (cidr CIDR) IPNet() (r *net.IPNet) {
+	mask := net.CIDRMask(cidr.PrefixLen, 8*net.IPv4len)
+	return &net.IPNet{IP: cidr.Addr.IP4(), Mask: mask}
+}
+
 // FromIP4 converts an ipv4 address to our integer address type
 func FromIP4(ip4 net.IP) (r Address) {
 	for _, b := range ip4.To4() {

@@ -60,7 +60,8 @@ func setupIface(args []string) error {
 	if err := netlink.LinkSetName(link, newIfName); err != nil {
 		return err
 	}
-	if err := weavenet.ConfigureARPCache(newIfName); err != nil {
+	// This is only called by AttachContainer which is only called in host pid namespace
+	if err := weavenet.ConfigureARPCache("/proc", newIfName); err != nil {
 		return err
 	}
 	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
@@ -71,10 +72,11 @@ func setupIface(args []string) error {
 }
 
 func configureARP(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("configure-arp", "<iface-name-prefix>")
+	if len(args) != 2 {
+		cmdUsage("configure-arp", "<iface-name-prefix> <root-path>")
 	}
 	prefix := args[0]
+	rootPath := args[1]
 
 	links, err := netlink.LinkList()
 	if err != nil {
@@ -83,7 +85,7 @@ func configureARP(args []string) error {
 	for _, link := range links {
 		ifName := link.Attrs().Name
 		if strings.HasPrefix(ifName, prefix) {
-			weavenet.ConfigureARPCache(ifName)
+			weavenet.ConfigureARPCache(rootPath+"/proc", ifName)
 			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
 				for _, addr := range addrs {
 					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)

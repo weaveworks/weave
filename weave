@@ -136,7 +136,7 @@ exec_options() {
             ;;
         # All the other commands that may create the bridge and need machine id files.
         # We don't mount '/' to avoid recursive mounts of '/var'
-        create-bridge|attach-router|attach|expose|hide)
+        create-bridge|attach|expose|hide)
             echo -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus -e HOST_ROOT=/host
             ;;
     esac
@@ -281,7 +281,6 @@ DATAPATH=datapath
 CONTAINER_IFNAME=ethwe
 BRIDGE_IFNAME=v${CONTAINER_IFNAME}-bridge
 DATAPATH_IFNAME=v${CONTAINER_IFNAME}-datapath
-PCAP_IFNAME=v${CONTAINER_IFNAME}-pcap
 PORT=${WEAVE_PORT:-6783}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-127.0.0.1:6782}
@@ -326,21 +325,6 @@ run_iptables() {
     iptables $IPTABLES_W "$@"
 }
 
-# Add a rule to iptables, if it doesn't exist already
-add_iptables_rule() {
-    IPTABLES_TABLE="$1"
-    shift 1
-    if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        ## Loop until we get an exit code other than "temporarily unavailable"
-        while true ; do
-            run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null && return 0
-            if [ $? != 4 ] ; then
-                return 1
-            fi
-        done
-    fi
-}
-
 # Insert a rule in iptables, if it doesn't exist already
 insert_iptables_rule() {
     IPTABLES_TABLE="$1"
@@ -365,15 +349,6 @@ delete_iptables_rule() {
     fi
 }
 
-# Configure the ARP cache parameters for the given interface.  This
-# makes containers react more quickly to a change in the MAC address
-# associated with an IP address.
-configure_arp_cache() {
-    $2 sh -c "echo 5 >$PROC_PATH/sys/net/ipv4/neigh/$1/base_reachable_time &&
-              echo 2 >$PROC_PATH/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
-              echo 1 >$PROC_PATH/sys/net/ipv4/neigh/$1/ucast_solicit"
-}
-
 # Send out an ARP announcement
 # (https://tools.ietf.org/html/rfc5227#page-15) to update ARP cache
 # entries across the weave network.  We do this in addition to
@@ -386,20 +361,6 @@ arp_update() {
     # It's not the end of the world if this doesn't run - we configure
     # ARP caches so that stale entries will be noticed quickly.
     ! command_exists arping || $3 arping -U -q -I $1 -c 1 ${2%/*}
-}
-
-# Generate a MAC value from a stdin containing six space separated
-# 2-digit hexadecimal numbers.
-mac_from_hex() {
-    # In the first byte of the MAC, the 'multicast' bit should be
-    # clear and 'locally administered' bit should be set.  All other
-    # bits should be random.
-    read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2))
-}
-
-# Generate a random MAC value
-random_mac() {
-    od -txC -An -N6 /dev/urandom | mac_from_hex
 }
 
 ######################################################################
@@ -427,51 +388,23 @@ EOF
     fi
 }
 
-enforce_docker_bridge_addr_assign_type() {
-    if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
-        echo "Could not determine address assignment type of $DOCKER_BRIDGE" >&2
-        return
-    fi
-    # From include/uapi/linux/netdevice.h
-    # #define NET_ADDR_PERM       0   /* address is permanent (default) */
-    # #define NET_ADDR_RANDOM     1   /* address is generated randomly */
-    # #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
-    # #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
-    if [ $ADDR_ASSIGN_TYPE != 3 ] ; then
-        echo "Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)" >&2
-        ip link set dev $DOCKER_BRIDGE address $(random_mac) || true
-    fi
-}
-
 # Detect the current bridge/datapath state. When invoked, the values of
 # $BRIDGE and $DATAPATH are expected to be distinct. $BRIDGE_TYPE and
 # $DATAPATH are set correctly on success; failure indicates that the
 # bridge/datapath devices have yet to be configured. If netdevs do exist
 # but are in an inconsistent state the script aborts with an error.
 detect_bridge_type() {
-    BRIDGE_TYPE=
-    if [ -d /sys/class/net/$DATAPATH ] ; then
-        # Unfortunately there's no simple way to positively check whether
-        # $DATAPATH is an ODP netdev so we have to make sure it isn't
-        # a bridge instead (and that $BRIDGE is).
-        if [ ! -d /sys/class/net/$DATAPATH/bridge -a -d /sys/class/net/$BRIDGE/bridge ] ; then
-            BRIDGE_TYPE=bridged_fastdp
-        else
-            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again." >&2
-            exit 1
-        fi
-    elif [ -d /sys/class/net/$BRIDGE ] ; then
-        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
-            BRIDGE_TYPE=bridge
-        else
-            BRIDGE_TYPE=fastdp
-            # The datapath is the bridge when there is no intermediary
+    BRIDGE_TYPE=$(util_op detect-bridge-type "$BRIDGE" "$DATAPATH")
+    case "$BRIDGE_TYPE" in
+        bridge|bridged_fastdp)
+            ;;
+        fastdp)
             DATAPATH="$BRIDGE"
-        fi
-    else
-        # No bridge/datapath devices configured
-        return 1
-    fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 
     # WEAVE_MTU may have been specified when the bridge was
     # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
@@ -481,95 +414,21 @@ detect_bridge_type() {
 }
 
 try_create_bridge() {
-    if ! detect_bridge_type ; then
-        BRIDGE_TYPE=bridge
-        if [ -z "$WEAVE_NO_FASTDP" ] ; then
-            BRIDGE_TYPE=bridged_fastdp
-            if [ -n "$WEAVE_NO_BRIDGED_FASTDP" ] ; then
-                BRIDGE_TYPE=fastdp
-                # The datapath is the bridge when there is no intermediary
-                DATAPATH="$BRIDGE"
-            fi
-            if util_op create-datapath $DATAPATH ; then
-                : # ODP datapath created successfully
-            elif [ $? = 17 ] ; then
-                # Exit status of 17 means the kernel doesn't have ODP
-                BRIDGE_TYPE=bridge
-            else
-                return 1
-            fi
-        fi
-
-        init_$BRIDGE_TYPE
-
-        # Drop traffic from Docker bridge to Weave; it can break
-        # subnet isolation
-        if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
-            # Note using -I to insert ahead of Docker's bridge rules
-            run_iptables -t filter -I FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP
-        fi
-
-        [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-
-        # forbid traffic to the Weave port from other containers
-        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dst $DOCKER_BRIDGE_IP --dport $PORT          -j DROP
-        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dst $DOCKER_BRIDGE_IP --dport $PORT          -j DROP
-        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dst $DOCKER_BRIDGE_IP --dport $(($PORT + 1)) -j DROP
-
-        # let DNS traffic to weaveDNS, since otherwise it might get blocked by the likes of UFW
-        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT
-        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT
-
-        if [ "$2" = "--expect-npc" ] ; then # matches usage in weave-kube launch.sh
-            # Steer traffic via the NPC
-            run_iptables -N WEAVE-NPC >/dev/null 2>&1 || true
-            add_iptables_rule filter FORWARD -o $BRIDGE -j WEAVE-NPC
-            add_iptables_rule filter FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86
-            add_iptables_rule filter FORWARD -o $BRIDGE -j DROP
-        else
-            # Work around the situation where there are no rules allowing traffic
-            # across our bridge. E.g. ufw
-            add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
-        fi
-        # Forward from weave to the rest of the world
-        add_iptables_rule filter FORWARD -i $BRIDGE ! -o $BRIDGE -j ACCEPT
-        # and allow replies back
-        add_iptables_rule filter FORWARD -o $BRIDGE -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-
-        # create a chain for masquerading
-        run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
-        add_iptables_rule nat POSTROUTING -j WEAVE
-    else
-        if [ -n "$LAUNCHING_ROUTER" ] ; then
-            if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] &&
-                util_op check-datapath $DATAPATH 2>/dev/null ; then
-                cat <<EOF >&2
-WEAVE_NO_FASTDP is not set, but there is already a bridge present of
-the wrong type for fast datapath.  Please do 'weave reset' to remove
-the bridge first.
-EOF
-                return 1
-            fi
-            if [ "$BRIDGE_TYPE" != bridge -a -n "$WEAVE_NO_FASTDP" ] ; then
-                cat <<EOF >&2
-WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
-bridge present.  Please do 'weave reset' to remove the bridge first.
-EOF
-                return 1
-            fi
-        fi
+    # Running this from 'weave --local' when weaveexec is not on the
+    # path will run it as a Docker container that does not have access
+    # to /etc/machine-id, so will not give the full range of persistent IDs
+    if [ -z "$WEAVEDB_DIR_PATH" ]; then
+        WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
     fi
-
-    [ "$1" = "--without-ethtool" -o -n "$AWSVPC" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
-
-    ip link set dev $BRIDGE up
-
-    # Configure the ARP cache parameters on the bridge interface for
-    # the sake of 'weave expose'
-    configure_arp_cache $BRIDGE
+    MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
+    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
+    # Set some variables that are expected by code that comes later
+    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
+    MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
 create_bridge() {
+    validate_bridge_type
     if ! try_create_bridge "$@" ; then
         echo "Creating bridge '$BRIDGE' failed" >&2
         # reset to original value so we destroy both kinds
@@ -579,18 +438,35 @@ create_bridge() {
     fi
 }
 
+validate_bridge_type() {
+    detect_bridge_type || return 0
+
+    if [ -n "$LAUNCHING_ROUTER" ] ; then
+        if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] &&
+               util_op check-datapath 2>/dev/null ; then
+            cat <<EOF >&2
+WEAVE_NO_FASTDP is not set, but there is already a bridge present of
+the wrong type for fast datapath.  Please do 'weave reset' to remove
+the bridge first.
+EOF
+            return 1
+        fi
+        if [ "$BRIDGE_TYPE" != bridge -a -n "$WEAVE_NO_FASTDP" ] ; then
+            cat <<EOF >&2
+WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
+bridge present.  Please do 'weave reset' to remove the bridge first.
+EOF
+            return 1
+        fi
+    fi
+}
+
 expose_ip() {
     ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
     for CIDR in $ALL_CIDRS ; do
         if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
             ip addr add dev $BRIDGE $CIDR
             arp_update $BRIDGE $CIDR || true
-            # Remove a default route installed by the kernel, because awsvpc
-            # has installed it as well
-            if [ -n "$AWSVPC" ]; then
-                RCIDR=$(ip route list exact $CIDR proto kernel | head -n1 | cut -d' ' -f1)
-                [ -n "$RCIDR" ] && ip route del dev $BRIDGE proto kernel $RCIDR
-            fi
         fi
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
@@ -612,80 +488,6 @@ create_veth() {
         ip link del $VETHR >/dev/null 2>&1 || true
         return 1
     fi
-}
-
-init_fastdp() {
-    # GCE has the lowest underlay network MTU we're likely to encounter on
-    # a local network, at 1460 bytes.  To get the overlay MTU from that we
-    # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
-    # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
-    # ethernet header. In addition, we subtract 34 bytes for the ESP overhead
-    # which is needed for the vxlan encryption.
-    MTU=${WEAVE_MTU:-1376}
-
-    # create_bridge already created the datapath netdev
-    ip link set dev $DATAPATH mtu $MTU
-}
-
-init_bridge_prep() {
-    # Observe any MTU that is already set
-    [ -n "$MTU" ] || MTU=${WEAVE_MTU:-65535}
-
-    ip link add name $BRIDGE type bridge
-
-    # Running this from 'weave --local' when weaveexec is not on the
-    # path will run it as a Docker container that does not have access
-    # to /etc/machine-id, so will not give the full range of persistent IDs
-    if [ -z "$WEAVEDB_DIR_PATH" ]; then
-        WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
-    fi
-    MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
-
-    ip link set dev $BRIDGE address $MAC
-
-    # Attempting to set the bridge MTU to a high value directly
-    # fails. Bridges take the lowest MTU of their interfaces. So
-    # instead we create a temporary interface with the desired
-    # MTU, attach that to the bridge, and then remove it again.
-    ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
-    ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
-    ip link del dev v${CONTAINER_IFNAME}du
-}
-
-init_bridge() {
-    init_bridge_prep
-    create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
-}
-
-init_bridged_fastdp() {
-    # Initialise the datapath as normal. NB sets MTU for use below
-    init_fastdp
-
-    # Initialise the bridge using fast datapath MTU
-    init_bridge_prep
-
-    # Create linking veth pair
-    create_veth $BRIDGE_IFNAME $DATAPATH_IFNAME configure_veth_bridged_fastdp
-
-    # Finally, bring the datapath up
-    ip link set dev $DATAPATH up
-}
-
-configure_veth_bridged_fastdp() {
-    add_iface_fastdp $DATAPATH_IFNAME || return 1
-    add_iface_bridge $BRIDGE_IFNAME || return 1
-}
-
-ethtool_tx_off_fastdp() {
-    true
-}
-
-ethtool_tx_off_bridge() {
-    ethtool -K $1 tx off >/dev/null
-}
-
-ethtool_tx_off_bridged_fastdp() {
-    true
 }
 
 destroy_bridge() {
@@ -760,16 +562,10 @@ configure_veth_attached_bridge() {
     ip link set $GUEST_IFNAME master $bridge
 }
 
-router_opts_fastdp() {
-    echo "--datapath $DATAPATH"
-}
-
-router_opts_bridge() {
-    echo "--iface $PCAP_IFNAME"
-}
-
-router_opts_bridged_fastdp() {
-    router_opts_fastdp "$@"
+router_bridge_opts() {
+    echo --docker-bridge "$DOCKER_BRIDGE" --weave-bridge "$BRIDGE" --datapath "$DATAPATH"
+    [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
+    [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
 }
 
 ask_version() {
@@ -1468,8 +1264,6 @@ common_launch_args() {
 launch_router() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
-    enforce_docker_bridge_addr_assign_type
-
     # backward compatibility...
     if is_cidr "$1" ; then
         echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
@@ -1539,11 +1333,7 @@ launch_router() {
     eval "set -- $ARGS"
 
     setup_cni
-    create_bridge
-    # We set the router name to the bridge MAC, which in turn is
-    # derived from the system UUID (if available), and thus stable
-    # across reboots.
-    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+    validate_bridge_type
 
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
@@ -1593,11 +1383,13 @@ launch_router() {
         --volumes-from $DB_CONTAINER_NAME \
         -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -v /run/docker/plugins:/run/docker/plugins \
+        -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
-        --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" \
-        $(router_opts_$BRIDGE_TYPE) \
+        --port $CONTAINER_PORT --nickname "$(hostname)" \
+        --host-root=/host \
+        $(router_bridge_opts) \
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
@@ -1608,43 +1400,10 @@ launch_router() {
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
         "$@")
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-    setup_awsvpc
-    populate_router
 
     if [ -n "$ENABLE_PLUGIN" ]; then
         wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME plugin-status.sock
         util_op create-plugin-network weave weavemesh $IPRANGE
-    fi
-}
-
-setup_awsvpc() {
-    if [ -n "$AWSVPC" ]; then
-        # Set proxy_arp on the bridge, so that it could accept packets destined
-        # to containers within the same subnet but running on remote hosts.
-        # Without it, exact routes on each container are required.
-        echo 1 >$PROC_PATH/sys/net/ipv4/conf/$BRIDGE/proxy_arp
-        # Avoid delaying the first ARP request. Also, setting it to 0 avoids
-        # placing the request into a bounded queue as it can be seen:
-        # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
-        echo 0 >$PROC_PATH/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
-        expose_ip
-    fi
-}
-
-# Recreate the parameter values that are set when the router is first launched
-fetch_router_args() {
-    CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
-    NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
-}
-
-populate_dns_for_one_container() {
-    [ -z "$4" ] || with_container_fqdn $1 put_dns_fqdn $4
-}
-
-populate_router() {
-    if [ -z "$NO_DNS_OPT" ] ; then
-        # Tell the newly-started weaveDNS about existing weave IPs
-        with_container_addresses populate_dns_for_one_container weave:allids
     fi
 }
 
@@ -1753,17 +1512,6 @@ if ! command_exists ip ; then
     exit 1
 fi
 
-if ! ip netns list >/dev/null 2>&1 ; then
-    echo "ERROR: $(ip -V) does not support network namespaces." >&2
-    echo "       Please install iproute2-ss111010 or later." >&2
-    exit 1
-fi
-
-if ! command_exists nsenter ; then
-    echo "ERROR: nsenter utility missing. Please install it." >&2
-    exit 1
-fi
-
 [ $# -gt 0 ] || usage
 COMMAND=$1
 shift 1
@@ -1788,22 +1536,6 @@ case "$COMMAND" in
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --proc-path=*)
-                    PROC_PATH="${1#*=}"
-                    shift
-                    ;;
-                --weavedb-dir-path=*)
-                    WEAVEDB_DIR_PATH="${1#*=}"
-                    shift
-                    ;;
-                *)
-                    break
-                    ;;
-            esac
-        done
-
         if [ "$1" != "--force" ] ; then
             cat 1>&2 <<EOF
 WARNING: 'weave create-bridge' is deprecated. Instead use 'weave attach-bridge'
@@ -1814,8 +1546,7 @@ EOF
         else
             shift 1
         fi
-
-        create_bridge --without-ethtool "$@"
+        create_bridge "$@"
         ;;
     attach-bridge)
         if detect_bridge_type ; then
@@ -1844,17 +1575,6 @@ EOF
         check_not_running_plugin_v2
         launch_router "$@"
         echo $ROUTER_CONTAINER
-        ;;
-    attach-router)
-        check_running $CONTAINER_NAME
-        enforce_docker_bridge_addr_assign_type
-        # We cannot use detect_awsvpc here, because HTTP server might not be started
-        ! docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--awsvpc" || AWSVPC=1
-        create_bridge
-        fetch_router_args
-        wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-        setup_awsvpc
-        populate_router
         ;;
     launch-proxy)
         deprecation_warnings "$@"
@@ -2020,7 +1740,7 @@ EOF
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
-        create_bridge --without-ethtool
+        create_bridge
         expose_ip
         util_op expose-nat $ALL_CIDRS
         show_addrs $ALL_CIDRS
@@ -2029,7 +1749,7 @@ EOF
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         ipam_cidrs lookup weave:expose $CIDR_ARGS
-        create_bridge --without-ethtool
+        create_bridge
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR

@@ -125,10 +125,10 @@ func main() {
 	var (
 		justVersion        bool
 		config             mesh.Config
+		bridgeConfig       weavenet.BridgeConfig
 		networkConfig      weave.NetworkConfig
 		protocolMinVersion int
 		resume             bool
-		ifaceName          string
 		routerName         string
 		nickName           string
 		password           string
@@ -144,10 +144,10 @@ func main() {
 		peers              []string
 		noDNS              bool
 		dnsConfig          dnsConfig
-		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
-		isAWSVPC           bool
+		hostRoot           string
+		procPath           string
 		discoveryEndpoint  string
 		token              string
 		advertiseAddress   string
@@ -168,7 +168,9 @@ func main() {
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
-	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
+	mflag.StringVar(&bridgeConfig.WeaveBridgeName, []string{"-weave-bridge"}, "weave", "name of weave bridge")
+	mflag.StringVar(&bridgeConfig.DockerBridgeName, []string{"-docker-bridge"}, "", "name of Docker bridge")
+	mflag.BoolVar(&bridgeConfig.NPC, []string{"-expect-npc"}, false, "set up iptables rules for npc")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
@@ -178,6 +180,7 @@ func main() {
 	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
+	mflag.IntVar(&bridgeConfig.MTU, []string{"-mtu"}, 0, "MTU size")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&statusAddr, []string{"-status-addr"}, "", "address to bind status+metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
@@ -192,10 +195,13 @@ func main() {
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
-	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
+	mflag.StringVar(&bridgeConfig.DatapathName, []string{"-datapath"}, "", "ODP datapath name")
+	mflag.BoolVar(&bridgeConfig.NoFastdp, []string{"-no-fastdp"}, false, "Disable Fast Datapath")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
-	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
+	mflag.StringVar(&procPath, []string{"-proc-path"}, "/proc", "path to reach host /proc filesystem")
+	mflag.BoolVar(&bridgeConfig.AWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
+	mflag.StringVar(&hostRoot, []string{"-host-root"}, "", "path to reach host filesystem")
 	mflag.StringVar(&discoveryEndpoint, []string{"-peer-discovery-url"}, "https://cloud.weave.works/api/net", "url for peer discovery")
 	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
 	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
@@ -244,18 +250,31 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	config.Password = determinePassword(password)
-
-	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB, config.Password != nil)
-	networkConfig.Bridge = bridge
-
-	if bridge != nil {
-		if err := weavenet.DetectHairpin("vethwe-bridge", Log); err != nil {
-			Log.Errorf("DetectHairpin failed: %s", err)
+	if bridgeConfig.DockerBridgeName != "" {
+		if setAddr, err := weavenet.EnforceAddrAssignType(bridgeConfig.DockerBridgeName); err != nil {
+			Log.Errorf("While checking address assignment type of %s: %s", bridgeConfig.DockerBridgeName, err)
+		} else if setAddr {
+			Log.Warningf("Setting %s MAC (mitigate https://github.com/docker/docker/issues/14908)", bridgeConfig.DockerBridgeName)
 		}
 	}
 
-	name := peerName(routerName)
+	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
+
+	bridgeConfig.Mac = name.String()
+	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig)
+	checkFatal(err)
+	Log.Println("Bridge type is", bridgeType)
+
+	config.Password = determinePassword(password)
+
+	overlay, bridge := createOverlay(bridgeType, bridgeConfig, config.Host, config.Port, bufSzMB, config.Password != nil)
+	networkConfig.Bridge = bridge
+
+	if bridge != nil {
+		if err := weavenet.DetectHairpin(weavenet.BridgeIfName, Log); err != nil {
+			Log.Errorf("DetectHairpin failed: %s", err)
+		}
+	}
 
 	if nickName == "" {
 		var err error
@@ -266,7 +285,7 @@ func main() {
 	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 	config.PeerDiscovery = !noDiscovery
 
-	if isAWSVPC && len(config.Password) > 0 {
+	if bridgeConfig.AWSVPC && len(config.Password) > 0 {
 		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
 	}
 
@@ -312,7 +331,7 @@ func main() {
 	}
 
 	network := ""
-	if isAWSVPC {
+	if bridgeConfig.AWSVPC {
 		network = "awsvpc"
 	}
 	checkForUpdates(dockerVersion, network)
@@ -335,16 +354,16 @@ func main() {
 	)
 	if ipamConfig.Enabled() {
 		var t tracker.LocalRangeTracker
-		if isAWSVPC {
+		if bridgeConfig.AWSVPC {
 			Log.Infoln("Creating AWSVPC LocalRangeTracker")
-			t, err = tracker.NewAWSVPCTracker()
+			t, err = tracker.NewAWSVPCTracker(bridgeConfig.WeaveBridgeName)
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
 			trackerName = "awsvpc"
 		}
 
-		preClaims, err := findExistingAddresses(dockerCli, weavenet.WeaveBridgeName)
+		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
 		checkFatal(err)
 
 		allocator, defaultSubnet = createAllocator(router, ipamConfig, preClaims, db, t, isKnownPeer)
@@ -367,6 +386,9 @@ func main() {
 		ns.Start()
 		defer ns.Stop()
 		dnsserver.ActivateAndServe()
+		if dockerCli != nil {
+			populateDNS(ns, dockerCli, name, bridgeConfig.WeaveBridgeName)
+		}
 		defer dnsserver.Stop()
 	}
 
@@ -410,7 +432,23 @@ func main() {
 		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
 	}
 
+	if bridgeConfig.AWSVPC {
+		// Run this on its own goroutine because the allocator can block
+		// We remove the default route installed by the kernel,
+		// because awsvpc has installed it as well
+		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC)
+	}
+
 	signals.SignalHandlerLoop(common.Log, router)
+}
+
+func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool) {
+	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
+	checkFatal(err)
+	cidr := address.MakeCIDR(subnet, addr)
+	err = weavenet.AddBridgeAddr(bridgeName, cidr.IPNet(), removeDefaultRoute)
+	checkFatal(err)
+	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
 }
 
 func options() map[string]string {
@@ -453,34 +491,32 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	var ignoreSleeve bool
 
 	switch {
-	case isAWSVPC:
+	case config.AWSVPC:
 		vpc := weave.NewAWSVPC()
 		overlay.Add("awsvpc", vpc)
 		bridge = weave.NullBridge{}
 		// Currently, we do not support any overlay with AWSVPC
 		ignoreSleeve = true
-	case datapathName != "" && ifaceName != "":
-		Log.Fatal("At most one of --datapath and --iface must be specified.")
-	case datapathName != "":
-		iface, err := weavenet.EnsureInterface(datapathName)
+	case bridgeType == nil:
+		bridge = weave.NullBridge{}
+	case bridgeType.IsFastdp():
+		iface, err := weavenet.EnsureInterface(config.DatapathName)
 		checkFatal(err)
 		fastdp, err := weave.NewFastDatapath(iface, port, enableEncryption)
 		checkFatal(err)
 		bridge = fastdp.Bridge()
 		overlay.Add("fastdp", fastdp.Overlay())
-	case ifaceName != "":
-		iface, err := weavenet.EnsureInterface(ifaceName)
+	case !bridgeType.IsFastdp():
+		iface, err := weavenet.EnsureInterface(weavenet.PcapIfName)
 		checkFatal(err)
 		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
-	default:
-		bridge = weave.NullBridge{}
 	}
 
 	if !ignoreSleeve {
@@ -578,13 +614,15 @@ func determinePassword(password string) []byte {
 	return []byte(password)
 }
 
-func peerName(routerName string) mesh.PeerName {
+func peerName(routerName, bridgeName, dbPrefix, hostRoot string) mesh.PeerName {
 	if routerName == "" {
-		iface, err := net.InterfaceByName(weavenet.WeaveBridgeName)
-		if err != nil {
-			Log.Fatalf("Unable to find bridge %q", weavenet.WeaveBridgeName)
+		iface, err := net.InterfaceByName(bridgeName)
+		if err == nil {
+			routerName = iface.HardwareAddr.String()
+		} else {
+			routerName, err = weavenet.GetSystemPeerName(dbPrefix, hostRoot)
+			checkFatal(err)
 		}
-		routerName = iface.HardwareAddr.String()
 	}
 	name, err := mesh.PeerNameFromUserInput(routerName)
 	checkFatal(err)

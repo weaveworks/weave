@@ -27,7 +27,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			vars      = mux.Vars(r)
 			container = vars["container"]
 			ipStr     = vars["ip"]
-			hostname  = dns.Fqdn(r.FormValue("fqdn"))
+			fqdn      = r.FormValue("fqdn")
 			ip, err   = address.ParseIP(ipStr)
 		)
 		if err != nil {
@@ -35,16 +35,11 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			return
 		}
 
-		if !dns.IsSubDomain(n.domain, hostname) {
-			n.infof("Ignoring registration %s %s %s (not a subdomain of %s)", hostname, ipStr, container, n.domain)
-			return
-		}
-
-		n.AddEntry(hostname, container, n.ourName, ip)
+		n.AddEntryFQDN(fqdn, container, n.ourName, ip)
 
 		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(container) {
 			n.infof("container '%s' is not running: removing", container)
-			n.Delete(hostname, container, ipStr, ip)
+			n.Delete(dns.Fqdn(fqdn), container, ipStr, ip)
 		}
 
 		w.WriteHeader(204)

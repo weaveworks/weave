@@ -17,6 +17,8 @@ func init() {
 		"help":                     help,
 		"netcheck":                 netcheck,
 		"docker-tls-args":          dockerTLSArgs,
+		"create-bridge":            createBridge,
+		"detect-bridge-type":       detectBridgeType,
 		"create-datapath":          createDatapath,
 		"delete-datapath":          deleteDatapath,
 		"check-datapath":           checkDatapath,
