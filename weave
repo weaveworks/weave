@@ -1264,11 +1264,6 @@ common_launch_args() {
 launch_router() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
-    # backward compatibility...
-    if is_cidr "$1" ; then
-        echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
-        shift 1
-    fi
 
     CONTAINER_PORT=$PORT
     ARGS=
