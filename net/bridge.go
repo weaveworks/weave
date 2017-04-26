@@ -436,7 +436,7 @@ func configureIPTables(config *BridgeConfig) error {
 
 	if config.NPC {
 		// Steer traffic via the NPC
-		if err = ipt.ClearChain("nat", "WEAVE-NPC"); err != nil {
+		if err = ipt.ClearChain("filter", "WEAVE-NPC"); err != nil {
 			return errors.Wrap(err, "clearing WEAVE-NPC chain")
 		}
 		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
