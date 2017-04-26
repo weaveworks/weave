@@ -157,7 +157,8 @@ function create_image() {
         terraform destroy -force "$DIR/../tools/provisioning/gcp"
         rm terraform.tfstate*
         echo
-        greenly echo "> Created GCP image $IMAGE_NAME in $(date -u -d @$(($(date +%s) - begin_img)) +"%T")."
+        local end_img=$(date +%s)
+        greenly echo "> Created GCP image $IMAGE_NAME in $(date -u -d @$((end_img - begin_img)) +"%T")."
     else
         wait_for_image
     fi
@@ -261,7 +262,8 @@ function provision() {
     esac
     [ "$1" == "on" ] && set_hosts
     echo
-    greenly echo "> Provisioning took $(date -u -d @$(($(date +%s) - begin_prov)) +"%T")."
+    local end_prov=$(date +%s)
+    greenly echo "> Provisioning took $(date -u -d @$((end_prov - begin_prov)) +"%T")."
 }
 
 function configure_with_ansible() {
@@ -290,7 +292,8 @@ function configure() {
         done
 
         echo
-        greenly echo "> Configuration took $(date -u -d @$(($(date +%s) - begin_conf)) +"%T")."
+        local end_conf=$(date +%s)
+        greenly echo "> Configuration took $(date -u -d @$((end_conf - begin_conf)) +"%T")."
     fi
 }
 
@@ -303,13 +306,16 @@ function run_tests() {
     "$DIR/run_all.sh" "$@"
     local status=$?
     echo
-    greenly echo "> Tests took $(date -u -d @$(($(date +%s) - begin_tests)) +"%T")."
+    local end_tests=$(date +%s)
+    greenly echo "> Tests took $(date -u -d @$((end_tests - begin_tests)) +"%T")."
     return $status
 }
 
+# shellcheck disable=SC2155
 function end() {
     echo
-    echo "> Build took $(date -u -d @$(($(date +%s) - begin)) +"%T")."
+    local end_time=$(date +%s)
+    echo "> Build took $(date -u -d @$((end_time - begin)) +"%T")."
 }
 
 function echo_export_hosts() {
