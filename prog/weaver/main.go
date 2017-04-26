@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
 	"github.com/weaveworks/common/mflag"
+	"github.com/weaveworks/common/mflagext"
 	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/mesh"
 
@@ -26,6 +27,7 @@ import (
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/plugin"
+	weaveproxy "github.com/weaveworks/weave/proxy"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -113,6 +115,13 @@ func (c *ipamConfig) parseMode() error {
 	return nil
 }
 
+func getenvOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
+}
+
 func main() {
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -133,7 +142,7 @@ func main() {
 		nickName                string
 		password                string
 		pktdebug                bool
-		logLevel                string
+		logLevel                = "info"
 		prof                    string
 		bufSzMB                 int
 		noDiscovery             bool
@@ -156,13 +165,8 @@ func main() {
 		enablePlugin            bool
 		enablePluginV2          bool
 		enablePluginV2Multicast bool
-
-		defaultDockerHost = "unix:///var/run/docker.sock"
+		defaultDockerHost       = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
 	)
-
-	if val := os.Getenv("DOCKER_HOST"); val != "" {
-		defaultDockerHost = val
-	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
@@ -213,6 +217,8 @@ func main() {
 	mflag.StringVar(&pluginSocket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginMeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
+	proxyConfig := configureProxy(version, defaultDockerHost)
+
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
 	// mflags error messages.
@@ -223,19 +229,19 @@ func main() {
 
 	mflag.Parse()
 
+	if justVersion {
+		fmt.Printf("weave %s\n", version)
+		os.Exit(0)
+	}
+
 	peers = mflag.Args()
 	if resume && len(peers) > 0 {
 		Log.Fatalf("You must not specify an initial peer list in conjunction with --resume")
 	}
 
 	common.SetLogLevel(logLevel)
-
-	if justVersion {
-		fmt.Printf("weave router %s\n", version)
-		os.Exit(0)
-	}
-
 	Log.Println("Command line options:", options())
+	Log.Infoln("weave ", version)
 
 	if prof != "" {
 		defer profile.Start(profile.CPUProfile, profile.ProfilePath(prof), profile.NoShutdownHook).Stop()
@@ -245,6 +251,17 @@ func main() {
 		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
+
+	// Start Weave Proxy:
+	proxy, err := weaveproxy.NewProxy(*proxyConfig)
+	if err != nil {
+		Log.Fatalf("Could not start proxy: %s", err)
+	}
+	defer proxy.Stop()
+	listeners := proxy.Listen()
+	proxy.AttachExistingContainers()
+	go proxy.Serve(listeners)
+	go proxy.ListenAndServeStatus("/home/weave/status.sock")
 
 	if pktdebug {
 		networkConfig.PacketLogging = packetLogging{}
@@ -495,6 +512,30 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 }
 
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
+}
+
+func configureProxy(version string, defaultDockerHost string) *weaveproxy.Config {
+	proxyConfig := weaveproxy.Config{
+		Version:      version,
+		Image:        getenvOrDefault("EXEC_IMAGE", "weaveworks/weaveexec"),
+		DockerBridge: getenvOrDefault("DOCKER_BRIDGE", "docker0"),
+		DockerHost:   defaultDockerHost,
+	}
+	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
+	mflag.StringVar(&proxyConfig.HostnameFromLabel, []string{"-hostname-from-label"}, "", "Key of container label from which to obtain the container's hostname")
+	mflag.StringVar(&proxyConfig.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
+	mflag.StringVar(&proxyConfig.HostnameReplacement, []string{"-hostname-replacement"}, "$1", "Expression to generate hostnames based on matches from --hostname-match (e.g. 'my-app-$1')")
+	mflag.BoolVar(&proxyConfig.RewriteInspect, []string{"-rewrite-inspect"}, false, "Rewrite 'inspect' calls to return the weave network settings (if attached)")
+	mflag.BoolVar(&proxyConfig.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
+	mflag.BoolVar(&proxyConfig.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
+	mflag.StringVar(&proxyConfig.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
+	mflag.StringVar(&proxyConfig.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
+	mflag.BoolVar(&proxyConfig.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
+	mflag.StringVar(&proxyConfig.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
+	mflag.BoolVar(&proxyConfig.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
+	mflag.BoolVar(&proxyConfig.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
+	mflag.BoolVar(&proxyConfig.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
+	return &proxyConfig
 }
 
 func createOverlay(bridgeType weavenet.Bridge, config weavenet.BridgeConfig, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.InjectorConsumer) {
