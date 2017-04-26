@@ -1,4 +1,4 @@
-FROM golang:1.7.4
+FROM golang:1.8.1
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
