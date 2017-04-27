@@ -35,10 +35,20 @@ func getKubePeers() ([]string, error) {
 	}
 	addresses := make([]string, 0, len(nodeList.Items))
 	for _, peer := range nodeList.Items {
+		var internalIP, externalIP string
 		for _, addr := range peer.Status.Addresses {
 			if addr.Type == "InternalIP" {
-				addresses = append(addresses, addr.Address)
+				internalIP = addr.Address
+			} else if addr.Type == "ExternalIP" {
+				externalIP = addr.Address
 			}
+		}
+
+		// Fallback for cases where a Node has an ExternalIP but no InternalIP
+		if internalIP != "" {
+			addresses = append(addresses, internalIP)
+		} else if externalIP != "" {
+			addresses = append(addresses, externalIP)
 		}
 	}
 	return addresses, nil
