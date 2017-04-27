@@ -51,7 +51,7 @@ IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 CIDR_REGEXP="(ip:|net:)?$IP_REGEXP/[0-9]{1,2}"
 
 is_cidr() {
-    [ $1 = "net:default" ] && return
+    [ "$1" = "net:default" ] && return
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
 
@@ -182,7 +182,7 @@ start_container_image() {
     else
         weave_dns_args=$(dns_args $host "$@")
     fi
-    is_cidr $1 && { cidr=$1; shift; }
+    is_cidr "$1" && { cidr=$1; shift; }
     container=$(docker_on $host run $weave_dns_args $name_args "$@" -dt $image /bin/sh)
     if ! weave_on $host attach $cidr $container >/dev/null ; then
         docker_on $host rm -f $container
