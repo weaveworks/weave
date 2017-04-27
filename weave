@@ -1395,11 +1395,6 @@ launch_router() {
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
         "$@")
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-
-    if [ -n "$ENABLE_PLUGIN" ]; then
-        wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME plugin-status.sock
-        util_op create-plugin-network weave weavemesh $IPRANGE
-    fi
 }
 
 stop_router() {

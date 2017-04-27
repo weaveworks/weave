@@ -225,6 +225,30 @@ func (c *Client) GetContainerIP(nameOrID string) (string, error) {
 	return info.NetworkSettings.IPAddress, nil
 }
 
+func (c *Client) EnsureNetwork(networkName, driver, subnet string, options map[string]interface{}) error {
+	_, err := c.CreateNetwork(
+		docker.CreateNetworkOptions{
+			Name:           networkName,
+			CheckDuplicate: true,
+			Driver:         driver,
+			IPAM: docker.IPAMOptions{
+				Driver: driver,
+				Config: []docker.IPAMConfig{{Subnet: subnet}},
+			},
+			Options: options,
+		})
+	if err != docker.ErrNetworkAlreadyExists && err != nil {
+		// Despite appearances to the contrary, CreateNetwork does
+		// sometimes(always?) *not* return ErrNetworkAlreadyExists
+		// when the network already exists. Hence we need to check for
+		// this explicitly.
+		if _, err2 := c.NetworkInfo(networkName); err2 != nil {
+			return fmt.Errorf("unable to create network: %s", err)
+		}
+	}
+	return nil
+}
+
 // logging
 
 func (c *Client) errorf(fmt string, args ...interface{}) {

@@ -1,9 +1,7 @@
 package plugin
 
 import (
-	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -18,7 +16,10 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
-const pluginV2Name = "net-plugin"
+const (
+	pluginV2Name    = "net-plugin"
+	MulticastOption = netplugin.MulticastOption
+)
 
 var Log = common.Log
 
@@ -53,12 +54,6 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer os.Remove(meshAddress)
 		defer meshListener.Close()
 	}
-
-	statusListener, err := weavenet.ListenUnixSocket("/home/weave/plugin-status.sock")
-	if err != nil {
-		return err
-	}
-	go serveStatus(statusListener)
 
 	return <-endChan
 }
@@ -97,13 +92,4 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 	}()
 
 	return listener, nil
-}
-
-func serveStatus(listener net.Listener) {
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "ok")
-	})}
-	if err := server.Serve(listener); err != nil {
-		Log.Fatalf("ListenAndServeStatus failed: %s", err)
-	}
 }

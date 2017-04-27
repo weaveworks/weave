@@ -431,6 +431,12 @@ func main() {
 	if enablePlugin || enablePluginV2 {
 		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
 	}
+	if enablePlugin {
+		Log.Println("Creating default 'weave' network")
+		options := map[string]interface{}{plugin.MulticastOption: "true"}
+		// TODO: the driver name should be extracted from pluginMeshSocket
+		dockerCli.EnsureNetwork("weave", "weavemesh", defaultSubnet.String(), options)
+	}
 
 	if bridgeConfig.AWSVPC {
 		// Run this on its own goroutine because the allocator can block

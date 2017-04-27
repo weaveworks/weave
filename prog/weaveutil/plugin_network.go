@@ -7,43 +7,7 @@ import (
 
 	"github.com/docker/docker/client"
 	docker "github.com/fsouza/go-dockerclient"
-
-	"github.com/weaveworks/weave/plugin/net"
 )
-
-func createPluginNetwork(args []string) error {
-	if len(args) != 3 {
-		cmdUsage("create-plugin-network", "<network-name> <driver-name> <default-subnet>")
-	}
-	networkName := args[0]
-	driverName := args[1]
-	subnet := args[2]
-	d, err := newDockerClient()
-	if err != nil {
-		return err
-	}
-	_, err = d.CreateNetwork(
-		docker.CreateNetworkOptions{
-			Name:           networkName,
-			CheckDuplicate: true,
-			Driver:         driverName,
-			IPAM: docker.IPAMOptions{
-				Driver: driverName,
-				Config: []docker.IPAMConfig{{Subnet: subnet}},
-			},
-			Options: map[string]interface{}{plugin.MulticastOption: "true"},
-		})
-	if err != docker.ErrNetworkAlreadyExists && err != nil {
-		// Despite appearances to the contrary, CreateNetwork does
-		// sometimes(always?) *not* return ErrNetworkAlreadyExists
-		// when the network already exists. Hence we need to check for
-		// this explicitly.
-		if _, err2 := d.NetworkInfo(networkName); err2 != nil {
-			return fmt.Errorf("unable to create network: %s", err)
-		}
-	}
-	return nil
-}
 
 func removePluginNetwork(args []string) error {
 	if len(args) != 1 {
