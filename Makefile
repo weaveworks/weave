@@ -98,9 +98,10 @@ RUNNER_EXE=tools/runner/runner
 MANIFEST_TOOL_DIR=vendor/github.com/estesp/manifest-tool
 MANIFEST_TOOL_EXE=$(MANIFEST_TOOL_DIR)/manifest-tool
 TEST_TLS_EXE=test/tls/tls
+NETWORKTESTER_EXE=test/images/network-tester/webserver
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE) $(NETWORKTESTER_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
@@ -110,8 +111,9 @@ PLUGIN_UPTODATE=.plugin$(ARCH_EXT).uptodate
 WEAVEKUBE_UPTODATE=.weavekube$(ARCH_EXT).uptodate
 WEAVENPC_UPTODATE=.weavenpc$(ARCH_EXT).uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
+NETWORKTESTER_UPTODATE=.networktester$(ARCH_EXT).uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE) $(NETWORKTESTER_UPTODATE)
 
 # The names of the images. Note that the images for other architectures than amd64 have a suffix in the image name.
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave$(ARCH_EXT)
@@ -121,8 +123,10 @@ WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube$(ARCH_EXT)
 WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc$(ARCH_EXT)
 BUILD_IMAGE=weaveworks/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
+PLUGIN_IMAGE=$(DOCKERHUB_USER)/net-plugin
+NETWORKTESTER_IMAGE=$(DOCKERHUB_USER)/network-tester
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE) $(NETWORKTESTER_IMAGE)
 
 PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
 PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_plugin push_ml_weave-kube push_ml_weave-npc
@@ -164,6 +168,7 @@ $(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
+$(NETWORKTESTER_EXE): test/images/network-tester/*.go
 tests: tools/.git
 lint: tools/.git
 
@@ -195,7 +200,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE):
+$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
@@ -278,6 +283,10 @@ $(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) $(WEAVENPC_EXE
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
 	$(SUDO) docker build -t $(WEAVEDB_IMAGE) prog/weavedb
+	touch $@
+
+$(NETWORKTESTER_UPTODATE): test/images/network-tester/Dockerfile $(NETWORKTESTER_EXE)
+	$(SUDO) docker build -t $(NETWORKTESTER_IMAGE) test/images/network-tester
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE)
