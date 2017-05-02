@@ -23,7 +23,6 @@ func init() {
 		"delete-datapath":          deleteDatapath,
 		"check-datapath":           checkDatapath,
 		"add-datapath-interface":   addDatapathInterface,
-		"create-plugin-network":    createPluginNetwork,
 		"remove-plugin-network":    removePluginNetwork,
 		"container-addrs":          containerAddrs,
 		"process-addrs":            processAddrs,
