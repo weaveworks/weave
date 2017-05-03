@@ -1,6 +1,7 @@
 ---
 title: Interactive Deployment
 menu_order: 20
+search_type: Documentation
 ---
 Weave Net can be launched interactively on the command line, and as 
 long as Docker is configured to start on boot, the network will survive 

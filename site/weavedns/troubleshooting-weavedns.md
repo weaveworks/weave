@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting and Present Limitations
 menu_order: 50
+search_type: Documentation
 ---
 
 

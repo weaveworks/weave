@@ -1,6 +1,7 @@
 ---
 title: Allocating IP Addresses
 menu_order: 70
+search_type: Documentation
 ---
 
 

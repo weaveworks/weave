@@ -1,6 +1,7 @@
 ---
 title: Concepts
 menu_order: 10
+search_type: Documentation
 ---
 This section describes some of the essential concepts with which you will
 need to be familiar before continuing to the example deployment

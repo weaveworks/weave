@@ -1,6 +1,7 @@
 ---
 title: Integrating Docker via the Network Plugin
 menu_order: 60
+search_type: Documentation
 ---
 
  * [Launching Weave Net and Running Containers Using the Plugin](#launching)

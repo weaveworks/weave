@@ -1,6 +1,7 @@
 ---
 title: Autoscaling
 menu_order: 40
+search_type: Documentation
 ---
 
 ### Bootstrapping

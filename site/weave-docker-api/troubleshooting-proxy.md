@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting
 menu_order: 60
+search_type: Documentation
 ---
 
 The command

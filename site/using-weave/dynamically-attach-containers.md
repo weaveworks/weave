@@ -1,6 +1,7 @@
 ---
 title: Dynamically Attaching and Detaching Applications
 menu_order: 40
+search_type: Documentation
 ---
 
 

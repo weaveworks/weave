@@ -1,6 +1,7 @@
 ---
 title: Discovering Containers with WeaveDNS
 menu_order: 80
+search_type: Documentation
 ---
 
 

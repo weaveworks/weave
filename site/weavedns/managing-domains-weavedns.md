@@ -1,6 +1,7 @@
 ---
 title: Managing Domains
 menu_order: 30
+search_type: Documentation
 ---
 
 The following topics are discussed:

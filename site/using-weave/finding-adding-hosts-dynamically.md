@@ -1,6 +1,7 @@
 ---
 title: Adding and Removing Hosts Dynamically
 menu_order: 90
+search_type: Documentation
 ---
 
 To add a host to an existing Weave network, launch Weave Net on the

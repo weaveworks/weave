@@ -1,6 +1,7 @@
 ---
 title: Using IP Routing on an Amazon Web Services Virtual Private Cloud
 menu_order: 110
+search_type: Documentation
 ---
 
 If your container infrastructure is running entirely within Amazon Web Services (AWS) 

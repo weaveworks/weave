@@ -1,6 +1,7 @@
 ---
 title: Managing Services - Exporting, Importing, Binding and Routing
 menu_order: 70
+search_type: Documentation
 ---
 
 This section contains the following topics: 

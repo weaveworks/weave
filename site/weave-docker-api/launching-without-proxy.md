@@ -1,6 +1,7 @@
 ---
 title: Launching Containers With Weave Run (without the Proxy)
 menu_order: 50
+search_type: Documentation
 ---
 
 In prior versions of Weave Net, we supported a command `weave run`

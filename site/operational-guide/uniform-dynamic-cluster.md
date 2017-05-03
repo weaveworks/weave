@@ -1,6 +1,7 @@
 ---
 title: Uniform Dynamic Clusters
 menu_order: 50
+search_type: Documentation
 ---
 
 A uniform dynamic cluster has the following characteristics:

@@ -1,6 +1,7 @@
 ---
 title: Feature Overview
 menu_order: 20
+search_type: Documentation
 ---
 
  * [Virtual Ethernet Switch](#virtual-ethernet-switch)

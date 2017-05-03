@@ -1,6 +1,7 @@
 ---
 title: Allocating IPs in a Specific Range
 menu_order: 15
+search_type: Documentation
 ---
 
 The default configurations for both Weave Net and Docker use [Private
