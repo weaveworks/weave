@@ -1,6 +1,7 @@
 ---
 title: Using Weave Cloud to get started with Weave Net
 menu_order: 10
+search_type: Documentation
 ---
 
 Weave Net provides a simple to deploy networking solution for containerized apps. Here, we describe how to manage a Weave container network using a sample application which consists of two simple `netcat` services deployed to containers on two separate hosts.
