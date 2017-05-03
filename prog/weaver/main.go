@@ -231,7 +231,8 @@ func main() {
 
 	if bridge != nil {
 		if err := weavenet.DetectHairpin("vethwe-bridge", Log); err != nil {
-			Log.Errorf("DetectHairpin failed: %s", err)
+			Log.Errorf("Setting may cause connectivity issues : %s", err)
+			Log.Infof("Hairpin mode may have been enabled by other software on this machine")
 		}
 	}
 
