@@ -1,6 +1,7 @@
 ---
 title: IP Addresses, Routes and Networks
 menu_order: 50
+search_type: Documentation
 ---
 
 

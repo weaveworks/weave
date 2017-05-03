@@ -1,6 +1,7 @@
 ---
 title: Uniform Fixed Clusters
 menu_order: 30
+search_type: Documentation
 ---
 
 This scenario describes a production deployment of a fixed number of N

@@ -1,6 +1,7 @@
 ---
 title: How Weave Finds Containers
 menu_order: 10
+search_type: Documentation
 ---
 
 

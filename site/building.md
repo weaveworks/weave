@@ -1,6 +1,7 @@
 ---
 title: Building Weave Net
 menu_order: 120
+search_type: Documentation
 ---
 You only need to build Weave Net if you want to work on the Weave Net codebase
 (or you just enjoy building software).

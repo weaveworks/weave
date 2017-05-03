@@ -1,6 +1,7 @@
 ---
 title: Integrating Kubernetes and Mesos via the CNI Plugin
 menu_order: 65
+search_type: Documentation
 ---
 
 > The recommended way of using Weave with Kubernetes is via the new

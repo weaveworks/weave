@@ -1,6 +1,7 @@
 ---
 title: Weave Net Router Sleeve Encapsulation
 menu_order: 10
+search_type: Documentation
 ---
 
 When the Weave Net router forwards packets to peers in `sleeve` mode

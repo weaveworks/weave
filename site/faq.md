@@ -1,6 +1,7 @@
 ---
 title: FAQ
 menu_order: 200
+search_type: Documentation
 ---
 
 

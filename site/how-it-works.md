@@ -1,6 +1,7 @@
 ---
 title: Understanding how Weave Net Works
 menu_order: 90
+search_type: Documentation
 ---
 
 
