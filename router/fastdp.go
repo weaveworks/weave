@@ -1224,7 +1224,7 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 	}
 
 	if fastdp.isHairpinFlow(&flow) {
-		log.Error("Vetoed installation of hairpin flow ", flow)
+		log.Warning("Vetoed installation of hairpin flow ", flow)
 		return
 	}
 

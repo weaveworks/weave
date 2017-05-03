@@ -271,8 +271,9 @@ func main() {
 	networkConfig.InjectorConsumer = injectorConsumer
 
 	if injectorConsumer != nil {
-		if err := weavenet.DetectHairpin(weavenet.BridgeIfName, Log); err != nil {
-			Log.Errorf("DetectHairpin failed: %s", err)
+		if err := weavenet.DetectHairpin("vethwe-bridge", Log); err != nil {
+			Log.Errorf("Setting may cause connectivity issues : %s", err)
+			Log.Infof("Hairpin mode may have been enabled by other software on this machine")
 		}
 	}
 
@@ -293,7 +294,8 @@ func main() {
 	checkFatal(err)
 	defer db.Close()
 
-	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
+	router, err := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
+	checkFatal(err)
 	Log.Println("Our name is", router.Ourself)
 
 	if token != "" {
@@ -330,11 +332,15 @@ func main() {
 		dockerVersion = dockerCli.DockerVersion()
 	}
 
+<<<<<<< HEAD
 	network := ""
 	if bridgeConfig.AWSVPC {
 		network = "awsvpc"
 	}
 	checkForUpdates(dockerVersion, network)
+=======
+	checkForUpdates(dockerVersion, router)
+>>>>>>> origin/1.9
 
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
@@ -562,7 +568,9 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, preClaims [
 
 	allocator := ipam.NewAllocator(c)
 
-	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
+	gossip, err := router.NewGossip("IPallocation", allocator)
+	checkFatal(err)
+	allocator.SetInterfaces(gossip)
 	allocator.Start()
 	router.Peers.OnGC(func(peer *mesh.Peer) { allocator.PeerGone(peer.Name) })
 
@@ -572,7 +580,9 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, preClaims [
 func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
 	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
 	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
-	ns.SetGossip(router.NewGossip("nameserver", ns))
+	gossip, err := router.NewGossip("nameserver", ns)
+	checkFatal(err)
+	ns.SetGossip(gossip)
 	upstream := nameserver.NewUpstream(config.ResolvConf, config.EffectiveListenAddress)
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
 		upstream, uint32(config.TTL), config.ClientTimeout)

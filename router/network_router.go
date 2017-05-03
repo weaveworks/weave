@@ -51,7 +51,7 @@ type NetworkRouter struct {
 	db   db.DB
 }
 
-func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) *NetworkRouter {
+func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) (*NetworkRouter, error) {
 	if overlay == nil {
 		overlay = NullNetworkOverlay{}
 	}
@@ -59,7 +59,11 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 		networkConfig.InjectorConsumer = NullInjectorConsumer{}
 	}
 
-	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay, common.LogLogger()), NetworkConfig: networkConfig, db: db}
+	meshRouter, err := mesh.NewRouter(config, name, nickName, overlay, common.LogLogger())
+	if err != nil {
+		return nil, err
+	}
+	router := &NetworkRouter{Router: meshRouter, NetworkConfig: networkConfig, db: db}
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
@@ -67,7 +71,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 			log.Println("Expired MAC", mac, "at", peer)
 		})
 	router.Peers.OnGC(func(peer *mesh.Peer) { router.Macs.Delete(peer) })
-	return router
+	return router, nil
 }
 
 // Start listening for TCP connections, locally captured packets, and

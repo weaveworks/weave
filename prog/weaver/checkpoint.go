@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/weaveworks/go-checkpoint"
+	weave "github.com/weaveworks/weave/router"
 )
 
 var checker *checkpoint.Checker
@@ -16,7 +17,7 @@ const (
 	updateCheckPeriod = 6 * time.Hour
 )
 
-func checkForUpdates(dockerVersion string, network string) {
+func checkForUpdates(dockerVersion string, router *weave.NetworkRouter) {
 	newVersion.Store("")
 	success.Store(true)
 
@@ -51,9 +52,6 @@ func checkForUpdates(dockerVersion string, network string) {
 		"docker-version": dockerVersion,
 		"kernel-version": kernelVersion,
 	}
-	if network != "" {
-		flags["network"] = network
-	}
 
 	// Start background version checking
 	params := checkpoint.CheckParams{
@@ -61,6 +59,21 @@ func checkForUpdates(dockerVersion string, network string) {
 		Version:       version,
 		SignatureFile: "",
 		Flags:         flags,
+		ExtraFlags:    func() []checkpoint.Flag { return checkpointFlags(router) },
 	}
 	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
+}
+
+func checkpointFlags(router *weave.NetworkRouter) []checkpoint.Flag {
+	flags := []checkpoint.Flag{}
+	status := weave.NewNetworkRouterStatus(router)
+	for _, conn := range status.Connections {
+		if connectionName, ok := conn.Attrs["name"].(string); ok {
+			if _, encrypted := conn.Attrs["encrypted"]; encrypted {
+				connectionName = connectionName + " encrypted"
+			}
+			flags = append(flags, checkpoint.Flag{Key: "network", Value: connectionName})
+		}
+	}
+	return flags
 }
