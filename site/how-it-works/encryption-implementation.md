@@ -1,6 +1,7 @@
 ---
 title: How Weave Net Implements Encryption
 menu_order: 70
+search_type: Documentation
 ---
 
 This section describes some details of Weave Net's built-in

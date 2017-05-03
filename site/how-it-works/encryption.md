@@ -1,6 +1,7 @@
 ---
 title: Encryption and Weave Net
 menu_order: 60
+search_type: Documentation
 ---
 
 

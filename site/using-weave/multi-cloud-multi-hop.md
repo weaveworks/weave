@@ -1,6 +1,7 @@
 ---
 title: Enabling Multi-Cloud, Multi-Hop Networking and Routing
 menu_order: 100
+search_type: Documentation
 ---
 
 

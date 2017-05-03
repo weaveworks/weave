@@ -1,6 +1,7 @@
 ---
 title: How Weave Net Interprets Network Topology
 menu_order: 20
+search_type: Documentation
 ---
 
 This section contains the following topics: 

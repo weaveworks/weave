@@ -1,6 +1,7 @@
 ---
 title: Administrative Tasks
 menu_order: 60
+search_type: Documentation
 ---
 
 The following administrative tasks are discussed: 

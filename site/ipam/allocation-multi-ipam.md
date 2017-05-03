@@ -1,6 +1,7 @@
 ---
 title: Automatic Allocation Across Multiple Subnets
 menu_order: 10
+search_type: Documentation
 ---
 
 

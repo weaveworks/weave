@@ -1,6 +1,7 @@
 ---
 title: Operational Guide
 menu_order: 45
+search_type: Documentation
 ---
 This operational guide is intended to give you an overview of how to
 operate and manage a Weave Network in production. It consists of three

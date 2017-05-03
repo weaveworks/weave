@@ -1,6 +1,7 @@
 ---
 title: Using Automatic Discovery With the Weave Net Proxy
 menu_order: 30
+search_type: Documentation
 ---
 
 Containers launched via the proxy use [weaveDNS](/site/weavedns.md)

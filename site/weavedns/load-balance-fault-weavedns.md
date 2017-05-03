@@ -1,6 +1,7 @@
 ---
 title: Load Balancing and Fault Resilience with weaveDNS
 menu_order: 20
+search_type: Documentation
 ---
 
 

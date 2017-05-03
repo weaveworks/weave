@@ -1,6 +1,7 @@
 ---
 title: Securing the Docker Communications With TLS
 menu_order: 20
+search_type: Documentation
 ---
 
 If you are [connecting to the docker daemon with

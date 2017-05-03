@@ -1,6 +1,7 @@
 ---
 title: Monitoring with Prometheus
 menu_order: 105
+search_type: Documentation
 ---
 
 Two endpoints are exposed: one for the Weave Net router, and, when deployed as

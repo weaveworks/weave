@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting Weave Net
 menu_order: 110
+search_type: Documentation
 ---
 
 

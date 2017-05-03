@@ -1,6 +1,7 @@
 ---
 title: Managing Domain Entries
 menu_order: 40
+search_type: Documentation
 ---
 
 

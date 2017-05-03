@@ -1,6 +1,7 @@
 ---
 title: Using The Weave Docker API Proxy
 menu_order: 10
+search_type: Documentation
 ---
 
 

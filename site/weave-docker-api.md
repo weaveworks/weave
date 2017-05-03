@@ -1,6 +1,7 @@
 ---
 title: Integrating Docker via the API Proxy
 menu_order: 50
+search_type: Documentation
 ---
 
 The Docker API proxy automatically attaches containers to the Weave

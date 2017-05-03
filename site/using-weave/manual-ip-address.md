@@ -1,6 +1,7 @@
 ---
 title: Manually Specifying the IP Address of a Container
 menu_order: 20
+search_type: Documentation
 ---
 
 Containers are automatically allocated an IP address that is unique across the Weave network. You can see which address was allocated by running, [`weave ps`](/site/troubleshooting.md#weave-status):

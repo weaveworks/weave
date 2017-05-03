@@ -1,6 +1,7 @@
 ---
 title: Starting, Stopping and Removing Peers
 menu_order: 20
+search_type: Documentation
 ---
 
 
