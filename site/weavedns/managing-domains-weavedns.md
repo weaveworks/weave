@@ -44,6 +44,6 @@ link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
 (though this is not strictly necessary).
 
 
- * [How Weave Finds Containers](/site/how-works-weavedns.md.md)
+ * [How Weave Finds Containers](/site/how-works-weavedns.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domain Entries](/site/weavedns/managing-entries-weavedns.md)
