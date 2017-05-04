@@ -66,6 +66,14 @@
           "value"
       ],
       "value": ""
+    },
+    {
+      "description": "Enable multicast for all Weave networks",
+      "name": "WEAVE_MULTICAST",
+      "settable": [
+          "value"
+      ],
+      "value": ""
     }
   ],
   "network": {

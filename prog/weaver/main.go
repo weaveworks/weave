@@ -123,38 +123,39 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		justVersion        bool
-		config             mesh.Config
-		bridgeConfig       weavenet.BridgeConfig
-		networkConfig      weave.NetworkConfig
-		protocolMinVersion int
-		resume             bool
-		routerName         string
-		nickName           string
-		password           string
-		pktdebug           bool
-		logLevel           string
-		prof               string
-		bufSzMB            int
-		noDiscovery        bool
-		httpAddr           string
-		statusAddr         string
-		ipamConfig         ipamConfig
-		dockerAPI          string
-		peers              []string
-		noDNS              bool
-		dnsConfig          dnsConfig
-		trustedSubnetStr   string
-		dbPrefix           string
-		hostRoot           string
-		procPath           string
-		discoveryEndpoint  string
-		token              string
-		advertiseAddress   string
-		pluginSocket       string
-		pluginMeshSocket   string
-		enablePlugin       bool
-		enablePluginV2     bool
+		justVersion             bool
+		config                  mesh.Config
+		bridgeConfig            weavenet.BridgeConfig
+		networkConfig           weave.NetworkConfig
+		protocolMinVersion      int
+		resume                  bool
+		routerName              string
+		nickName                string
+		password                string
+		pktdebug                bool
+		logLevel                string
+		prof                    string
+		bufSzMB                 int
+		noDiscovery             bool
+		httpAddr                string
+		statusAddr              string
+		ipamConfig              ipamConfig
+		dockerAPI               string
+		peers                   []string
+		noDNS                   bool
+		dnsConfig               dnsConfig
+		trustedSubnetStr        string
+		dbPrefix                string
+		hostRoot                string
+		procPath                string
+		discoveryEndpoint       string
+		token                   string
+		advertiseAddress        string
+		pluginSocket            string
+		pluginMeshSocket        string
+		enablePlugin            bool
+		enablePluginV2          bool
+		enablePluginV2Multicast bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -208,6 +209,7 @@ func main() {
 
 	mflag.BoolVar(&enablePlugin, []string{"-plugin"}, false, "enable Docker plugin (v1)")
 	mflag.BoolVar(&enablePluginV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
+	mflag.BoolVar(&enablePluginV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
 	mflag.StringVar(&pluginSocket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginMeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
@@ -427,7 +429,7 @@ func main() {
 	}
 
 	if enablePlugin || enablePluginV2 {
-		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2)
+		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2, enablePluginV2Multicast)
 	}
 	if enablePlugin {
 		Log.Println("Creating default 'weave' network")
