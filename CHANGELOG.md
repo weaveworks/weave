@@ -1,3 +1,23 @@
+## Release 1.9.5
+
+Bug fixes and minor improvements
+
+* Improve log messages generated if "hairpin" conditions are detected,
+  to make clear which kind is likely to cause problems #2808/#2926
+* Filter out IPv6 peer addresses from Kubernetes; Weave Net currently
+  only supports IPv4 #2904/#2912
+* Fix rare crash during initialization of weave-kube #2893/#2892
+* Include overlay and encryption modes in checkpoint reports, in case
+  this is relevant to a version upgrade #2771/#2907
+
+Build and Testing
+
+* Ensure CI build can run gcloud tools  #2887
+* Prevent kubeadm from upgrading Kubernetes if we are trying to test an older version #2886
+* Upgrade build scripts to support Kubernetes 1.6 #2880
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/54?closed=1).
+
 ## Release 1.9.4
 
 Bug fixes and minor improvements
