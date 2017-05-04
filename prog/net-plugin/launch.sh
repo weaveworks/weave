@@ -23,28 +23,8 @@ echo "Starting launch.sh"
 #   available to any plugin in general (https://github.com/moby/moby/issues/32815).
 
 PEERS=
-IPALLOC_INIT=
 if [ ! -f "/restart.sentinel" ]; then
-    STATUS=0
-    /usr/bin/weaveutil is-swarm-manager 2>/dev/null || STATUS=$?
-    if [ $STATUS -eq 0 ]; then
-        IS_SWARM_MANAGER=1
-    elif [ $STATUS -eq 20 ]; then
-        echo "Host swarm is not \"active\"; exiting." >&2
-        exit 1
-    fi
-
-    SWARM_MANAGER_PEERS=$(/usr/bin/weaveutil swarm-manager-peers)
-
-    if [ -z "$IPALLOC_INIT" ]; then
-        IPALLOC_INIT="observer"
-        if [ "$IS_SWARM_MANAGER" == "1" ]; then
-            IPALLOC_INIT="consensus=$(echo $SWARM_MANAGER_PEERS | wc -l)"
-        fi
-    fi
-
-    PEERS=$(echo $SWARM_MANAGER_PEERS | tr '\n' ' ')
-    IPALLOC_INIT="--ipalloc-init $IPALLOC_INIT"
+    PEERS=$(/usr/bin/weaveutil swarm-manager-peers)
 fi
 
 router_bridge_opts() {
@@ -63,7 +43,6 @@ exec /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR \
     --no-dns \
     --ipalloc-range=$IPALLOC_RANGE \
-    $IPALLOC_INIT \
     --nickname "$(hostname)" \
     --log-level=debug \
     --db-prefix="$WEAVE_DIR/weave" \
