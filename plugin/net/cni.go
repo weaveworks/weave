@@ -195,8 +195,8 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 	// As of CNI 0.3 spec, runtimes can send blank if they just want the address deallocated
 	if args.Netns != "" {
 		if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
+			// We log the error and carry on instead of returning nil, as there may still be resources to free in IPAM.
 			logOnStderr(fmt.Errorf("error removing interface %q: %s", args.IfName, err))
-			return nil
 		}
 	}
 
