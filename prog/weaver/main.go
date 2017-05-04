@@ -332,15 +332,7 @@ func main() {
 		dockerVersion = dockerCli.DockerVersion()
 	}
 
-<<<<<<< HEAD
-	network := ""
-	if bridgeConfig.AWSVPC {
-		network = "awsvpc"
-	}
-	checkForUpdates(dockerVersion, network)
-=======
 	checkForUpdates(dockerVersion, router)
->>>>>>> origin/1.9
 
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
