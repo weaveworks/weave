@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"syscall"
 
 	"github.com/containernetworking/cni/pkg/ipam"
@@ -183,16 +182,21 @@ func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
 	return nil
 }
 
+// As of CNI 0.5 spec:
+//   "Plugins should generally complete a DEL action without error even if some resources are missing"
+// this method should therefore return nil in most, if not all, cases.
 func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 	conf, err := loadNetConf(args.StdinData)
 	if err != nil {
-		return err
+		logOnStderr(err)
+		return nil
 	}
 
 	// As of CNI 0.3 spec, runtimes can send blank if they just want the address deallocated
 	if args.Netns != "" {
 		if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
-			return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
+			// We log the error and carry on instead of returning nil, as there may still be resources to free in IPAM.
+			logOnStderr(fmt.Errorf("error removing interface %q: %s", args.IfName, err))
 		}
 	}
 
@@ -202,14 +206,14 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 	} else {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
 	}
-	// Hack - don't know how we should detect this situation properly
-	if args.Netns == "" && strings.Contains(err.Error(), "no addresses") {
-		err = nil
-	}
-	if err != nil {
-		return fmt.Errorf("unable to release IP address: %s", err)
-	}
+	logOnStderr(fmt.Errorf("unable to release IP address: %s", err))
 	return nil
+}
+
+// Standard error is inherited from the caller (e.g. Kubelet, when running Weave Net's CNI plugin
+// under Kubernetes) hence provided errors should eventually appear in the caller's log files.
+func logOnStderr(err error) {
+	fmt.Fprintln(os.Stderr, "weave-cni:", err)
 }
 
 type NetConf struct {
