@@ -6,7 +6,6 @@ search_type: Documentation
 
  * [Launching Weave Net and Running Containers Using the Plugin](#launching)
  * [Restarting the Plugin](#restarting)
- * [Configuring the Plugin](#configuring)
 
 Docker versions 1.9 and later have a plugin mechanism for adding
 different network providers. Weave Net installs itself as a network

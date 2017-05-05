@@ -4,16 +4,12 @@ menu_order: 40
 search_type: Documentation
 ---
 
-
 The following topics are discussed: 
 
 * [Adding and removing extra DNS entries](#add-remove)
 * [Resolving WeaveDNS entries from the Host](#resolve-weavedns-entries-from-host)
 * [Hot-swapping Service Containers](#hot-swapping)
-* [Retaining DNS Entries When Containers Stop](#retain-stopped)
 * [Configuring a Custom TTL](#ttl)
-
-
 
 ### <a name="add-remove"></a>Adding and Removing Extra DNS Entries
 
