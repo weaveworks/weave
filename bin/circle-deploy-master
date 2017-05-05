@@ -13,5 +13,5 @@ if [ -n "$TEST_AND_PUBLISH" ] ; then
 fi
 
 cd $SRCDIR
-bin/install-wordepress v1.0.0
+bin/install-wordepress dc25407c2d2669366cd5c5b41c166b719f5570d0
 bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
