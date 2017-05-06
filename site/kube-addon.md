@@ -19,21 +19,19 @@ The following topics are discussed:
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
-* Kubernetes versions `1.6` and above:
-
 ```
-$ kubectl apply -f https://git.io/weave-kube-1.6
-```
-
-* Kubernetes versions up to `1.5`:
-
-```
-$ kubectl apply -f https://git.io/weave-kube
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
 network.
+
+**Note:** In Kubernetes versions `1.6` and above, depending on how your cluster is configured, you may need to:
+
+- add `sudo`,
+- add `--kubeconfig /etc/kubernetes/admin.conf` (or equivalent),
+
 
 **Note:** This command requires Kubernetes 1.4 or later.
 
@@ -60,10 +58,34 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-The URLs [https://git.io/weave-kube](https://git.io/weave-kube) and [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point
-to the YAML file for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon.
-Historic versions are archived on our [GitHub release
-page](https://github.com/weaveworks/weave/releases).
+**Note:** You can customise the generated YAML file by passing Weave-Kube options, arguments and environment variables as query parameters:
+  - `version`: Weave-Kube's version. Default: latest release.
+  - `known-peers`: comma-separated list of hosts. Default: empty.
+  - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
+  - `disable-npc`: boolean (`true|false`). Default: `false`.
+  - `enable-encryption`: boolean (`true|false`). Default: `false`.
+  - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
+
+Example:
+```
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.MTU=1337"
+```
+This command generates a YAML file containing, among others:
+
+```
+[...]
+          containers:
+            - name: weave
+[...]
+              env:
+                - name: MTU
+                  value: '1337'
+[...]
+```
+
+**Note:** URLs [git.io/weave-kube](https://git.io/weave-kube) and [git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point respectively to [cloud.weave.works/k8s/v1.5/net](https://cloud.weave.works/k8s/v1.5/net) and [cloud.weave.works/k8s/v1.6/net](https://cloud.weave.works/k8s/v1.6/net).
+In the past, these URLs were pointing to static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml)
+Historic versions of these static YAML files are archived on our [GitHub release page](https://github.com/weaveworks/weave/releases).
 
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
