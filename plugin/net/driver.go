@@ -194,12 +194,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 }
 
 func (driver *driver) findNetworkInfo(id string) (network, error) {
-	driver.Lock()
-	network, found := driver.networks[id]
-	driver.Unlock()
-	if found {
-		return network, nil
-	}
+	var network network
 
 	// plugin-v2 does not have access to docker.sock, so we cannot call Docker
 	// API for the network info.
@@ -208,10 +203,13 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 		network.isOurs = true
 		network.hasMulticastRoute = driver.forceMulticast
 
-		driver.Lock()
-		driver.networks[id] = network
-		driver.Unlock()
+		return network, nil
+	}
 
+	driver.Lock()
+	network, found := driver.networks[id]
+	driver.Unlock()
+	if found {
 		return network, nil
 	}
 
