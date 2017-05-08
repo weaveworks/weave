@@ -135,10 +135,18 @@ However a similar request for disk space can not
 be made, and so please be aware of this issue and monitor your
 resources to ensure that they stay below 100%.
 
-Kubernetes displays a notification in the event of an eviction similar to this:
+You can see when pods have been evicted via the `kubectl get events` command
 
 ```
-pod weave-net-4ozht_kube-system(546acee0-ee25-11e6-8965-068f417b4097) evicted successfully
+LASTSEEN   COUNT     NAME          KIND    TYPE      REASON     SOURCE            MESSAGE
+1m         1         mypod-09vkd   Pod     Warning   Evicted    kubelet, node-1   The node was low on resource: memory.
+```
+
+or `kubectl get pods`
+
+```
+NAME                READY     STATUS    RESTARTS   AGE       IP          NODE
+mypod-09vkd         0/1       Evicted   0          1h        <none>      node-1
 ```
 
 If you see this in your cluster, consider some of the above steps to
