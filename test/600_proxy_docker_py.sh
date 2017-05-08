@@ -29,7 +29,7 @@ docker_py_test() {
         i=$(($i + 1))
     done
 
-    weave_on $HOST1 launch-proxy --no-default-ipalloc
+    weave_on $HOST1 launch --no-default-ipalloc
 
     DOCKER_BRIDGE_IP=$(weave_on $HOST1 docker-bridge-ip)
 

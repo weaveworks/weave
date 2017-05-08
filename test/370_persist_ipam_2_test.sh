@@ -7,7 +7,7 @@ start_suite "Checking persistence of IPAM"
 launch_router_with_db() {
     host=$1
     shift
-    weave_on $host launch-router "$@"
+    weave_on $host launch "$@"
 }
 
 launch_router_with_db $HOST1 $HOST2

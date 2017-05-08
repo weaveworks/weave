@@ -41,7 +41,7 @@ case "$1" in
         for i in $(seq $START $FINISH); do
             IP=$SUBNET.$i
             sudo ip addr add $IP/24 dev multiweave
-            weave $i launch-router --datapath '' --iface '' --no-dns --host $IP \
+            weave $i launch --datapath '' --iface '' --no-dns --host $IP \
                 --name $(random_mac) --nickname weave$i "$@"
         done
         echo $(date -R) connecting
@@ -57,7 +57,7 @@ case "$1" in
         for i in $(seq $FINISH -1 $START); do
             IP=$SUBNET.$i
             echo Stopping weave$i
-            weave $i stop-router
+            weave $i stop
             sudo ip addr del $IP/24 dev multiweave || true
         done
         [ -z "$(ip -4 -o addr show multiweave)" ] && sudo ip link del multiweave

@@ -126,7 +126,7 @@ docker_run_options() {
 
 exec_options() {
     case "$1" in
-        setup|setup-cni|launch|launch-router)
+        setup|setup-cni|launch)
             echo -v /:/host -e HOST_ROOT=/host
             ;;
         # All the other commands that may create the bridge and need machine id files.

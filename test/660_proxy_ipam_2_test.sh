@@ -11,10 +11,8 @@ assert_no_ethwe() {
 
 start_suite "Ping proxied containers over cross-host weave network (with IPAM)"
 
-weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE
-weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE $HOST1
-weave_on $HOST1 launch-proxy
-weave_on $HOST2 launch-proxy --no-default-ipalloc
+weave_on $HOST1 launch --ipalloc-range                      $UNIVERSE
+weave_on $HOST2 launch --ipalloc-range --no-default-ipalloc $UNIVERSE $HOST1
 
 proxy_start_container $HOST1 --name=auto
 proxy_start_container $HOST1 --name=none       -e WEAVE_CIDR=none

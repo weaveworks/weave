@@ -4,9 +4,9 @@
 
 start_suite "IPAM ring seed mismatch"
 
-weave_on $HOST1 launch-router --no-discovery
-weave_on $HOST2 launch-router --no-discovery
-weave_on $HOST3 launch-router --no-discovery
+weave_on $HOST1 launch --no-discovery
+weave_on $HOST2 launch --no-discovery
+weave_on $HOST3 launch --no-discovery
 
 # Do some allocations to get the ring initialized on two hosts
 start_container $HOST1

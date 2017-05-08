@@ -10,8 +10,8 @@ weave_on $HOST1 launch
 start_container_local_plugin $HOST1 --name=c1 --hostname=$C1_NAME
 c1ip=$(container_ip $HOST1 c1)
 
-weave_on $HOST1 stop-router
-weave_on $HOST1 launch-router
+weave_on $HOST1 stop
+weave_on $HOST1 launch
 
 assert "container_ip $HOST1 c1" "$c1ip"
 assert "weave_on $HOST1 dns-lookup $C1_NAME" "$c1ip"

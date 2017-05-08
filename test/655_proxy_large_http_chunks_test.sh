@@ -17,7 +17,7 @@ done
 # Sanity-check that it's big enough to cause issues.
 assert_raises "test $(curl -s http://$HOST1:$DOCKER_PORT/v1.19/images/json?all=true | wc -c) -gt 65536"
 
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 launch
 
 assert_raises "proxy docker_on $HOST1 images -a"
 

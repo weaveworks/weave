@@ -4,8 +4,7 @@
 
 start_suite "Containers get same IP address on restart"
 
-weave_on $HOST1 launch-router
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 launch
 
 # Use up first address with throwaway container
 start_container $HOST1 --name=c1

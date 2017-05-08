@@ -4,7 +4,7 @@
 
 start_suite "Resolve a non-weave address"
 
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 
 start_container_with_dns $HOST1 10.2.1.5/24 --name=c1
 

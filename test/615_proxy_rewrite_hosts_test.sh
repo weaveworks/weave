@@ -11,7 +11,7 @@ image_ip() {
 start_suite "Proxy rewrites hosts file"
 
 # Default rewrites the host file
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 launch
 assert "image_ip $SMALL_IMAGE" $expected_ip
 
 # When container user is non-root
@@ -25,8 +25,8 @@ EOF
 assert "image_ip non-root" $expected_ip
 
 # When rewrite hosts is disabled
-weave_on $HOST1 stop-proxy
-weave_on $HOST1 launch-proxy --no-rewrite-hosts
+weave_on $HOST1 stop
+weave_on $HOST1 launch --no-rewrite-hosts
 assert_raises "image_ip $SMALL_IMAGE | grep -v $expected_ip"
 
 end_suite

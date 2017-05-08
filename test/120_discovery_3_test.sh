@@ -6,9 +6,9 @@ C1=10.2.1.41
 C3=10.2.1.71
 
 launch_all() {
-    weave_on $HOST1 launch-router $1
-    weave_on $HOST2 launch-router $1 --ipalloc-range="" $HOST1
-    weave_on $HOST3 launch-router $1                    $HOST2
+    weave_on $HOST1 launch $1
+    weave_on $HOST2 launch $1 --ipalloc-range="" $HOST1
+    weave_on $HOST3 launch $1                    $HOST2
 }
 
 start_suite "Peer discovery, multi-hop routing and gossip forwarding"

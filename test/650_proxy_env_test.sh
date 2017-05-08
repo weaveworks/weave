@@ -15,22 +15,22 @@ start_suite "Configure the docker daemon for the proxy"
 assert "weave_on $HOST1 env" ""
 assert "weave_on $HOST1 config" ""
 
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 launch
 check
 
 # Check we can use the weave script through the proxy
 assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE version"
 assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE ps"
-assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE launch-router"
+assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE launch"
 
 # Check we can use weave env/config with multiple -Hs specified
 weave_on $HOST1 stop
-weave_on $HOST1 launch-proxy -H tcp://0.0.0.0:12375 -H unix:///var/run/weave/weave.sock
+weave_on $HOST1 launch -H tcp://0.0.0.0:12375 -H unix:///var/run/weave/weave.sock
 check
 
 # Check we can use weave env/config with unix -Hs specified
 weave_on $HOST1 stop
-weave_on $HOST1 launch-proxy -H unix:///var/run/weave/weave.sock
+weave_on $HOST1 launch -H unix:///var/run/weave/weave.sock
 assert_raises "run_on $HOST1 'eval \$(weave env) ; docker $CMD'"
 assert_raises "run_on $HOST1 'docker \$(weave config) $CMD'"
 

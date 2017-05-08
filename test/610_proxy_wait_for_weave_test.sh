@@ -18,10 +18,10 @@ BASE_IMAGE=busybox
 ! docker_on $HOST1 inspect --format=" " $BASE_IMAGE >/dev/null 2>&1 || docker_on $HOST1 rmi $BASE_IMAGE
 
 # check that interface is ready, with and without --no-multicast-route
-weave_on $HOST1 launch-proxy --no-multicast-route
+weave_on $HOST1 launch --no-multicast-route
 check_iface_ready 10.2.1.1/24
-weave_on $HOST1 stop-proxy
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 stop
+weave_on $HOST1 launch
 check_iface_ready 10.2.1.1/24
 
 # Check committed containers only have one weavewait prepended

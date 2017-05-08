@@ -49,14 +49,9 @@ assert_raises "timeout 90 cat <( run_many )"
 # Start a container that needs IPAM, then restart it when the router is stopped
 proxy_start_container $HOST1 -di --name=c3 --restart=always
 wait_for_attached $HOST1 c3
-weave_on $HOST1 stop-router
-docker_on $HOST1 restart c3
-weave_on $HOST1 launch-router
-wait_for_attached $HOST1 c3
-
-# Restarting proxy shouldn't kill unattachable containers
 weave_on $HOST1 stop
-weave_on $HOST1 launch-proxy
+docker_on $HOST1 restart c3
+weave_on $HOST1 launch
 wait_for_attached $HOST1 c3
 
 end_suite
