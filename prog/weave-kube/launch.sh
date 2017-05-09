@@ -53,7 +53,7 @@ else
     fi
 fi
 
-# Explicitly create the bridge so we can pass --expect-npc
+# Default is that npc will be running; allow caller to override
 WEAVE_NPC_OPTS="--expect-npc"
 if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
