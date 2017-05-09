@@ -23,23 +23,23 @@ const (
 
 var Log = common.Log
 
-func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, dns bool, isPluginV2 bool) {
+func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, dns bool, isPluginV2, forceMulticast bool) {
 	weave := weaveapi.NewClient(weaveAPIAddr, Log)
 
 	Log.Info("Waiting for Weave API Server...")
 	weave.WaitAPIServer(30)
 	Log.Info("Finished waiting for Weave API Server")
 
-	if err := run(dockerClient, weave, address, meshAddress, dns, isPluginV2); err != nil {
+	if err := run(dockerClient, weave, address, meshAddress, dns, isPluginV2, forceMulticast); err != nil {
 		Log.Fatal(err)
 	}
 }
 
-func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, dns, isPluginV2 bool) error {
+func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, dns, isPluginV2, forceMulticast bool) error {
 	endChan := make(chan error, 1)
 
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false, dns, isPluginV2)
+		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false, dns, isPluginV2, forceMulticast)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, endChan, "local", true, dns, isPluginV2)
+		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, endChan, "local", true, dns, isPluginV2, forceMulticast)
 		if err != nil {
 			return err
 		}
@@ -58,20 +58,15 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 	return <-endChan
 }
 
-func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, dns bool, isPluginV2 bool) (net.Listener, error) {
-	var isNetworkOur func(string) bool
+func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, dns bool, isPluginV2, forceMulticast bool) (net.Listener, error) {
+	var name string
 	if isPluginV2 {
-		isNetworkOur = func(driverName string) bool {
-			return strings.Contains(driverName, pluginV2Name)
-		}
+		name = pluginV2Name
 	} else {
-		name := strings.TrimSuffix(path.Base(address), ".sock")
-		isNetworkOur = func(driverName string) bool {
-			return driverName == name
-		}
+		name = strings.TrimSuffix(path.Base(address), ".sock")
 	}
 
-	d, err := netplugin.New(dockerClient, weave, scope, dns, isPluginV2, isNetworkOur)
+	d, err := netplugin.New(dockerClient, weave, name, scope, dns, isPluginV2, forceMulticast)
 	if err != nil {
 		return nil, err
 	}

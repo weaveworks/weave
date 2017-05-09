@@ -29,28 +29,39 @@ type network struct {
 
 type driver struct {
 	sync.RWMutex
-	scope        string
-	docker       *docker.Client
-	dns          bool
-	isPluginV2   bool
-	networks     map[string]network
-	isNetworkOur func(driverName string) bool
+	name  string
+	scope string
+	// Docker API is not available for plugin-v2
+	docker     *docker.Client
+	dns        bool
+	isPluginV2 bool
+	// Enable multicast regardless whether multicast opt is passed to Docker;
+	// used only by plugin-v2
+	forceMulticast bool
+	networks       map[string]network
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, scope string, dns, isPluginV2 bool, isNetworkOur func(string) bool) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, name, scope string, dns, isPluginV2, forceMulticast bool) (skel.Driver, error) {
 	driver := &driver{
-		scope:        scope,
-		docker:       client,
-		dns:          dns,
-		isPluginV2:   isPluginV2,
-		networks:     make(map[string]network),
-		isNetworkOur: isNetworkOur,
+		name:       name,
+		scope:      scope,
+		docker:     client,
+		dns:        dns,
+		isPluginV2: isPluginV2,
+		// make sure that it's used only by plugin-v2
+		forceMulticast: isPluginV2 && forceMulticast,
+		networks:       make(map[string]network),
 	}
 
-	_, err := NewWatcher(client, weave, driver)
-	if err != nil {
-		return nil, err
+	// Do not start watcher in the case of plugin v2, which prevents us from
+	// configuring arp settings of containers.
+	if client != nil {
+		_, err := NewWatcher(client, weave, driver)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return driver, nil
 }
 
@@ -183,17 +194,34 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 }
 
 func (driver *driver) findNetworkInfo(id string) (network, error) {
+	var network network
+
+	// plugin-v2 does not have access to docker.sock, so we cannot call Docker
+	// API for the network info.
+	if driver.isPluginV2 {
+		// safe to set, as isOurs used only by the watcher which is disabled for plugin-v2
+		network.isOurs = true
+		network.hasMulticastRoute = driver.forceMulticast
+
+		return network, nil
+	}
+
 	driver.Lock()
 	network, found := driver.networks[id]
 	driver.Unlock()
 	if found {
 		return network, nil
 	}
+
+	if driver.docker == nil {
+		return network, fmt.Errorf("Docker client disabled; unable to get network info")
+	}
+
 	info, err := driver.docker.NetworkInfo(id)
 	if err != nil {
 		return network, err
 	}
-	return driver.setupNetworkInfo(id, driver.isNetworkOur(info.Driver), info.Options)
+	return driver.setupNetworkInfo(id, info.Driver == driver.name, info.Options)
 }
 
 func (driver *driver) setupNetworkInfo(id string, isOurs bool, options map[string]string) (network, error) {

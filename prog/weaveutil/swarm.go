@@ -2,33 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/pkg/errors"
 )
 
 const DOCKER_API_VERSION = "1.26"
-
-func isSwarmManager(args []string) error {
-	info, err := dockerInfo()
-	if err != nil {
-		return err
-	}
-
-	// hack-y way to denote that a node does not belong to any swarm
-	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive {
-		os.Exit(20)
-	}
-
-	if !info.Swarm.ControlAvailable {
-		return fmt.Errorf("node is not a manager")
-	}
-
-	return nil
-}
 
 func swarmManagerPeers(args []string) error {
 	info, err := dockerInfo()
@@ -36,13 +16,17 @@ func swarmManagerPeers(args []string) error {
 		return err
 	}
 
+	ips := make([]string, 0)
+
 	for _, managerNode := range info.Swarm.RemoteManagers {
 		ip, err := ipFromAddr(managerNode.Addr)
 		if err != nil {
 			return errors.Wrap(err, "ipFromAddr")
 		}
-		fmt.Println(ip)
+		ips = append(ips, ip)
 	}
+
+	fmt.Println(strings.Join(ips, " "))
 
 	return nil
 }
