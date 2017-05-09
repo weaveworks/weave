@@ -21,7 +21,6 @@ check
 # Check we can use the weave script through the proxy
 assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE version"
 assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE ps"
-assert_raises "eval '$(weave_on $HOST1 env)' ; $WEAVE launch"
 
 # Check we can use weave env/config with multiple -Hs specified
 weave_on $HOST1 stop

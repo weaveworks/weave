@@ -26,13 +26,8 @@ run_container "grep ^1$ /sys/class/net/ethwe/carrier"
 build_image false '["/bin/false"]' ''
 run_container "--entrypoint='grep' false ^1$ /sys/class/net/ethwe/carrier"
 
+weave_on $HOST1 stop
 weave_on $HOST1 launch --ipalloc-range 10.2.2.0/24
-# NOTE: docker-kill hangs (https://github.com/docker/docker/issues/31447), so we
-# kill directly the weaveproxy process instead.
-WEAVEPROXY_PID=$(container_pid $HOST1 weaveproxy)
-$SSH $HOST1 "ps aux | grep weaveproxy"
-run_on $HOST1 "sudo kill -9 $WEAVEPROXY_PID"
-weave_on $HOST1 launch
 
 assert_raises "proxy docker_on $HOST1 run check-ethwe-up"
 

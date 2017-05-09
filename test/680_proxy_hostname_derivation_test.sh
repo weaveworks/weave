@@ -43,8 +43,6 @@ test_cleanup() {
 
 start_suite "Hostname derivation"
 
-weave_on $HOST1 launch
-
 # Hostname derivation through container name substitutions
 test_setup --hostname-match '^[^-]+-(?P<appname>[^-]*)-[^-]+$' --hostname-replacement '$appname'
 # check that the normal container_name->hostname derivation doesn't break

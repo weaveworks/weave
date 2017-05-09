@@ -23,10 +23,6 @@ start_suite "Proxy registers containers with dns"
 
 bridge_ip=$(weave_on $HOST1 docker-bridge-ip)
 
-# Assert behaviour without weaveDNS
-weave_on $HOST1 launch
-do_assert_resolution assert_no_dns_record
-
 # Assert behaviour with weaveDNS running
 weave_on $HOST1 launch
 do_assert_resolution assert_dns_record
