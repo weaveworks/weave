@@ -8,6 +8,11 @@ modprobe_safe() {
 
 # Check whether xt_set actually exists
 xt_set_exists() {
+    # Clean everything up in advance, in case there's leftovers
+    iptables -F WEAVE-KUBE-TEST 2>/dev/null || true
+    iptables -X WEAVE-KUBE-TEST 2>/dev/null || true
+    ipset destroy weave-kube-test 2>/dev/null || true
+
     ipset create weave-kube-test hash:ip
     iptables -t filter -N WEAVE-KUBE-TEST
     if ! iptables -A WEAVE-KUBE-TEST -m set --match-set weave-kube-test src -j DROP; then
