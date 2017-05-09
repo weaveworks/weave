@@ -851,52 +851,13 @@ dns_args() {
     fi
 }
 
-etc_hosts_contents() {
-    FQDN=$1
-    shift
-    NAME=${FQDN%%.*}
-    HOSTNAMES="$NAME"
-    [ "$NAME" = "$FQDN" -o "$NAME." = "$FQDN" ] || HOSTNAMES="${FQDN%.} $HOSTNAMES"
-
-    echo "# created by Weave - BEGIN"
-    echo "# container hostname"
-    for CIDR in $ALL_CIDRS ; do
-        echo "${CIDR%/*}    $HOSTNAMES"
-    done
-    echo
-    echo "# static names added with --add-host"
-    for EXTRA_HOST in "$@" ; do
-        echo "${EXTRA_HOST#*:}     ${EXTRA_HOST%:*}"
-    done
-
-    cat <<-EOF
-
-# default localhost entries
-127.0.0.1       localhost
-::1             ip6-localhost ip6-loopback
-fe00::0         ip6-localnet
-ff00::0         ip6-mcastprefix
-ff02::1         ip6-allnodes
-ff02::2         ip6-allrouters
-EOF
-
-    echo "# created by Weave - END"
-}
-
 rewrite_etc_hosts() {
     HOSTS_PATH_AND_FQDN=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER) || return 1
     HOSTS=${HOSTS_PATH_AND_FQDN% *}
     FQDN=${HOSTS_PATH_AND_FQDN#* }
-    CONTAINERS_PATH=$(dirname $HOSTS)
-    MNT=/container
-    MNT_HOSTS=$MNT/$(basename $HOSTS)
-    CONTENTS="$(etc_hosts_contents $FQDN "$@")"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    docker run --rm --net=none -e WEAVE_CIDR=none \
-        -v $CONTAINERS_PATH:$MNT \
-        --entrypoint=sh \
-        $EXEC_IMAGE -c "echo '$CONTENTS' > $MNT_HOSTS && rm -f $MNT_HOSTS && echo '$CONTENTS' > $MNT_HOSTS"
+    util_op rewrite-etc-hosts "$HOSTS" "$FQDN" "$EXEC_IMAGE" "$ALL_CIDRS" "$@"
 }
 
 # Print an error to stderr and return with an indicative exit status

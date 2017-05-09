@@ -40,6 +40,7 @@ func init() {
 		"unique-id":                uniqueID,
 		"swarm-manager-peers":      swarmManagerPeers,
 		"is-docker-plugin-enabled": isDockerPluginEnabled,
+		"rewrite-etc-hosts":        rewriteEtcHosts,
 	}
 }
 
