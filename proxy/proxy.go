@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,10 +15,11 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/pkg/errors"
+
 	weaveapi "github.com/weaveworks/weave/api"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
-	"github.com/weaveworks/weave/net/address"
 )
 
 const (
@@ -63,6 +63,7 @@ type Config struct {
 	Version             string
 	WithoutDNS          bool
 	NoMulticastRoute    bool
+	KeepTXOn            bool
 	DockerBridge        string
 	DockerHost          string
 }
@@ -509,53 +510,77 @@ func (proxy *Proxy) attach(containerID string) error {
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
-	if err := validateCIDRs(cidrs); err != nil {
+	ips, err := proxy.allocateCIDRs(container.ID, cidrs)
+	if err != nil {
 		return err
 	}
 
-	args := []string{"attach"}
-	args = append(args, cidrs...)
+	fqdn := container.Config.Hostname + "." + container.Config.Domainname
 	if !proxy.NoRewriteHosts {
-		args = append(args, "--rewrite-hosts")
-
+		var extraHosts []string
 		if container.HostConfig != nil {
-			for _, eh := range container.HostConfig.ExtraHosts {
-				args = append(args, fmt.Sprintf("--add-host=%s", eh))
+			extraHosts = container.HostConfig.ExtraHosts
+		}
+		proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts)
+	}
+
+	pid := container.State.Pid
+	// Passing 0 for mtu means it will be taken from the bridge
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, proxy.KeepTXOn)
+	if err != nil {
+		return err
+	}
+
+	if !proxy.WithoutDNS {
+		for _, ip := range ips {
+			if err := proxy.weave.RegisterWithDNS(container.ID, fqdn, ip.IP.String()); err != nil {
+				return errors.Wrapf(err, "unable to register %s with weaveDNS: %s", container.ID, err)
 			}
 		}
 	}
-	if proxy.NoMulticastRoute {
-		args = append(args, "--no-multicast-route")
-	}
-	args = append(args, container.ID)
-	return callWeaveAttach(container, args)
+
+	return err
 }
 
-func callWeaveAttach(container *docker.Container, args []string) error {
-	if _, stderr, err := callWeave(args...); err != nil {
-		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
-	} else if len(stderr) > 0 {
-		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IPNet, error) {
+	if len(cidrs) == 0 {
+		cidrs = []string{"net:default"}
 	}
-	return nil
-}
-
-func validateCIDRs(cidrs []string) error {
+	var ipnet *net.IPNet
+	var err error
+	var ipnets []*net.IPNet
 	for _, cidr := range cidrs {
-		if cidr == "net:default" {
-			continue
-		}
-		for _, prefix := range []string{"ip:", "net:", ""} {
-			if strings.HasPrefix(cidr, prefix) {
-				if _, err := address.ParseCIDR(strings.TrimPrefix(cidr, prefix)); err == nil {
-					break
-				}
-				return fmt.Errorf("invalid WEAVE_CIDR: %s", cidr)
+		switch {
+		case cidr == "net:default":
+			ipnet, err = proxy.weave.AllocateIP(containerID)
+		case strings.HasPrefix(cidr, "net:"):
+			var subnet *net.IPNet
+			_, subnet, err = net.ParseCIDR(strings.TrimPrefix(cidr, "net:"))
+			if err != nil {
+				break
 			}
+			ipnet, err = proxy.weave.AllocateIPInSubnet(containerID, subnet)
+		case strings.HasPrefix(cidr, "ip:"):
+			ipnet, err = proxy.claimCIDR(containerID, strings.TrimPrefix(cidr, "ip:"))
+		default:
+			ipnet, err = proxy.claimCIDR(containerID, cidr)
 		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "for %q", cidr)
+		}
+		ipnets = append(ipnets, ipnet)
 	}
-	return nil
+	return ipnets, nil
+}
+
+func (proxy *Proxy) claimCIDR(containerID, cidr string) (*net.IPNet, error) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	ipnet.IP = ip // we want the specific IP plus the mask
+	err = proxy.weave.ClaimIP(containerID, ipnet)
+	return ipnet, err
 }
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {

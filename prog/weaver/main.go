@@ -220,6 +220,7 @@ func main() {
 	proxyConfig := configureProxy(version, defaultDockerHost)
 	if bridgeConfig.AWSVPC {
 		proxyConfig.NoMulticastRoute = true
+		proxyConfig.KeepTXOn = true
 	}
 
 	// crude way of detecting that we probably have been started in a

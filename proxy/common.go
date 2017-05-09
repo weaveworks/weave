@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 
@@ -24,42 +22,6 @@ var (
 
 	Log = common.Log
 )
-
-func callWeave(args ...string) ([]byte, []byte, error) {
-	args = append([]string{"--local"}, args...)
-	cmd := exec.Command("./weave", args...)
-	cmd.Env = []string{
-		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-	}
-
-	propagateEnv := func(key string) {
-		if val := os.Getenv(key); val != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, val))
-		}
-	}
-
-	propagateEnv("DOCKER_HOST")
-
-	// Propagate WEAVE_DEBUG, to make debugging easier.
-	propagateEnv("WEAVE_DEBUG")
-
-	// This prevents the code coverage contortions in our
-	// integration test suite breaking things.
-	propagateEnv("COVERAGE")
-
-	// In case the router control endpoint address is non-standard.
-	propagateEnv("WEAVE_HTTP_ADDR")
-
-	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		Log.Debug("weave returned error: ", err)
-	}
-	return stdout.Bytes(), stderr.Bytes(), err
-}
 
 func unmarshalRequestBody(r *http.Request, target interface{}) error {
 	body, err := ioutil.ReadAll(r.Body)

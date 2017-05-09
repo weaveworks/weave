@@ -1322,9 +1322,7 @@ launch() {
         -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
-        -e COVERAGE \
         -e WEAVE_HTTP_ADDR \
-        -e EXEC_IMAGE=$EXEC_IMAGE \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS \
