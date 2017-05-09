@@ -50,6 +50,7 @@ func dockerAPIEndpoint(endpoint string) *regexp.Regexp {
 }
 
 type Config struct {
+	Enabled             bool
 	HostnameFromLabel   string
 	HostnameMatch       string
 	HostnameReplacement string

@@ -48,7 +48,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--no-restart] [--resume] [--no-discovery] [--no-dns]
                     [--ipalloc-init <mode>]
                     [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                    [--plugin]
+                    [--plugin=false] [--proxy=false]
                     [-H <endpoint>] [--without-dns] [--no-multicast-route]
                     [--no-rewrite-hosts] [--no-default-ipalloc]
                     [--hostname-from-label <labelkey>]
@@ -1509,7 +1509,8 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running_plugin_v2
-        launch --plugin "$@"
+        # Plugin and proxy are started by default. Should users additionally pass --plugin=false or --proxy=false, their overrides will take precedence when parsed by Go.
+        launch --plugin --proxy "$@"
         echo "$WEAVE_CONTAINER"
         ;;
     env)

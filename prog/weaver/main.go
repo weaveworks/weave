@@ -252,16 +252,18 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	// Start Weave Proxy:
-	proxy, err := weaveproxy.NewProxy(*proxyConfig)
-	if err != nil {
-		Log.Fatalf("Could not start proxy: %s", err)
+	if proxyConfig.Enabled {
+		// Start Weave Proxy:
+		proxy, err := weaveproxy.NewProxy(*proxyConfig)
+		if err != nil {
+			Log.Fatalf("Could not start proxy: %s", err)
+		}
+		defer proxy.Stop()
+		listeners := proxy.Listen()
+		proxy.AttachExistingContainers()
+		go proxy.Serve(listeners)
+		go proxy.ListenAndServeStatus("/home/weave/status.sock")
 	}
-	defer proxy.Stop()
-	listeners := proxy.Listen()
-	proxy.AttachExistingContainers()
-	go proxy.Serve(listeners)
-	go proxy.ListenAndServeStatus("/home/weave/status.sock")
 
 	if pktdebug {
 		networkConfig.PacketLogging = packetLogging{}
@@ -521,6 +523,7 @@ func configureProxy(version string, defaultDockerHost string) *weaveproxy.Config
 		DockerBridge: getenvOrDefault("DOCKER_BRIDGE", "docker0"),
 		DockerHost:   defaultDockerHost,
 	}
+	mflag.BoolVar(&proxyConfig.Enabled, []string{"-proxy"}, false, "instruct Weave Net to start its Docker proxy")
 	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
 	mflag.StringVar(&proxyConfig.HostnameFromLabel, []string{"-hostname-from-label"}, "", "Key of container label from which to obtain the container's hostname")
 	mflag.StringVar(&proxyConfig.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
