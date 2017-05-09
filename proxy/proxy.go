@@ -77,6 +77,7 @@ type Proxy struct {
 	sync.Mutex
 	Config
 	client                 *docker.Client
+	weave                  *weaveapi.Client
 	dockerBridgeIP         string
 	hostnameMatchRegexp    *regexp.Regexp
 	weaveWaitVolume        string
@@ -129,6 +130,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		waiters:    make(map[*http.Request]*wait),
 		attachJobs: make(map[string]*attachJob),
 		quit:       make(chan struct{}),
+		weave:      weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log),
 	}
 
 	if err := p.TLSConfig.LoadCerts(); err != nil {
@@ -594,8 +596,7 @@ func (proxy *Proxy) getDNSDomain() string {
 	if proxy.WithoutDNS {
 		return ""
 	}
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
-	domain, _ := weave.DNSDomain()
+	domain, _ := proxy.weave.DNSDomain()
 	return domain
 }
 
