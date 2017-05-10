@@ -76,7 +76,7 @@ type wait struct {
 type Proxy struct {
 	sync.Mutex
 	Config
-	client                 *docker.Client
+	client                 *weavedocker.Client
 	weave                  *weaveapi.Client
 	dockerBridgeIP         string
 	hostnameMatchRegexp    *regexp.Regexp
@@ -124,17 +124,13 @@ func (j attachJob) Stop() {
 	j.timer.Stop()
 }
 
-func NewProxy(c Config) (*Proxy, error) {
+func StubProxy(c Config) (*Proxy, error) {
 	p := &Proxy{
 		Config:     c,
 		waiters:    make(map[*http.Request]*wait),
 		attachJobs: make(map[string]*attachJob),
 		quit:       make(chan struct{}),
 		weave:      weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log),
-	}
-
-	if err := p.TLSConfig.LoadCerts(); err != nil {
-		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
 	// We pin the protocol version to 1.18 (which corresponds to
@@ -146,9 +142,21 @@ func NewProxy(c Config) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	Log.Info(client.Info())
+	p.client = client
+	return p, nil
+}
 
-	p.client = client.Client
+func NewProxy(c Config) (*Proxy, error) {
+	p, err := StubProxy(c)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.TLSConfig.LoadCerts(); err != nil {
+		Log.Fatalf("Could not configure tls for proxy: %s", err)
+	}
+
+	Log.Info(p.client.Info())
 
 	if !p.WithoutDNS {
 		ip, err := weavenet.FindBridgeIP(c.DockerBridge, nil)
@@ -169,7 +177,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 
-	client.AddObserver(p)
+	p.client.AddObserver(p)
 
 	return p, nil
 }
