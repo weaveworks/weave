@@ -78,7 +78,7 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 	i.logReq("RequestAddress", poolID, address, options)
 	defer func() { i.logRes("RequestAddress", err, ip) }()
 	if poolID == "weavepool" { // old-style
-		ip, err = i.weave.AllocateIP(api.NoContainerID)
+		ip, err = i.weave.AllocateIP(api.NoContainerID, false)
 		return
 	}
 	subnet, iprange, err := splitPoolID(poolID)
@@ -92,7 +92,7 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 		}
 	} else {
 		// We are lying slightly to IPAM here: the range is not a subnet
-		if ip, err = i.weave.AllocateIPInSubnet(api.NoContainerID, iprange); err != nil {
+		if ip, err = i.weave.AllocateIPInSubnet(api.NoContainerID, iprange, false); err != nil {
 			return
 		}
 		ip.Mask = subnet.Mask // fix up the subnet we lied about

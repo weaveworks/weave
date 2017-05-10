@@ -552,14 +552,14 @@ func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IP
 	for _, cidr := range cidrs {
 		switch {
 		case cidr == "net:default":
-			ipnet, err = proxy.weave.AllocateIP(containerID)
+			ipnet, err = proxy.weave.AllocateIP(containerID, true)
 		case strings.HasPrefix(cidr, "net:"):
 			var subnet *net.IPNet
 			_, subnet, err = net.ParseCIDR(strings.TrimPrefix(cidr, "net:"))
 			if err != nil {
 				break
 			}
-			ipnet, err = proxy.weave.AllocateIPInSubnet(containerID, subnet)
+			ipnet, err = proxy.weave.AllocateIPInSubnet(containerID, subnet, true)
 		case strings.HasPrefix(cidr, "ip:"):
 			ipnet, err = proxy.claimCIDR(containerID, strings.TrimPrefix(cidr, "ip:"))
 		default:

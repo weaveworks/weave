@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net"
+	"net/url"
 )
 
 // Special token used in place of a container identifier when:
@@ -14,21 +15,29 @@ import (
 // which should be kept in mind if the entry needs to be removed at any point.
 const NoContainerID string = "_"
 
-func (client *Client) ipamOp(ID string, op string) (*net.IPNet, error) {
-	ip, err := client.httpVerb(op, fmt.Sprintf("/ip/%s", ID), nil)
+func (client *Client) ipamOp(ID string, op string, values url.Values) (*net.IPNet, error) {
+	ip, err := client.httpVerb(op, fmt.Sprintf("/ip/%s", ID), values)
 	if err != nil {
 		return nil, err
 	}
 	return parseIP(ip)
 }
 
-// returns an IP for the ID given, allocating a fresh one if necessary
-func (client *Client) AllocateIP(ID string) (*net.IPNet, error) {
-	return client.ipamOp(ID, "POST")
+func ipamValues(checkAlive bool) url.Values {
+	values := make(url.Values)
+	if checkAlive {
+		values.Set("check-alive", "true")
+	}
+	return values
 }
 
-func (client *Client) AllocateIPInSubnet(ID string, subnet *net.IPNet) (*net.IPNet, error) {
-	ip, err := client.httpVerb("POST", fmt.Sprintf("/ip/%s/%s", ID, subnet), nil)
+// returns an IP for the ID given, allocating a fresh one if necessary
+func (client *Client) AllocateIP(ID string, checkAlive bool) (*net.IPNet, error) {
+	return client.ipamOp(ID, "POST", ipamValues(checkAlive))
+}
+
+func (client *Client) AllocateIPInSubnet(ID string, subnet *net.IPNet, checkAlive bool) (*net.IPNet, error) {
+	ip, err := client.httpVerb("POST", fmt.Sprintf("/ip/%s/%s", ID, subnet), ipamValues(checkAlive))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +47,7 @@ func (client *Client) AllocateIPInSubnet(ID string, subnet *net.IPNet) (*net.IPN
 // returns an IP for the ID given, or nil if one has not been
 // allocated
 func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
-	return client.ipamOp(ID, "GET")
+	return client.ipamOp(ID, "GET", nil)
 }
 
 // Claim a specific IP on behalf of the ID
