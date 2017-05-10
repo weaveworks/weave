@@ -178,7 +178,7 @@ var statusTemplate = defTemplate("status", `\
 {{if allIPAMOwnersUnreachable .IPAM}}\
          Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
 {{else if len .IPAM.PendingAllocates}}\
-         Status: waiting for IP range grant from peers
+         Status: waiting for IP(s) to become available
 {{else}}\
          Status: ready
 {{end}}\
