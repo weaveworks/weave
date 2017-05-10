@@ -1282,10 +1282,6 @@ launch() {
             --no-restart)
                 RESTART_POLICY=
                 ;;
-            --awsvpc)
-                AWSVPC_ARGS="--awsvpc"
-                AWSVPC=1
-                ;;
             --plugin)
                 PLUGIN_ARGS="--plugin"
                 ENABLE_PLUGIN=1
@@ -1348,7 +1344,6 @@ launch() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    [ -n "$AWSVPC" ] && PROXY_ARGS="$PROXY_ARGS --no-multicast-route"
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
@@ -1380,7 +1375,6 @@ launch() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
-        $AWSVPC_ARGS \
         $PLUGIN_ARGS \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
