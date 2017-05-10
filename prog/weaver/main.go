@@ -527,20 +527,20 @@ func configureProxy(version string, defaultDockerHost string) *weaveproxy.Config
 		DockerHost:   defaultDockerHost,
 	}
 	mflag.BoolVar(&proxyConfig.Enabled, []string{"-proxy"}, false, "instruct Weave Net to start its Docker proxy")
-	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
+	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen for Docker proxy")
 	mflag.StringVar(&proxyConfig.HostnameFromLabel, []string{"-hostname-from-label"}, "", "Key of container label from which to obtain the container's hostname")
 	mflag.StringVar(&proxyConfig.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
 	mflag.StringVar(&proxyConfig.HostnameReplacement, []string{"-hostname-replacement"}, "$1", "Expression to generate hostnames based on matches from --hostname-match (e.g. 'my-app-$1')")
 	mflag.BoolVar(&proxyConfig.RewriteInspect, []string{"-rewrite-inspect"}, false, "Rewrite 'inspect' calls to return the weave network settings (if attached)")
-	mflag.BoolVar(&proxyConfig.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
-	mflag.BoolVar(&proxyConfig.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
+	mflag.BoolVar(&proxyConfig.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "proxy: do not automatically allocate addresses for containers without a WEAVE_CIDR")
+	mflag.BoolVar(&proxyConfig.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "proxy: do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&proxyConfig.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
 	mflag.StringVar(&proxyConfig.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
 	mflag.BoolVar(&proxyConfig.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&proxyConfig.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&proxyConfig.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
-	mflag.BoolVar(&proxyConfig.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
-	mflag.BoolVar(&proxyConfig.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
+	mflag.BoolVar(&proxyConfig.WithoutDNS, []string{"-without-dns"}, false, "proxy: instruct created containers to never use weaveDNS as their nameserver")
+	mflag.BoolVar(&proxyConfig.NoMulticastRoute, []string{"-no-multicast-route"}, false, "proxy: do not add a multicast route via the weave interface when attaching containers")
 	return &proxyConfig
 }
 
