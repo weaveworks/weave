@@ -25,7 +25,7 @@ RUN apk add --update \
     bind-tools \
   && rm -rf /var/cache/apk/*
 
-ADD ./weave ./sigproxy ./weaveproxy ./symlink /home/weave/
+ADD ./weave ./sigproxy ./symlink /home/weave/
 ADD ./weaveutil ./docker /usr/bin/
 ADD ./weavewait /w/w
 ADD ./weavewait_noop /w-noop/w

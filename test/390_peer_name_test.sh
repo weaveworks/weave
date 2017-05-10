@@ -26,7 +26,7 @@ ORIG_MACHINE_ID=$($SSH $HOST1 cat /etc/machine-id)
 # Blank machine-id to begin, so peername will work the same as pre-1.9
 $SSH $HOST1 sudo cp /dev/null /etc/machine-id
 
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 weave_on $HOST1 prime
 PEERNAME1=$(get_peername)
 
@@ -34,21 +34,21 @@ PEERNAME1=$(get_peername)
 echo $ORIG_MACHINE_ID | $SSH $HOST1 sudo tee /etc/machine-id >/dev/null
 
 # Stop and restart; it should take the ID from the bridge
-weave_on $HOST1 stop-router
-weave_on $HOST1 launch-router
+weave_on $HOST1 stop
+weave_on $HOST1 launch
 
 assert "get_peername" "$PEERNAME1"
 
 # Stop and remove the bridge, then restart; it should take the ID from persistence
-weave_on $HOST1 stop-router
+weave_on $HOST1 stop
 remove_bridge
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 
 assert "get_peername" "$PEERNAME1"
 
 # Now remove everything and restart: should get a different peer name
 weave_on $HOST1 reset
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 
 PEERNAME3=$(get_peername)
 assert_raises "[ $PEERNAME3 != $PEERNAME1 ]"
@@ -57,9 +57,9 @@ assert_raises "[ $PEERNAME3 != $PEERNAME1 ]"
 echo $ORIG_MACHINE_ID | rot8 | $SSH $HOST1 sudo tee /etc/machine-id >/dev/null
 
 # Remove bridge and restart; it should get a different ID
-weave_on $HOST1 stop-router
+weave_on $HOST1 stop
 remove_bridge
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 
 assert_raises "[ $(get_peername) != $PEERNAME3 ]"
 

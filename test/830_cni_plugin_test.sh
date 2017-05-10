@@ -90,7 +90,7 @@ assert_raises "exec_on $HOST1 c1 $PING $C3IP"
 stop_weave_on $HOST1
 
 # Ensure no warning is printed to the standard error:
-ACTUAL_OUTPUT=$(CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" DOCKER_HOST=tcp://$HOST1:$DOCKER_PORT $WEAVE launch-router 2>&1)
+ACTUAL_OUTPUT=$(CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" DOCKER_HOST=tcp://$HOST1:$DOCKER_PORT $WEAVE launch 2>&1)
 EXPECTED_OUTPUT=$($SSH $HOST1 docker inspect --format="{{.Id}}" weave)
 
 assert_raises "[ $EXPECTED_OUTPUT == $ACTUAL_OUTPUT ]"

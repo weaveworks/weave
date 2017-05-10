@@ -22,7 +22,7 @@ check_dns() {
 start_suite "With or without DNS test"
 
 # Assert behaviour without weaveDNS running
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch
 
 start_container $HOST1 $TARGET_IP/24 --name c2 -h $TARGET
 

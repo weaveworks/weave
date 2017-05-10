@@ -6,8 +6,7 @@ start_suite "Boot the proxy with TLS-enabled Docker support"
 
 PWD=$($SSH $HOST1 pwd)
 
-weave_on $HOST1 launch-router
-weave_on $HOST1 launch-proxy \
+weave_on $HOST1 launch \
   --tlsverify \
   --tlscacert $PWD/tls/ca.pem \
   --tlscert   $PWD/tls/$HOST1.pem \

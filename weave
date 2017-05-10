@@ -42,23 +42,21 @@ weave --help | help
       setup
       version
 
-weave launch        <same arguments as 'weave launch-router'>
-      launch-router [--password <pass>] [--trusted-subnets <cidr>,...]
-                      [--host <ip_address>]
-                      [--name <mac>] [--nickname <nickname>]
-                      [--no-restart] [--resume] [--no-discovery] [--no-dns]
-                      [--ipalloc-init <mode>]
-                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--plugin]
-                      [--log-level=debug|info|warning|error]
-                      <peer> ...
-      launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
-                      [--no-rewrite-hosts] [--no-default-ipalloc] [--no-restart]
-                      [--hostname-from-label <labelkey>]
-                      [--hostname-match <regexp>]
-                      [--hostname-replacement <replacement>]
-                      [--rewrite-inspect]
-                      [--log-level=debug|info|warning|error]
+weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
+                    [--host <ip_address>]
+                    [--name <mac>] [--nickname <nickname>]
+                    [--no-restart] [--resume] [--no-discovery] [--no-dns]
+                    [--ipalloc-init <mode>]
+                    [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
+                    [--plugin=false] [--proxy=false]
+                    [-H <endpoint>] [--without-dns] [--no-multicast-route]
+                    [--no-rewrite-hosts] [--no-default-ipalloc]
+                    [--hostname-from-label <labelkey>]
+                    [--hostname-match <regexp>]
+                    [--hostname-replacement <replacement>]
+                    [--rewrite-inspect]
+                    [--log-level=debug|info|warning|error]
+                    <peer> ...
 
 weave prime
 
@@ -87,12 +85,9 @@ weave status        [targets | connections | peers | dns | ipam]
       ps            [<container_id> ...]
 
 weave stop
-      stop-router
-      stop-proxy
 
 weave reset         [--force]
       rmpeer        <peer_id> ...
-
 
 where <peer>     = <ip_address_or_fqdn>[:<port>]
       <cidr>     = <ip_address>/<routing_prefix_length>
@@ -131,7 +126,7 @@ docker_run_options() {
 
 exec_options() {
     case "$1" in
-        setup|setup-cni|launch|launch-router)
+        setup|setup-cni|launch)
             echo -v /:/host -e HOST_ROOT=/host
             ;;
         # All the other commands that may create the bridge and need machine id files.
@@ -151,7 +146,6 @@ exec_remote() {
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
-        -e WEAVEPROXY_DOCKER_ARGS \
         -e WEAVEPLUGIN_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
@@ -285,7 +279,7 @@ PORT=${WEAVE_PORT:-6783}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-127.0.0.1:6782}
 PROXY_PORT=12375
-PROXY_CONTAINER_NAME=weaveproxy
+OLD_PROXY_CONTAINER_NAME=weaveproxy
 PROC_PATH="/proc"
 COVERAGE_ARGS=""
 [ -n "$COVERAGE" ] && COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
@@ -632,10 +626,6 @@ check_not_running() {
             return 2
             ;;
     esac
-}
-
-stop() {
-    docker stop $1 >/dev/null 2>&1 || echo "$2 is not running." >&2
 }
 
 # Given a container name or short ID in $1, ensure the specified
@@ -1133,10 +1123,11 @@ host_arg() {
     fi
     PROXY_VOLUMES="$PROXY_VOLUMES -v /var/run/weave:/var/run/weave"
   fi
-  PROXY_ARGS="$PROXY_ARGS -H $1"
+  PROXY_ARGS="-H $1 $PROXY_ARGS"
 }
 
 proxy_parse_args() {
+    args=""
     while [ $# -gt 0 ]; do
         case "$1" in
           -H)
@@ -1178,11 +1169,13 @@ proxy_parse_args() {
             RESTART_POLICY=
             ;;
           *)
-            PROXY_ARGS="$PROXY_ARGS $1"
+            args="$args $1"
             ;;
         esac
         shift
     done
+    # Merge proxy options and other args, keeping $args at the end, as these could contain peers:
+    PROXY_ARGS="$PROXY_ARGS $args"
 }
 
 proxy_args() {
@@ -1196,7 +1189,7 @@ proxy_args() {
     if [ -z "$PROXY_TLS_ENABLED" -a -z "$PROXY_TLS_DETECTION_DISABLED" ] ; then
         if ! DOCKER_TLS_ARGS=$(util_op docker-tls-args) ; then
             echo -n "Warning: unable to detect proxy TLS configuration. To enable TLS, " >&2
-            echo -n "launch the proxy with 'weave launch-proxy' and supply TLS options. " >&2
+            echo -n "launch the proxy with 'weave launch' and supply TLS options. " >&2
             echo "To suppress this warning, supply the '--no-detect-tls' option." >&2
         else
             proxy_parse_args $DOCKER_TLS_ARGS
@@ -1216,11 +1209,10 @@ proxy_args() {
 }
 
 proxy_addrs() {
-    if addr="$(http_call_unix $PROXY_CONTAINER_NAME status.sock GET /status 2>/dev/null)" ; then
+    if addr="$(http_call_unix $CONTAINER_NAME status.sock GET /status 2>/dev/null)" ; then
       echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g"
-
     else
-      echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
+      echo "$CONTAINER_NAME container is not present. Have you launched it?" >&2
       return 1
     fi
 }
@@ -1240,28 +1232,7 @@ warn_if_stopping_proxy_in_env() {
 # launch helpers
 ######################################################################
 
-common_launch_args() {
-    args=""
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            --no-restart)
-                args="$args $1"
-                ;;
-            --log-level)
-                [ $# -gt 1 ] || usage
-                args="$args $1 $2"
-                shift
-                ;;
-            --log-level=*)
-                args="$args $1"
-                ;;
-        esac
-        shift
-    done
-    echo "$args"
-}
-
-launch_router() {
+launch() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
 
@@ -1310,10 +1281,6 @@ launch_router() {
                 ;;
             --no-restart)
                 RESTART_POLICY=
-                ;;
-            --awsvpc)
-                AWSVPC_ARGS="--awsvpc"
-                AWSVPC=1
                 ;;
             --plugin)
                 PLUGIN_ARGS="--plugin"
@@ -1368,45 +1335,6 @@ launch_router() {
     RESOLV_CONF_DIR=$(dirname "$RESOLV_CONF")
     RESOLV_CONF_BASE=$(basename "$RESOLV_CONF")
 
-    # Set WEAVE_DOCKER_ARGS in the environment in order to supply
-    # additional parameters, such as resource limits, to docker
-    # when launching the weave container.
-    ROUTER_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
-        $(docker_run_options) \
-        $RESTART_POLICY \
-        --pid=host \
-        --volumes-from $DB_CONTAINER_NAME \
-        -v $RESOLV_CONF_DIR:/var/run/weave/etc \
-        -v /run/docker/plugins:/run/docker/plugins \
-        -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus \
-        -e WEAVE_PASSWORD \
-        -e CHECKPOINT_DISABLE \
-        $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
-        --port $CONTAINER_PORT --nickname "$(hostname)" \
-        --host-root=/host \
-        $(router_bridge_opts) \
-        --ipalloc-range "$IPRANGE" \
-        --dns-effective-listen-address $DOCKER_BRIDGE_IP \
-        $DNS_ROUTER_OPTS $NO_DNS_OPT \
-        $AWSVPC_ARGS \
-        $PLUGIN_ARGS \
-        --http-addr $HTTP_ADDR \
-        --status-addr $STATUS_ADDR \
-        --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
-        "$@")
-    wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-}
-
-stop_router() {
-    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
-    stop $CONTAINER_NAME "Weave"
-    conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-}
-
-launch_proxy() {
-    # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
-    # additional parameters, such as resource limits, to docker
-    # when launching the weaveproxy container.
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
     mkdir -p /var/run/weave
@@ -1416,28 +1344,50 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    detect_awsvpc
-    [ -n "$AWSVPC" ] && PROXY_ARGS="$PROXY_ARGS --no-multicast-route"
-    PROXY_CONTAINER=$(docker run -d --name=$PROXY_CONTAINER_NAME \
+
+    # Set WEAVE_DOCKER_ARGS in the environment in order to supply
+    # additional parameters, such as resource limits, to docker
+    # when launching the weave container.
+    WEAVE_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
         --pid=host \
-        $PROXY_VOLUMES \
+        --volumes-from $DB_CONTAINER_NAME \
         --volumes-from $VOLUMES_CONTAINER_NAME \
+        $PROXY_VOLUMES \
         -v /var/run/weave:/var/run/weave \
+        -v $RESOLV_CONF_DIR:/var/run/weave/etc \
+        -v /run/docker/plugins:/run/docker/plugins \
+        -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
         -e WEAVE_HTTP_ADDR \
         -e EXEC_IMAGE=$EXEC_IMAGE \
-        --entrypoint=/home/weave/weaveproxy \
-        $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
-    wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
+        -e WEAVE_PASSWORD \
+        -e CHECKPOINT_DISABLE \
+        $WEAVE_DOCKER_ARGS \
+        $IMAGE \
+        $COVERAGE_ARGS \
+        --port $CONTAINER_PORT --nickname "$(hostname)" \
+        --host-root=/host \
+        $(router_bridge_opts) \
+        --ipalloc-range "$IPRANGE" \
+        --dns-effective-listen-address $DOCKER_BRIDGE_IP \
+        $DNS_ROUTER_OPTS $NO_DNS_OPT \
+        $PLUGIN_ARGS \
+        --http-addr $HTTP_ADDR \
+        --status-addr $STATUS_ADDR \
+        --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
+        $PROXY_ARGS)
+    wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
 }
 
-stop_proxy() {
+stop() {
+    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
     warn_if_stopping_proxy_in_env
-    stop $PROXY_CONTAINER_NAME "Proxy"
+    docker stop $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
+    conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
 }
 
 protect_against_docker_hang() {
@@ -1521,7 +1471,6 @@ case "$COMMAND" in
     version)
         [ $# -eq 0 ] || usage
         ask_version $CONTAINER_NAME $IMAGE || true
-        ask_version $PROXY_CONTAINER_NAME $EXEC_IMAGE --entrypoint=/home/weave/weaveproxy || true
         ;;
     # intentionally undocumented since it assumes knowledge of weave
     # internals
@@ -1553,25 +1502,10 @@ EOF
     launch)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
-        check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
         check_not_running_plugin_v2
-        COMMON_ARGS=$(common_launch_args "$@")
-        launch_router --plugin "$@"
-        launch_proxy  $COMMON_ARGS
-        ;;
-    launch-router)
-        deprecation_warnings "$@"
-        check_not_running router $CONTAINER_NAME $BASE_IMAGE
-        check_not_running_plugin_v2
-        launch_router "$@"
-        echo $ROUTER_CONTAINER
-        ;;
-    launch-proxy)
-        deprecation_warnings "$@"
-        check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
-        check_not_running_plugin_v2
-        launch_proxy "$@"
-        echo $PROXY_CONTAINER
+        # Plugin and proxy are started by default. Should users additionally pass --plugin=false or --proxy=false, their overrides will take precedence when parsed by Go.
+        launch --plugin --proxy "$@"
+        echo "$WEAVE_CONTAINER"
         ;;
     env)
         if PROXY_ADDR=$(proxy_addr) ; then
@@ -1607,7 +1541,7 @@ EOF
             echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
             usage
         fi
-        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDRS=$(proxy_addrs) ; then
+        if [ -z "$SUB_STATUS" ] && PROXY_ADDRS=$(proxy_addrs) ; then
             echo
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
@@ -1632,7 +1566,7 @@ EOF
             call_weave GET /report -H 'Accept: application/json'
         fi
         ;;
-    run|start|restart|launch-plugin|stop-plugin)
+    run|start|restart|launch-plugin|stop-plugin|launch-proxy|stop-proxy|launch-router|stop-router)
         echo "The 'weave $COMMAND' command has been removed as of Weave Net version 2.0" >&2
         echo "Please see release notes for further information" >&2
         exit 1
@@ -1759,18 +1693,10 @@ EOF
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        stop_router
-        stop_proxy
-        # In case user has upgraded from <v2.0 and left the old container running
+        stop
+        # In case user has upgraded from <v2.0 and left old containers running
         docker stop $OLD_PLUGIN_CONTAINER_NAME >/dev/null 2>&1 || true
-        ;;
-    stop-router)
-        [ $# -eq 0 ] || usage
-        stop_router
-        ;;
-    stop-proxy)
-        [ $# -eq 0 ] || usage
-        stop_proxy
+        docker stop $OLD_PROXY_CONTAINER_NAME >/dev/null 2>&1 || true
         ;;
     reset)
         [ $# -eq 0 ] || [ $# -eq 1 -a "$1" = "--force" ] || usage
@@ -1792,7 +1718,7 @@ EOF
                 exit 1
                 ;;
         esac
-        for NAME in $CONTAINER_NAME $PROXY_CONTAINER_NAME $OLD_PLUGIN_CONTAINER_NAME ; do
+        for NAME in $CONTAINER_NAME $OLD_PROXY_CONTAINER_NAME $OLD_PLUGIN_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
         done

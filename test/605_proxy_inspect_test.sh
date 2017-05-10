@@ -4,8 +4,7 @@
 
 start_suite "Check that docker inspect returns the weave IP"
 
-weave_on $HOST1 launch-router
-weave_on $HOST1 launch-proxy --rewrite-inspect
+weave_on $HOST1 launch --rewrite-inspect
 
 proxy docker_on $HOST1 run -dt --name c1 $SMALL_IMAGE /bin/sh
 inspect_format="{{.Name}} {{.NetworkSettings.MacAddress}} {{.NetworkSettings.IPAddress}}/{{.NetworkSettings.IPPrefixLen}}"

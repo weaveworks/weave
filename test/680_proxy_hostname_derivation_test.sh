@@ -33,17 +33,15 @@ check_dns_records() {
 }
 
 test_setup() {
-    weave_on $HOST1 launch-proxy $@
+    weave_on $HOST1 launch $@
 }
 
 test_cleanup() {
-    weave_on $HOST1 stop-proxy
+    weave_on $HOST1 stop
 }
 
 
 start_suite "Hostname derivation"
-
-weave_on $HOST1 launch-router
 
 # Hostname derivation through container name substitutions
 test_setup --hostname-match '^[^-]+-(?P<appname>[^-]*)-[^-]+$' --hostname-replacement '$appname'

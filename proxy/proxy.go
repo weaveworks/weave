@@ -50,6 +50,7 @@ func dockerAPIEndpoint(endpoint string) *regexp.Regexp {
 }
 
 type Config struct {
+	Enabled             bool
 	HostnameFromLabel   string
 	HostnameMatch       string
 	HostnameReplacement string
@@ -204,7 +205,7 @@ func (proxy *Proxy) findWeaveWaitVolumes() error {
 }
 
 func (proxy *Proxy) findVolume(v string) (string, error) {
-	container, err := proxy.client.InspectContainer("weaveproxy")
+	container, err := proxy.client.InspectContainer("weave")
 	if err != nil {
 		return "", fmt.Errorf("Could not find the weavewait volume: %s", err)
 	}
