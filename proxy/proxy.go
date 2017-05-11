@@ -280,13 +280,17 @@ func (proxy *Proxy) Listen() []net.Listener {
 	return listeners
 }
 
-func (proxy *Proxy) Serve(listeners []net.Listener) {
+func (proxy *Proxy) Serve(listeners []net.Listener, ready func()) {
 	errs := make(chan error)
 	for _, listener := range listeners {
 		go func(listener net.Listener) {
 			errs <- (&http.Server{Handler: proxy}).Serve(listener)
 		}(listener)
 	}
+	// It would be better if we could delay calling Done() until all
+	// the listeners are ready, but it doesn't seem to be possible to
+	// hook the right point in http.Server
+	ready()
 	for range listeners {
 		err := <-errs
 		if err != nil {
