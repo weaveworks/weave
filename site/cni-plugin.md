@@ -12,7 +12,7 @@ search_type: Documentation
 CNI, the [_Container Network Interface_](https://github.com/containernetworking/cni),
 is a proposed standard for configuring network interfaces for Linux
 application containers.  CNI is supported by
-[Kubernetes](http://kubernetes.io/), [Apache Mesos](mesos.apache.org)
+[Kubernetes](http://kubernetes.io/), [Apache Mesos](http://mesos.apache.org)
 and 
 [others](https://github.com/containernetworking/cni#who-is-using-cni).
 

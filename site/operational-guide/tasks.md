@@ -44,7 +44,7 @@ or possible:
 In some cases you may already be aware of the problem, as you were
 unable to execute `weave reset` successfully or because you know
 through other channels that the host has died. In these cases you can
-proceed straight to [Manually Reclaiming Lost Address Space](#reclaim-address-space).
+proceed straight to [Manually Reclaiming Lost Address Space](#manually-reclaim-address-space).
 
 However in some scenarios it may not be obvious that space has been
 lost, in which case you can check for it periodically with the

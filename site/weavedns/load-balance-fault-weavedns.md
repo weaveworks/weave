@@ -49,7 +49,7 @@ WeaveDNS removes the addresses of any container that dies. This offers
 a simple way to implement redundancy. E.g. if in our example we stop
 one of the `pingme` containers and re-run the ping tests, eventually
 (within ~30s at most, since that is the weaveDNS
-[cache expiry time](#ttl)) we will only be hitting the address of the
+[cache expiry time](/site/weavedns/managing-entries-weavedns.md#ttl)) we will only be hitting the address of the
 container that is still alive.
 
 **See Also**

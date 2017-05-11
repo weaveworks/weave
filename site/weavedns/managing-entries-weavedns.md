@@ -4,16 +4,12 @@ menu_order: 40
 search_type: Documentation
 ---
 
-
 The following topics are discussed: 
 
 * [Adding and removing extra DNS entries](#add-remove)
 * [Resolving WeaveDNS entries from the Host](#resolve-weavedns-entries-from-host)
 * [Hot-swapping Service Containers](#hot-swapping)
-* [Retaining DNS Entries When Containers Stop](#retain-stopped)
 * [Configuring a Custom TTL](#ttl)
-
-
 
 ### <a name="add-remove"></a>Adding and Removing Extra DNS Entries
 
@@ -82,6 +78,6 @@ weaveDNS instance will receive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/how-works-weavedns.md)
+ * [How Weave Finds Containers](/site/weavedns/how-works-weavedns.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)
