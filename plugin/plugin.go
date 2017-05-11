@@ -23,19 +23,19 @@ const (
 
 var Log = common.Log
 
-func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, dns bool, isPluginV2, forceMulticast bool) {
+func Start(weaveAPIAddr string, dockerClient *docker.Client, address string, meshAddress string, dns bool, isPluginV2, forceMulticast bool, defaultSubnet string, ready func()) {
 	weave := weaveapi.NewClient(weaveAPIAddr, Log)
 
 	Log.Info("Waiting for Weave API Server...")
 	weave.WaitAPIServer(30)
 	Log.Info("Finished waiting for Weave API Server")
 
-	if err := run(dockerClient, weave, address, meshAddress, dns, isPluginV2, forceMulticast); err != nil {
+	if err := run(dockerClient, weave, address, meshAddress, dns, isPluginV2, forceMulticast, defaultSubnet, ready); err != nil {
 		Log.Fatal(err)
 	}
 }
 
-func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, dns, isPluginV2, forceMulticast bool) error {
+func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, dns, isPluginV2, forceMulticast bool, defaultSubnet string, ready func()) error {
 	endChan := make(chan error, 1)
 
 	if address != "" {
@@ -54,6 +54,13 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer os.Remove(meshAddress)
 		defer meshListener.Close()
 	}
+	if !isPluginV2 {
+		Log.Println("Creating default 'weave' network")
+		options := map[string]interface{}{MulticastOption: "true"}
+		// TODO: the driver name should be extracted from pluginMeshSocket
+		dockerClient.EnsureNetwork("weave", "weavemesh", defaultSubnet, options)
+	}
+	ready()
 
 	return <-endChan
 }

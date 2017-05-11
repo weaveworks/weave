@@ -78,10 +78,12 @@ func (client *Client) Connect(remote string) error {
 }
 
 // IsReady returns true if the API server is up and running
+// (note it returns StatusServiceUnavailable until all parts are ready,
+// but callers of this function are expected to be ok with a partial service)
 func (client *Client) IsReady() bool {
-	_, err := client.httpVerb("GET", "/status", nil)
-
-	return err == nil
+	resp, err := http.Get(client.baseURL + "/status")
+	return err == nil &&
+		(resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusServiceUnavailable)
 }
 
 // WaitAPIServer waits until the API server is ready to serve.

@@ -13,6 +13,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/go-checkpoint"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
@@ -273,6 +274,7 @@ func (v *VersionCheck) String() string {
 }
 
 type WeaveStatus struct {
+	Ready        bool
 	Version      string
 	VersionCheck *VersionCheck              `json:"VersionCheck,omitempty"`
 	Router       *weave.NetworkRouterStatus `json:"Router,omitempty"`
@@ -281,9 +283,10 @@ type WeaveStatus struct {
 }
 
 // Read-only functions, suitable for exposing on an unprotected socket
-func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
+func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer, waitReady *common.WaitGroup) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
+			waitReady.IsDone(),
 			version,
 			versionCheck(),
 			weave.NewNetworkRouterStatus(router),
@@ -324,7 +327,11 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler := func(path string, template *template.Template) {
 		muxRouter.Methods("GET").Path(path).HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				if err := template.Execute(w, status()); err != nil {
+				s := status()
+				if !s.Ready {
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}
+				if err := template.Execute(w, s); err != nil {
 					http.Error(w, "error during template execution", http.StatusInternalServerError)
 					Log.Error(err)
 				}

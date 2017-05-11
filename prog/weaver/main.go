@@ -255,6 +255,8 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
+	var waitReady common.WaitGroup
+
 	if proxyConfig.Enabled {
 		// Start Weave Proxy:
 		proxy, err := weaveproxy.NewProxy(*proxyConfig)
@@ -264,7 +266,7 @@ func main() {
 		defer proxy.Stop()
 		listeners := proxy.Listen()
 		proxy.AttachExistingContainers()
-		go proxy.Serve(listeners)
+		go proxy.Serve(listeners, waitReady.Add())
 		go proxy.ListenAndServeStatus("/home/weave/status.sock")
 	}
 
@@ -432,7 +434,7 @@ func main() {
 			ns.HandleHTTP(muxRouter, dockerCli)
 		}
 		router.HandleHTTP(muxRouter)
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, &waitReady)
 		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
@@ -442,7 +444,7 @@ func main() {
 
 	if statusAddr != "" {
 		muxRouter := mux.NewRouter()
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, &waitReady)
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)
@@ -451,32 +453,27 @@ func main() {
 	}
 
 	if enablePlugin || enablePluginV2 {
-		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2, enablePluginV2Multicast)
-	}
-	if enablePlugin {
-		Log.Println("Creating default 'weave' network")
-		options := map[string]interface{}{plugin.MulticastOption: "true"}
-		// TODO: the driver name should be extracted from pluginMeshSocket
-		dockerCli.EnsureNetwork("weave", "weavemesh", defaultSubnet.String(), options)
+		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2, enablePluginV2Multicast, defaultSubnet.String(), waitReady.Add())
 	}
 
 	if bridgeConfig.AWSVPC {
 		// Run this on its own goroutine because the allocator can block
 		// We remove the default route installed by the kernel,
 		// because awsvpc has installed it as well
-		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC)
+		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC, waitReady.Add())
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)
 }
 
-func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool) {
+func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool, ready func()) {
 	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
 	checkFatal(err)
 	cidr := address.MakeCIDR(subnet, addr)
 	err = weavenet.AddBridgeAddr(bridgeName, cidr.IPNet(), removeDefaultRoute)
 	checkFatal(err)
 	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
+	ready()
 }
 
 func options() map[string]string {
