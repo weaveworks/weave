@@ -643,7 +643,6 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 }
 
 func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
-	var container *docker.Container
 	binds := []string{"/var/run/weave:/var/run/weave"}
 	froms := []string{}
 	for _, addr := range unixAddrs {
@@ -659,7 +658,10 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 	if len(froms) == 0 {
 		return
 	}
+	return proxy.runTransientContainer([]string{"/home/weave/symlink", weaveSock}, froms, binds)
+}
 
+func (proxy *Proxy) runTransientContainer(entrypoint, cmd, binds []string) (err error) {
 	env := []string{
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
@@ -668,14 +670,15 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
 	}
 
+	var container *docker.Container
 	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image:      proxy.Image,
-			Entrypoint: []string{"/home/weave/symlink", weaveSock},
-			Cmd:        froms,
+			Entrypoint: entrypoint,
+			Cmd:        cmd,
 			Env:        env,
 		},
-		HostConfig: &docker.HostConfig{Binds: binds},
+		HostConfig: &docker.HostConfig{Binds: binds, NetworkMode: "none"},
 	})
 	if err != nil {
 		return
