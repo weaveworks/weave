@@ -118,10 +118,10 @@ func newMetrics(router *weave.NetworkRouter, allocator *ipam.Allocator, ns *name
 
 func (m *collector) Collect(ch chan<- prometheus.Metric) {
 
-	status := WeaveStatus{"", nil,
-		weave.NewNetworkRouterStatus(m.router),
-		ipam.NewStatus(m.allocator, address.CIDR{}),
-		nameserver.NewStatus(m.ns, m.dnsserver)}
+	status := WeaveStatus{
+		Router: weave.NewNetworkRouterStatus(m.router),
+		IPAM:   ipam.NewStatus(m.allocator, address.CIDR{}),
+		DNS:    nameserver.NewStatus(m.ns, m.dnsserver)}
 
 	for _, metric := range metrics {
 		metric.Collect(status, metric.Desc, ch)
