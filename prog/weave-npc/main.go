@@ -91,7 +91,7 @@ func resetIPSets(ips ipset.Interface) error {
 	common.Log.Debugf("Got list of ipsets: %v", sets)
 
 	for _, s := range sets {
-		common.Log.Debugf("Destroying ipsets '%s'", string(s))
+		common.Log.Debugf("Destroying ipset '%s'", string(s))
 		if err := ips.Destroy(s); err != nil {
 			common.Log.Errorf("Failed to destroy ipset '%s'", string(s))
 			return err
