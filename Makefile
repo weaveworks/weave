@@ -248,17 +248,17 @@ else
 endif
 
 # The targets below builds the weave images
-$(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) $(WEAVEEXEC_UPTODATE)
+$(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) weave $(WEAVEUTIL_EXE)
+	cp $(WEAVEUTIL_EXE) prog/weaver/weaveutil
+	cp weave prog/weaver/weave
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
-	cp weave prog/weaveexec/weave
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(DOCKER_DISTRIB) $(SIGPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVER_UPTODATE)
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
-	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
 	tar -xf $(DOCKER_DISTRIB) usr/local/bin/docker -O > prog/weaveexec/docker
 	chmod +x prog/weaveexec/docker
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
