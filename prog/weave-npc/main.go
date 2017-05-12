@@ -90,6 +90,15 @@ func resetIPSets(ips ipset.Interface) error {
 
 	common.Log.Debugf("Got list of ipsets: %v", sets)
 
+	// Must remove references to ipsets by other ipsets before they're destroyed
+	for _, s := range sets {
+		common.Log.Debugf("Flushing ipset '%s'", string(s))
+		if err := ips.Flush(s); err != nil {
+			common.Log.Errorf("Failed to flush ipset '%s'", string(s))
+			return err
+		}
+	}
+
 	for _, s := range sets {
 		common.Log.Debugf("Destroying ipset '%s'", string(s))
 		if err := ips.Destroy(s); err != nil {
