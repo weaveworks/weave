@@ -1,11 +1,15 @@
 ---
-title: How the Weave Net Docker Network Plugin Works
+title: How the Weave Net Docker Network Plugins Work
 menu_order: 20
 search_type: Documentation
 ---
 
 
-The Weave Net plugin actually provides *two* network drivers to Docker - one named `weavemesh` that can operate without a cluster store and another one named `weave` that can only work with one (like Docker's overlay driver).
+The Weave Net legacy plugin actually provides *two* network drivers to Docker -
+one named `weavemesh` that can operate without a cluster store and another one
+named `weave` that can only work with one (like Docker's overlay driver), while
+the V2 plugin provides *one* - `store/weaveworks/net-plugin:latest_release`
+operating only in swarm mode.
 
 ### `weavemesh` driver
 
@@ -37,7 +41,16 @@ The plugin accepts the following options via `docker network create ... --opt`:
    network created when the plugin is first launched has the multicast
    option turned on, but for any networks you create it defaults to off.
 
+### `store/weaveworks/net-plugin:latest_release` driver
+
+* The driver runs within the plugin V2.
+* Requires Docker to run in [swarm mode](https://docs.docker.com/engine/swarm/swarm-mode/).
+* Supports multiple networks.
+* Used with Docker's IPAM.
+
+
 **See Also**
 
- * [Integrating Docker via the Network Plugin](/site/plugin.md)
+ * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
+ * [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md)
 

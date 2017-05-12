@@ -1,5 +1,5 @@
 ---
-title: Integrating Docker via the Network Plugin
+title: Integrating Docker via the Network Plugin (Legacy)
 menu_order: 60
 search_type: Documentation
 ---
@@ -62,26 +62,9 @@ different sets of containers to each network. However, coordinating
 this between hosts requires that you run Docker in ["swarm mode"](https://docs.docker.com/engine/swarm/swarm-mode/) or configure a
 ["key-value store"](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#/set-up-a-key-value-store).
 
-Docker swarm mode requires Docker version 1.13 or later to work with
-plugins such as Weave Net.
-
-To create a new network for services in swarm mode, run:
-
-    $ docker network create --driver=weaveworks/net-plugin:2.0.0 mynetwork
-
-then use it to create a service:
-
-    $ docker service create --network=mynetwork --name myservice ...
-
-
-To create a new network to attach containers in swarm mode, run:
-
-    $ docker network create --driver=weave --attachable mynetwork
-
-then use it to connect a container:
-
-    $ docker run --net=mynetwork ...
-
+To operate in swarm mode, you are required to use the plugin v2 of Weave Net.
+See [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md) for
+more details.
 
 If your Docker installation has a key-value store, create a network
 based on Weave Net as follows:
@@ -113,4 +96,4 @@ If you are using `systemd` with Docker 1.9, it is advised that you modify the Do
 
 **See Also**
 
- * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)
+ * [How the Weave Network Plugins Work](/site/plugin/plugin-how-it-works.md)

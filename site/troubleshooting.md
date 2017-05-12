@@ -74,7 +74,7 @@ $ weave status
         Service: proxy
         Address: tcp://127.0.0.1:12375
 
-       Service: plugin
+       Service: plugin (v1)
     DriverName: weave
 ```
 

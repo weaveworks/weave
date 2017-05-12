@@ -203,4 +203,4 @@ named `weavedb` is used to store this data.
  **See Also**
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
- * [Integrating Docker via the Network Plugin](/site/plugin.md)
+ * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)

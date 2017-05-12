@@ -86,8 +86,8 @@ Using the Weave plugin enables you to take advantage of [Docker's network functi
 Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
 
-See [Integrating Docker via the Network Plugin](/site/plugin.md) for more details.
-
+There are two plugin implementations for Weave Net. See [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
+and [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md) for more details.
 
 ### <a name="cniplugin"></a>Weave Network CNI Plugin
 

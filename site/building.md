@@ -42,8 +42,8 @@ On a fresh repository, the Makefile will do the following:
 - assemble the build container
 - download specific versions of all the dependencies
 - build the weave components in the build container
-- package them into three Docker images (`weaveworks/weave`,
-`weaveworks/weaveexec`, and `weaveworks/plugin`)
+- package them into two Docker images (`weaveworks/weave`,
+`weaveworks/weaveexec`)
 - Exported these images as `weave.tar.gz`
 
 The first two steps may take a while - don't worry, they are
