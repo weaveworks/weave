@@ -1126,9 +1126,6 @@ proxy_parse_args() {
           --tlskey=*)
             tls_arg "${1%%=*}" "${1#*=}" key
             ;;
-          --no-restart)
-            RESTART_POLICY=
-            ;;
           *)
             args="$args $1"
             ;;
@@ -1203,8 +1200,6 @@ launch() {
     IPRANGE_SPECIFIED=
 
     [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-    DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
-    NO_DNS_OPT=
 
     while [ $# -gt 0 ] ; do
         case "$1" in
@@ -1236,16 +1231,8 @@ launch() {
                 IPRANGE="${1#*=}"
                 IPRANGE_SPECIFIED=1
                 ;;
-            --no-dns)
-                DNS_ROUTER_OPTS=
-                NO_DNS_OPT="--no-dns"
-                ;;
             --no-restart)
                 RESTART_POLICY=
-                ;;
-            --plugin)
-                PLUGIN_ARGS="--plugin"
-                ENABLE_PLUGIN=1
                 ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
@@ -1333,8 +1320,7 @@ launch() {
         $(router_bridge_opts) \
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
-        $DNS_ROUTER_OPTS $NO_DNS_OPT \
-        $PLUGIN_ARGS \
+        --dns-listen-address $DOCKER_BRIDGE_IP:53 \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
