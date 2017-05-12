@@ -1165,9 +1165,6 @@ proxy_parse_args() {
           --tlskey=*)
             tls_arg "${1%%=*}" "${1#*=}" key
             ;;
-          --no-restart)
-            RESTART_POLICY=
-            ;;
           *)
             args="$args $1"
             ;;
