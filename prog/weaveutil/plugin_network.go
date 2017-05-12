@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/docker/docker/client"
 	docker "github.com/fsouza/go-dockerclient"
@@ -56,16 +57,19 @@ func isDockerPluginEnabled(args []string) error {
 	}
 
 	ctx := context.Background()
-	p, _, err := c.PluginInspectWithRaw(ctx, pluginName)
+
+	plugins, err := c.PluginList(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !p.Enabled {
-		return fmt.Errorf("plugin %q is disabled", pluginName)
+	for _, p := range plugins {
+		if p.Enabled && strings.Contains(p.Name, pluginName) {
+			return nil
+		}
 	}
 
-	return nil
+	return fmt.Errorf("plugin %q not found", pluginName)
 }
 
 func newDockerClient() (*docker.Client, error) {
