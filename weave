@@ -1276,10 +1276,6 @@ launch() {
             --no-restart)
                 RESTART_POLICY=
                 ;;
-            --plugin)
-                PLUGIN_ARGS="--plugin"
-                ENABLE_PLUGIN=1
-                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1369,7 +1365,6 @@ launch() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         --dns-listen-address $DOCKER_BRIDGE_IP:53 \
-        $PLUGIN_ARGS \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
