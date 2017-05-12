@@ -3,7 +3,7 @@ FROM golang:1.8.1
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
 
-# The names of the architectures that we're fetching cross-compilers for from the Ubuntu packages
+# The names of the architectures that we're fetching cross-compilers for from the Debian packages
 ENV DEB_CROSSPLATFORMS \
 	armhf \
 	arm64
@@ -18,7 +18,7 @@ ENV GCC_CROSSCOMPILERS \
 	arm-linux-gnueabihf \
 	aarch64-linux-gnu
 
-# Temporarily add the Ubuntu repositories, because we're going to install gcc cross-compilers from there
+# Temporarily add the Debian repositories, because we're going to install gcc cross-compilers from there
 # Install the build-essential and crossbuild-essential-ARCH packages
 RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
   && curl http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
