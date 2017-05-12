@@ -65,6 +65,7 @@ func isDockerPluginEnabled(args []string) error {
 
 	for _, p := range plugins {
 		if p.Enabled && strings.Contains(p.Name, pluginName) {
+			fmt.Println(p.Name)
 			return nil
 		}
 	}
