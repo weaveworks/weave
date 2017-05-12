@@ -38,14 +38,14 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 	var ipnet *net.IPNet
 
 	if conf.Subnet == "" {
-		ipnet, err = i.weave.AllocateIP(containerID)
+		ipnet, err = i.weave.AllocateIP(containerID, false)
 	} else {
 		var subnet *net.IPNet
 		subnet, err = types.ParseCIDR(conf.Subnet)
 		if err != nil {
 			return nil, fmt.Errorf("subnet given in config, but not parseable: %s", err)
 		}
-		ipnet, err = i.weave.AllocateIPInSubnet(containerID, subnet)
+		ipnet, err = i.weave.AllocateIPInSubnet(containerID, subnet, false)
 	}
 
 	if err != nil {
