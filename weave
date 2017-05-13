@@ -218,8 +218,6 @@ kill_container() {
 # main
 ######################################################################
 
-check_docker_version
-
 [ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
 # "--help|help" are special because we always want to process them
@@ -244,6 +242,7 @@ elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
 fi
 
 if [ -z "$IS_LOCAL" ] ; then
+    check_docker_version
     exec_remote "$@"
     exit $?
 fi
