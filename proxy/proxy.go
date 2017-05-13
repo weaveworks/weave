@@ -310,17 +310,6 @@ func (proxy *Proxy) Serve(listeners []net.Listener, ready func()) {
 	}
 }
 
-func (proxy *Proxy) ListenAndServeStatus(socket string) {
-	listener, err := weavenet.ListenUnixSocket(socket)
-	if err != nil {
-		Log.Fatalf("ListenAndServeStatus failed: %s", err)
-	}
-	handler := http.HandlerFunc(proxy.StatusHTTP)
-	if err := (&http.Server{Handler: handler}).Serve(listener); err != nil {
-		Log.Fatalf("ListenAndServeStatus failed: %s", err)
-	}
-}
-
 func (proxy *Proxy) StatusHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, addr := range proxy.normalisedAddrs {
 		fmt.Fprintln(w, addr)

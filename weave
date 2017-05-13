@@ -661,19 +661,6 @@ http_call() {
     return $retval
 }
 
-http_call_unix() {
-    container="$1"
-    socket="$2"
-    http_verb="$3"
-    url="$4"
-    shift 4
-    # NB: requires curl >= 7.40
-    output=$(docker exec $container curl -s -S -X $http_verb --unix-socket $socket "$@" http:$url) || return 1
-    # in some docker versions, `docker exec` does not fail when the executed command fails
-    [ -n "$output" ] || return 1
-    echo $output
-}
-
 call_weave() {
     TMPERR=/tmp/call_weave_err_$$
     retval=0
@@ -1166,10 +1153,9 @@ proxy_args() {
 }
 
 proxy_addrs() {
-    if addr="$(http_call_unix $CONTAINER_NAME status.sock GET /status 2>/dev/null)" ; then
+    if addr="$(call_weave GET /proxyaddrs)" ; then
       echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
-      echo "$CONTAINER_NAME container is not present. Have you launched it?" >&2
       return 1
     fi
 }
