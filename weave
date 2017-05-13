@@ -146,7 +146,6 @@ exec_remote() {
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
-        -e WEAVEPLUGIN_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_HTTP_ADDR \
