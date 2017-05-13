@@ -316,6 +316,9 @@ func main() {
 	if bridgeConfig.AWSVPC && len(config.Password) > 0 {
 		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
 	}
+	if bridgeConfig.AWSVPC && !ipamConfig.Enabled() {
+		Log.Fatalf("--awsvpc mode requires IPAM enabled")
+	}
 
 	db, err := db.NewBoltDB(dbPrefix)
 	checkFatal(err)
