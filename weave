@@ -583,7 +583,11 @@ attach() {
 
 # Docker Plugin V1 runs in a Docker container.
 is_plugin_v1_enabled() {
-    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME 2>/dev/null | grep -q -- "--plugin"
+    cmd="$(docker inspect -f '{{.Config.Cmd}}' "$CONTAINER_NAME" 2>/dev/null)"
+    if echo "$cmd" | grep -q -- "--plugin=false" ; then
+        return 1  # Plugin has been explicitly disabled.
+    fi
+    echo "$cmd" | grep -q -- "--plugin" && check_running "$CONTAINER_NAME"
 }
 
 # The presence of Docker Plugin V2 can be checked only via 'docker plugin',
