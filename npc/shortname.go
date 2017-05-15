@@ -7,12 +7,13 @@ import (
 
 const (
 	// This array:
-	// * Must include only printable UTF8 characters that are represented with a single byte
+	// * Must include only printable UTF8 characters that are represented with a single byte (http://www.utf8-chartable.de/)
 	// * Must be at least of length 85 (`len("weave-") + l(2^160)/l(85)` equals 31, the maximum ipset name length)
 	// * Must not include commas as those are treated specially by `ipset add` when adding a named set to a list:set
 	// * Should not include space for readability
+	// * Should not include invalid chars for XML `<>&"'`
 	// * Should not include single quote or backslash to be nice to shell users
-	ShortNameSymbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789(){}[]<>_$%^&*|/?.;:@#~"
+	ShortNameSymbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789(){}[]+=_$%^!*|/?.;:@#~"
 )
 
 // sha1 hash an arbitrary string and represent it using the full range of
