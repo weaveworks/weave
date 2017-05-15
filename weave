@@ -1303,7 +1303,7 @@ launch() {
 }
 
 stop() {
-    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
+    util_op remove-plugin-network weave || true
     warn_if_stopping_proxy_in_env
     docker stop $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
     # In case user has upgraded from <v2.0 and left old containers running
