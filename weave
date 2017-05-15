@@ -593,14 +593,6 @@ is_plugin_v2_enabled() {
     util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
 }
 
-# Check that plugin (v2) is not running.
-check_not_running_plugin_v2() {
-    if is_plugin_v2_enabled; then
-        echo "Docker plugin \"$PLUGIN_NAME\" is running; Aborting." >&2
-        return 1
-    fi
-}
-
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
@@ -1417,7 +1409,10 @@ case "$COMMAND" in
     launch)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
-        check_not_running_plugin_v2
+        if http_call $HTTP_ADDR GET /status >/dev/null 2>&1 ; then
+            echo "Weave Net is already running" >&2
+            exit 1
+        fi
         # Plugin and proxy are started by default. Should users additionally pass --plugin=false or --proxy=false, their overrides will take precedence when parsed by Go.
         launch --plugin --proxy "$@"
         echo "$WEAVE_CONTAINER"
