@@ -606,11 +606,11 @@ check_not_running() {
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
     case ${RUN_STATUS%:*} in
         "true restarting $3")
-            echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
+            echo "$2 is restarting; you can stop it with 'weave stop'." >&2
             return 3
             ;;
         "true "*" $3")
-            echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
+            echo "$2 is already running; you can stop it with 'weave stop'." >&2
             return 1
             ;;
         "false "*" $3")
