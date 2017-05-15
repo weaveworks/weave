@@ -1154,7 +1154,7 @@ proxy_args() {
 
 proxy_addrs() {
     if addr="$(call_weave GET /proxyaddrs)" ; then
-      echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g"
+      echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g" | tr '\n' ' '
     else
       return 1
     fi
