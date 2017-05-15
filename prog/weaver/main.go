@@ -442,7 +442,9 @@ func main() {
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, &waitReady)
 		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
-		muxRouter.Methods("GET").Path("/proxyaddrs").HandlerFunc(proxy.StatusHTTP)
+		if proxy != nil {
+			muxRouter.Methods("GET").Path("/proxyaddrs").HandlerFunc(proxy.StatusHTTP)
+		}
 		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
 		Log.Println("Listening for HTTP control messages on", httpAddr)
 		go listenAndServeHTTP(httpAddr, nil)
