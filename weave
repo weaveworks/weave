@@ -1456,20 +1456,6 @@ case "$COMMAND" in
             echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
             usage
         fi
-        if [ -z "$SUB_STATUS" ] && PROXY_ADDRS=$(proxy_addrs 2>/dev/null) ; then
-            echo
-            echo "        Service: proxy"
-            echo "        Address: $PROXY_ADDRS"
-        fi
-        if [ -z "$SUB_STATUS" ] && is_plugin_v1_enabled ; then
-            echo
-            echo "        Service: plugin (v1)"
-            echo "     DriverName: weave"
-        elif [ -z "$SUB_STATUS" ] && PLUGIN_FULL_NAME=$(is_plugin_v2_enabled) ; then
-            echo
-            echo "        Service: plugin (v2)"
-            echo "     DriverName: $PLUGIN_FULL_NAME"
-        fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
         ;;

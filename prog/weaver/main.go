@@ -427,6 +427,12 @@ func main() {
 	}
 	checkFatal(router.CreateRestartSentinel())
 
+	// Slightly ugly that plugin status is separated from the plugin.Start call
+	var pluginStatus *plugin.Status
+	if enablePlugin || enablePluginV2 {
+		pluginStatus = plugin.NewStatus(pluginSocket, pluginMeshSocket, enablePluginV2)
+	}
+
 	// The weave script always waits for a status call to succeed,
 	// so there is no point in doing "weave launch --http-addr ''".
 	// This is here to support stand-alone use of weaver.
@@ -439,7 +445,7 @@ func main() {
 			ns.HandleHTTP(muxRouter, dockerCli)
 		}
 		router.HandleHTTP(muxRouter)
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, &waitReady)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, pluginStatus, &waitReady)
 		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		if proxy != nil {
@@ -452,7 +458,7 @@ func main() {
 
 	if statusAddr != "" {
 		muxRouter := mux.NewRouter()
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, &waitReady)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, pluginStatus, &waitReady)
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)

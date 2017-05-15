@@ -17,6 +17,8 @@ import (
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/plugin"
+	"github.com/weaveworks/weave/proxy"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -203,6 +205,18 @@ var statusTemplate = defTemplate("status", `\
             TTL: {{.DNS.TTL}}
         Entries: {{countDNSEntries .DNS.Entries}}
 {{end}}\
+{{if .Proxy}}\
+
+        Service: proxy
+        Address: {{printList .Proxy.Addresses}}
+{{end}}\
+{{if .Plugin}}\
+
+        Service: plugin (v{{.Plugin.Version}})
+{{if eq .Plugin.Version 1}}\
+        DriverName: {{.Plugin.DriverName}}
+{{end}}\
+{{end}}\
 `)
 
 var targetsTemplate = defTemplate("targetsTemplate", `\
@@ -280,10 +294,12 @@ type WeaveStatus struct {
 	Router       *weave.NetworkRouterStatus `json:"Router,omitempty"`
 	IPAM         *ipam.Status               `json:"IPAM,omitempty"`
 	DNS          *nameserver.Status         `json:"DNS,omitempty"`
+	Proxy        *proxy.Status              `json:"Proxy,omitempty"`
+	Plugin       *plugin.Status             `json:"Plugin,omitempty"`
 }
 
 // Read-only functions, suitable for exposing on an unprotected socket
-func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer, waitReady *common.WaitGroup) {
+func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer, prxy *proxy.Proxy, pluginStatus *plugin.Status, waitReady *common.WaitGroup) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
 			waitReady.IsDone(),
@@ -291,7 +307,10 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			versionCheck(),
 			weave.NewNetworkRouterStatus(router),
 			ipam.NewStatus(allocator, defaultSubnet),
-			nameserver.NewStatus(ns, dnsserver)}
+			nameserver.NewStatus(ns, dnsserver),
+			proxy.NewStatus(prxy),
+			pluginStatus,
+		}
 	}
 	muxRouter.Methods("GET").Path("/report").Headers("Accept", "application/json").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
