@@ -214,7 +214,7 @@ var statusTemplate = defTemplate("status", `\
 
         Service: plugin (v{{.Plugin.Version}})
 {{if eq .Plugin.Version 1}}\
-        DriverName: {{.Plugin.DriverName}}
+     DriverName: {{.Plugin.DriverName}}
 {{end}}\
 {{end}}\
 `)
