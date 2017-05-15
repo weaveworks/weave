@@ -582,17 +582,6 @@ attach() {
 # functions for interacting with containers
 ######################################################################
 
-# Docker Plugin V1 runs in a Docker container.
-is_plugin_v1_enabled() {
-    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME 2>/dev/null | grep -q -- "--plugin"
-}
-
-# The presence of Docker Plugin V2 can be checked only via 'docker plugin',
-# as v2 plugins do not run as regular containers.
-is_plugin_v2_enabled() {
-    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
-}
-
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
@@ -1313,10 +1302,8 @@ stop() {
 }
 
 protect_against_docker_hang() {
-    # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
-    if ! is_plugin_v1_enabled && ! is_plugin_v2_enabled ; then
-        rm -f $HOST_ROOT/run/docker/plugins/weave.sock $HOST_ROOT/run/docker/plugins/weavemesh.sock
-    fi
+    # Since the plugin is not running, remove its socket so Docker doesn't try to talk to it
+    rm -f $HOST_ROOT/run/docker/plugins/weave.sock $HOST_ROOT/run/docker/plugins/weavemesh.sock
 }
 
 ######################################################################
