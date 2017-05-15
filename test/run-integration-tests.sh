@@ -284,7 +284,7 @@ function configure() {
         local inventory_file=$(mktemp /tmp/ansible_inventory_XXXXX)
         echo "[all]" >"$inventory_file"
         # shellcheck disable=SC2001
-        echo "$2" | sed "s/$/:$3/" >>"$inventory_file"
+        echo "$2" | sed "s/\$/:$3/" >>"$inventory_file"
 
         # Configure the provisioned machines using Ansible, allowing up to 3 retries upon failure (e.g. APT connectivity issues, etc.):
         for i in $(seq 3); do
