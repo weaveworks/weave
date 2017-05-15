@@ -130,7 +130,7 @@ PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_weave-kube push_ml_weave-npc
 
 WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
 
-DOCKER_VERSION=1.10.3
+DOCKER_VERSION=1.12.6
 DOCKER_DISTRIB=prog/weaveexec/docker-$(DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
@@ -259,7 +259,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
 	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
-	tar -xf $(DOCKER_DISTRIB) usr/local/bin/docker -O > prog/weaveexec/docker
+	tar -xf $(DOCKER_DISTRIB) docker/docker -O > prog/weaveexec/docker
 	chmod +x prog/weaveexec/docker
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
