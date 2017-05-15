@@ -57,8 +57,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 	if !isPluginV2 {
 		Log.Println("Creating default 'weave' network")
 		options := map[string]interface{}{MulticastOption: "true"}
-		// TODO: the driver name should be extracted from pluginMeshSocket
-		dockerClient.EnsureNetwork("weave", "weavemesh", defaultSubnet, options)
+		dockerClient.EnsureNetwork("weave", pluginNameFromAddress(meshAddress), defaultSubnet, options)
 	}
 	ready()
 
@@ -70,7 +69,7 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 	if isPluginV2 {
 		name = pluginV2Name
 	} else {
-		name = strings.TrimSuffix(path.Base(address), ".sock")
+		name = pluginNameFromAddress(address)
 	}
 
 	d, err := netplugin.New(dockerClient, weave, name, scope, dns, isPluginV2, forceMulticast)
@@ -94,4 +93,9 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 	}()
 
 	return listener, nil
+}
+
+// Take a socket address like "/run/docker/plugins/weavemesh.sock" and extract the plugin name "weavemesh"
+func pluginNameFromAddress(address string) string {
+	return strings.TrimSuffix(path.Base(address), ".sock")
 }
