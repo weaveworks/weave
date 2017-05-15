@@ -82,6 +82,8 @@ endif
 DOCKERHUB_USER?=weaveworks
 # The default version that's chosen when pushing the images. Can/should be overridden
 WEAVE_VERSION?=git-$(shell git rev-parse --short=12 HEAD)
+# Docker Store does not allow the "latest" tag.
+NET_PLUGIN_LATEST=latest_release
 
 # Paths to all relevant binaries that should be compiled
 WEAVER_EXE=prog/weaver/weaver
@@ -278,9 +280,9 @@ $(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAV
 	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
 	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
 	$(SUDO) docker plugin create $(PLUGIN_IMAGE):$(WEAVE_VERSION) prog/net-plugin
-	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):latest 2>/dev/null
-	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):latest 2>/dev/null
-	$(SUDO) docker plugin create $(PLUGIN_IMAGE):latest prog/net-plugin
+	-$(SUDO) docker plugin disable $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST) 2>/dev/null
+	-$(SUDO) docker plugin rm $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST) 2>/dev/null
+	$(SUDO) docker plugin create $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST) prog/net-plugin
 	touch $@
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
@@ -311,9 +313,9 @@ tools/.git $(MANIFEST_TOOL_DIR)/.git:
 # Push plugin
 plugin_publish: $(PLUGIN_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):$(WEAVE_VERSION)
-# "latest" means "stable release" here, so only push that if explicitly told to
+# "$(NET_PLUGIN_LATEST)" means "stable release" here, so only push that if explicitly told to
 ifeq ($(UPDATE_LATEST),true)
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):latest
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST)
 endif
 
 # This target first runs "make publish" for each architecture
