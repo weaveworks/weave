@@ -18,6 +18,7 @@ import (
 
 const (
 	pluginV2Name    = "net-plugin"
+	defaultNetwork  = "weave"
 	MulticastOption = netplugin.MulticastOption
 )
 
@@ -53,11 +54,11 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		}
 		defer os.Remove(meshAddress)
 		defer meshListener.Close()
-	}
-	if !isPluginV2 {
-		Log.Println("Creating default 'weave' network")
-		options := map[string]interface{}{MulticastOption: "true"}
-		dockerClient.EnsureNetwork("weave", pluginNameFromAddress(meshAddress), defaultSubnet, options)
+		if !isPluginV2 {
+			Log.Printf("Creating default %q network", defaultNetwork)
+			options := map[string]interface{}{MulticastOption: "true"}
+			dockerClient.EnsureNetwork(defaultNetwork, pluginNameFromAddress(meshAddress), defaultSubnet, options)
+		}
 	}
 	ready()
 
