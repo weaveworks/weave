@@ -299,7 +299,7 @@ type WeaveStatus struct {
 }
 
 // Read-only functions, suitable for exposing on an unprotected socket
-func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer, prxy *proxy.Proxy, pluginStatus *plugin.Status, waitReady *common.WaitGroup) {
+func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer, prxy *proxy.Proxy, plugin *plugin.Plugin, waitReady *common.WaitGroup) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
 			waitReady.IsDone(),
@@ -309,7 +309,7 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			ipam.NewStatus(allocator, defaultSubnet),
 			nameserver.NewStatus(ns, dnsserver),
 			proxy.NewStatus(prxy),
-			pluginStatus,
+			plugin.NewStatus(),
 		}
 	}
 	muxRouter.Methods("GET").Path("/report").Headers("Accept", "application/json").HandlerFunc(

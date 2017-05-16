@@ -132,40 +132,36 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		justVersion             bool
-		config                  mesh.Config
-		bridgeConfig            weavenet.BridgeConfig
-		networkConfig           weave.NetworkConfig
-		protocolMinVersion      int
-		resume                  bool
-		routerName              string
-		nickName                string
-		password                string
-		pktdebug                bool
-		logLevel                = "info"
-		prof                    string
-		bufSzMB                 int
-		noDiscovery             bool
-		httpAddr                string
-		statusAddr              string
-		ipamConfig              ipamConfig
-		dockerAPI               string
-		peers                   []string
-		noDNS                   bool
-		dnsConfig               dnsConfig
-		trustedSubnetStr        string
-		dbPrefix                string
-		hostRoot                string
-		procPath                string
-		discoveryEndpoint       string
-		token                   string
-		advertiseAddress        string
-		pluginSocket            string
-		pluginMeshSocket        string
-		enablePlugin            bool
-		enablePluginV2          bool
-		enablePluginV2Multicast bool
-		defaultDockerHost       = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
+		justVersion        bool
+		config             mesh.Config
+		bridgeConfig       weavenet.BridgeConfig
+		networkConfig      weave.NetworkConfig
+		protocolMinVersion int
+		resume             bool
+		routerName         string
+		nickName           string
+		password           string
+		pktdebug           bool
+		logLevel           = "info"
+		prof               string
+		bufSzMB            int
+		noDiscovery        bool
+		httpAddr           string
+		statusAddr         string
+		ipamConfig         ipamConfig
+		dockerAPI          string
+		peers              []string
+		noDNS              bool
+		dnsConfig          dnsConfig
+		trustedSubnetStr   string
+		dbPrefix           string
+		hostRoot           string
+		procPath           string
+		discoveryEndpoint  string
+		token              string
+		advertiseAddress   string
+		pluginConfig       plugin.Config
+		defaultDockerHost  = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
 	)
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
@@ -211,11 +207,11 @@ func main() {
 	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
 	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
 
-	mflag.BoolVar(&enablePlugin, []string{"-plugin"}, false, "enable Docker plugin (v1)")
-	mflag.BoolVar(&enablePluginV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
-	mflag.BoolVar(&enablePluginV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
-	mflag.StringVar(&pluginSocket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
-	mflag.StringVar(&pluginMeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
+	mflag.BoolVar(&pluginConfig.Enable, []string{"-plugin"}, false, "enable Docker plugin (v1)")
+	mflag.BoolVar(&pluginConfig.EnableV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
+	mflag.BoolVar(&pluginConfig.EnableV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
+	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
+	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
 	proxyConfig := configureProxy(version, defaultDockerHost)
 	if bridgeConfig.AWSVPC {
@@ -427,11 +423,9 @@ func main() {
 	}
 	checkFatal(router.CreateRestartSentinel())
 
-	// Slightly ugly that plugin status is separated from the plugin.Start call
-	var pluginStatus *plugin.Status
-	if enablePlugin || enablePluginV2 {
-		pluginStatus = plugin.NewStatus(pluginSocket, pluginMeshSocket, enablePluginV2)
-	}
+	pluginConfig.DNS = !noDNS
+	pluginConfig.DefaultSubnet = defaultSubnet.String()
+	plugin := plugin.NewPlugin(pluginConfig)
 
 	// The weave script always waits for a status call to succeed,
 	// so there is no point in doing "weave launch --http-addr ''".
@@ -445,7 +439,7 @@ func main() {
 			ns.HandleHTTP(muxRouter, dockerCli)
 		}
 		router.HandleHTTP(muxRouter)
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, pluginStatus, &waitReady)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)
 		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		if proxy != nil {
@@ -458,7 +452,7 @@ func main() {
 
 	if statusAddr != "" {
 		muxRouter := mux.NewRouter()
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, pluginStatus, &waitReady)
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)
@@ -466,8 +460,8 @@ func main() {
 		go listenAndServeHTTP(statusAddr, statusMux)
 	}
 
-	if enablePlugin || enablePluginV2 {
-		go plugin.Start(httpAddr, dockerCli, pluginSocket, pluginMeshSocket, !noDNS, enablePluginV2, enablePluginV2Multicast, defaultSubnet.String(), waitReady.Add())
+	if plugin != nil {
+		go plugin.Start(httpAddr, dockerCli, waitReady.Add())
 	}
 
 	if bridgeConfig.AWSVPC {

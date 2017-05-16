@@ -6,13 +6,16 @@ type Status struct {
 	Version        int
 }
 
-func NewStatus(address, meshAddress string, isPluginV2 bool) *Status {
+func (plugin *Plugin) NewStatus() *Status {
+	if plugin == nil {
+		return nil
+	}
 	status := &Status{
-		DriverName:     pluginNameFromAddress(address),
-		MeshDriverName: pluginNameFromAddress(meshAddress),
+		DriverName:     pluginNameFromAddress(plugin.Socket),
+		MeshDriverName: pluginNameFromAddress(plugin.MeshSocket),
 		Version:        1,
 	}
-	if isPluginV2 {
+	if plugin.EnableV2 {
 		status.Version = 2
 	}
 	return status
