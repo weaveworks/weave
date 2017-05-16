@@ -62,7 +62,8 @@ spec:
       restartPolicy: Always
       volumes:
         - name: weavedb
-          emptyDir: {}
+          hostPath:
+            path: /var/lib/weave
         - name: cni-bin
           hostPath:
             path: /opt
