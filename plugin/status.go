@@ -1,9 +1,9 @@
 package plugin
 
 type Status struct {
+	Config         Config
 	DriverName     string
 	MeshDriverName string `json:"MeshDriverName,omitempty"`
-	Version        int
 }
 
 func (plugin *Plugin) NewStatus() *Status {
@@ -13,10 +13,7 @@ func (plugin *Plugin) NewStatus() *Status {
 	status := &Status{
 		DriverName:     pluginNameFromAddress(plugin.Socket),
 		MeshDriverName: pluginNameFromAddress(plugin.MeshSocket),
-		Version:        1,
-	}
-	if plugin.EnableV2 {
-		status.Version = 2
+		Config:         plugin.Config,
 	}
 	return status
 }

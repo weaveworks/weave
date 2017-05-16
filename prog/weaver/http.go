@@ -212,8 +212,10 @@ var statusTemplate = defTemplate("status", `\
 {{end}}\
 {{if .Plugin}}\
 
-        Service: plugin (v{{.Plugin.Version}})
-{{if eq .Plugin.Version 1}}\
+{{if .Plugin.Config.EnableV2}}\
+        Service: plugin (v2)
+{{else}}\
+        Service: plugin (legacy)
      DriverName: {{.Plugin.DriverName}}
 {{end}}\
 {{end}}\
