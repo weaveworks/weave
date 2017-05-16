@@ -37,6 +37,13 @@ specify `--rewrite-hosts` when running `weave attach`:
 
     host1$ weave attach --rewrite-hosts c1
 
+Weave Net will set the bridge side of the `veth` pair to enable hairpin mode when attaching a container.
+If you do *not* want hairpin mode enabled, e.g. your kernel is one of those that panics for unknown reasons
+when hairpin is enabled on a `veth`, you can set it to false:
+
+host1$ weave attach --hairpin-mode=false c1
+
+
 ### Dynamically Detaching Containers
 
 A container can be detached from a subnet, by using the `weave detach` command:

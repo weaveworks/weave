@@ -128,7 +128,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	if err := weavenet.AttachContainer(args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&ip.Address}, false); err != nil {
+	if err := weavenet.AttachContainer(args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&ip.Address}, false, conf.HairpinMode); err != nil {
 		return err
 	}
 	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
@@ -218,8 +218,9 @@ func logOnStderr(err error) {
 
 type NetConf struct {
 	types.NetConf
-	BrName string `json:"bridge"`
-	IsGW   bool   `json:"isGateway"`
-	IPMasq bool   `json:"ipMasq"`
-	MTU    int    `json:"mtu"`
+	BrName      string `json:"bridge"`
+	IsGW        bool   `json:"isGateway"`
+	IPMasq      bool   `json:"ipMasq"`
+	MTU         int    `json:"mtu"`
+	HairpinMode bool   `json:"hairpinMode"`
 }

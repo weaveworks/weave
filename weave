@@ -56,6 +56,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--hostname-replacement <replacement>]
                     [--rewrite-inspect]
                     [--log-level=debug|info|warning|error]
+                    [--hairpin-mode=true|false]
                     <peer> ...
 
 weave prime
@@ -745,17 +746,20 @@ create_cni_config() {
     cat >"$1" <<EOF
 {
     "name": "weave",
-    "type": "weave-net"
+    "type": "weave-net",
+    "hairpinMode": $2
 }
 EOF
 }
 
 setup_cni() {
+    # if env var HAIRPIN_MODE is not set, default it to true
+    HAIRPIN_MODE=${HAIRPIN_MODE:-true}
     if install_cni_plugin $CNI_PLUGIN_DIR ; then
         upgrade_cni_plugin $CNI_PLUGIN_DIR
     fi
     if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf
+        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf $HAIRPIN_MODE
     fi
 }
 
@@ -1164,6 +1168,7 @@ launch() {
     ARGS=
     IPRANGE=
     IPRANGE_SPECIFIED=
+    HAIRPIN_MODE=true
 
     [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 
@@ -1196,6 +1201,9 @@ launch() {
             --ipalloc-range=*)
                 IPRANGE="${1#*=}"
                 IPRANGE_SPECIFIED=1
+                ;;
+            --hairpin-mode=*)
+                HAIRPIN_MODE="${1#*=}"
                 ;;
             --no-restart)
                 RESTART_POLICY=
