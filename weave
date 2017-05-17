@@ -581,25 +581,6 @@ attach() {
 # functions for interacting with containers
 ######################################################################
 
-# Docker Plugin V1 runs in a Docker container.
-is_plugin_v1_enabled() {
-    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME 2>/dev/null | grep -q -- "--plugin"
-}
-
-# The presence of Docker Plugin V2 can be checked only via 'docker plugin',
-# as v2 plugins do not run as regular containers.
-is_plugin_v2_enabled() {
-    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
-}
-
-# Check that plugin (v2) is not running.
-check_not_running_plugin_v2() {
-    if is_plugin_v2_enabled; then
-        echo "Docker plugin \"$PLUGIN_NAME\" is running; Aborting." >&2
-        return 1
-    fi
-}
-
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
@@ -1310,7 +1291,7 @@ launch() {
 }
 
 stop() {
-    ! is_plugin_v1_enabled || util_op remove-plugin-network weave || true
+    util_op remove-plugin-network weave || true
     warn_if_stopping_proxy_in_env
     docker stop $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
     # In case user has upgraded from <v2.0 and left old containers running
@@ -1320,10 +1301,8 @@ stop() {
 }
 
 protect_against_docker_hang() {
-    # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
-    if ! is_plugin_v1_enabled && ! is_plugin_v2_enabled ; then
-        rm -f $HOST_ROOT/run/docker/plugins/weave.sock $HOST_ROOT/run/docker/plugins/weavemesh.sock
-    fi
+    # Since the plugin is not running, remove its socket so Docker doesn't try to talk to it
+    rm -f $HOST_ROOT/run/docker/plugins/weave.sock $HOST_ROOT/run/docker/plugins/weavemesh.sock
 }
 
 ######################################################################
@@ -1416,7 +1395,10 @@ case "$COMMAND" in
     launch)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
-        check_not_running_plugin_v2
+        if http_call $HTTP_ADDR GET /status >/dev/null 2>&1 ; then
+            echo "Weave Net is already running" >&2
+            exit 1
+        fi
         # Plugin and proxy are started by default. Should users additionally pass --plugin=false or --proxy=false, their overrides will take precedence when parsed by Go.
         launch --plugin --proxy "$@"
         echo "$WEAVE_CONTAINER"
@@ -1454,20 +1436,6 @@ case "$COMMAND" in
         if [ $res -eq 4 ] ; then
             echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
             usage
-        fi
-        if [ -z "$SUB_STATUS" ] && PROXY_ADDRS=$(proxy_addrs 2>/dev/null) ; then
-            echo
-            echo "        Service: proxy"
-            echo "        Address: $PROXY_ADDRS"
-        fi
-        if [ -z "$SUB_STATUS" ] && is_plugin_v1_enabled ; then
-            echo
-            echo "        Service: plugin (v1)"
-            echo "     DriverName: weave"
-        elif [ -z "$SUB_STATUS" ] && PLUGIN_FULL_NAME=$(is_plugin_v2_enabled) ; then
-            echo
-            echo "        Service: plugin (v2)"
-            echo "     DriverName: $PLUGIN_FULL_NAME"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
