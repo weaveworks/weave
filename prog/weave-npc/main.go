@@ -53,29 +53,6 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	// Configure main chain static rules
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
-	if allowMcast {
-		if err := ipt.Append(npc.TableFilter, npc.MainChain,
-			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
-			return err
-		}
-	}
-
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
-		return err
-	}
-
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -110,6 +87,33 @@ func resetIPSets(ips ipset.Interface) error {
 	return nil
 }
 
+func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
+	// Configure main chain static rules
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if allowMcast {
+		if err := ipt.Append(npc.TableFilter, npc.MainChain,
+			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
+			return err
+		}
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func root(cmd *cobra.Command, args []string) {
 	common.SetLogLevel(logLevel)
 	common.Log.Infof("Starting Weaveworks NPC %s", version)
@@ -135,6 +139,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
+	handleError(createBaseRules(ipt, ips))
 
 	npc := npc.New(ipt, ips)
 
