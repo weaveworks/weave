@@ -28,6 +28,7 @@ var (
 	metricsAddr string
 	logLevel    string
 	allowMcast  bool
+	nodeName    string
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -116,7 +117,14 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 func root(cmd *cobra.Command, args []string) {
 	common.SetLogLevel(logLevel)
-	common.Log.Infof("Starting Weaveworks NPC %s", version)
+	if nodeName == "" {
+		// HOSTNAME is set by Kubernetes for pods in the host network namespace
+		nodeName = os.Getenv("HOSTNAME")
+	}
+	if nodeName == "" {
+		common.Log.Fatalf("Must set node name via --node-name or $HOSTNAME")
+	}
+	common.Log.Infof("Starting Weaveworks NPC %s; node name %q", version, nodeName)
 
 	if err := metrics.Start(metricsAddr); err != nil {
 		common.Log.Fatalf("Failed to start metrics: %v", err)
@@ -141,7 +149,7 @@ func root(cmd *cobra.Command, args []string) {
 	handleError(resetIPSets(ips))
 	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(ipt, ips)
+	npc := npc.New(nodeName, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -221,6 +229,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
+	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 
 	handleError(rootCmd.Execute())
 }
