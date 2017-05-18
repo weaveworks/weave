@@ -112,6 +112,16 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
+	// If the destination address is not any of the local pods, let it through
+	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "--match-set", npc.LocalIpset, "src",
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
