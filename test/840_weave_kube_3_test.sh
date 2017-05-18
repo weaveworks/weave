@@ -64,6 +64,12 @@ assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
+check_ready() {
+    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
+}
+
+assert_raises 'wait_for_x check_ready "hosts to be ready"'
+
 # See if we can get some pods running that connect to the network
 run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=nettest.default.svc.cluster.local."
 # Create a headless service so they can be found in Kubernetes DNS
