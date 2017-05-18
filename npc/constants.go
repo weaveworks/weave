@@ -8,4 +8,6 @@ const (
 	IngressChain = "WEAVE-NPC-INGRESS"
 
 	IpsetNamePrefix = "weave-"
+
+	LocalIpset = IpsetNamePrefix + "local-pods"
 )

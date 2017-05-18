@@ -88,6 +88,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
+	ns.ips.AddEntry(LocalIpset, obj.Status.PodIP)
 	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 }
 
@@ -100,10 +101,12 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if hasIP(oldObj) && !hasIP(newObj) {
+		ns.ips.DelEntry(LocalIpset, oldObj.Status.PodIP)
 		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.Labels, oldObj.Status.PodIP)
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
+		ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP)
 		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP)
 	}
 
@@ -139,6 +142,7 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 		return nil
 	}
 
+	ns.ips.DelEntry(LocalIpset, obj.Status.PodIP)
 	return ns.podSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 }
 
