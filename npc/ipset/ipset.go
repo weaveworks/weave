@@ -3,6 +3,7 @@ package ipset
 import (
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -67,11 +68,18 @@ func (i *ipset) FlushAll() error {
 
 func (i *ipset) Destroy(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	// Loop until we get an exit code other than inUseErrStr
+	// Loop until we get an err other than inUseErrStr or 20 attempts
+	var attempt = 1
+	var err error
 	for {
-		if err := doExec("destroy", string(ipsetName)); !isErrInUse(err) {
+		if err = doExec("destroy", string(ipsetName)); !isErrInUse(err) {
 			return err
 		}
+		if attempt >= 20 {
+			return err
+		}
+		time.Sleep(time.Millisecond * 500)
+		attempt++
 	}
 }
 
