@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -12,6 +11,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/odp"
 )
 
@@ -276,18 +276,9 @@ func subnets(addrs []netlink.Addr) map[string]struct{} {
 func addNatRule(ipt *iptables.IPTables, rulespec ...string) error {
 	// Loop until we get an exit code other than "temporarily unavailable"
 	for {
-		if err := ipt.AppendUnique("nat", "WEAVE", rulespec...); err != nil {
-			if ierr, ok := err.(*iptables.Error); ok {
-				if status, ok := ierr.ExitError.Sys().(syscall.WaitStatus); ok {
-					// (magic exit code 4 found in iptables source code; undocumented)
-					if status.ExitStatus() == 4 {
-						continue
-					}
-				}
-			}
+		if err := ipt.AppendUnique("nat", "WEAVE", rulespec...); !common.IsErrExitCode4(err) {
 			return err
 		}
-		return nil
 	}
 }
 

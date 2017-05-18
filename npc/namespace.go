@@ -230,11 +230,21 @@ func bypassRule(nsIpsetName ipset.Name) []string {
 }
 
 func (ns *ns) ensureBypassRule(nsIpsetName ipset.Name) error {
-	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
+	// Loop until we get an exit code other than "temporarily unavailable"
+	for {
+		if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...); !common.IsErrExitCode4(err) {
+			return err
+		}
+	}
 }
 
 func (ns *ns) deleteBypassRule(nsIpsetName ipset.Name) error {
-	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
+	// Loop until we get an exit code other than "temporarily unavailable"
+	for {
+		if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...); !common.IsErrExitCode4(err) {
+			return err
+		}
+	}
 }
 
 func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
