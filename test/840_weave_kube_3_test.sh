@@ -18,6 +18,7 @@ NUM_HOSTS=$(howmany $HOSTS)
 SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
 KUBE_PORT=6443
+IMAGE=weaveworks/network-tester:latest
 
 tear_down_kubeadm
 
@@ -44,19 +45,11 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirn
 
 sleep 5
 
-wait_for_connections() {
-    for i in $(seq 1 45); do
-        if run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\"" ; then
-            return
-        fi
-        echo "Waiting for connections"
-        sleep 1
-    done
-    echo "Timed out waiting for connections to establish" >&2
-    exit 1
+check_connections() {
+    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
 }
 
-assert_raises wait_for_connections
+assert_raises 'wait_for_x check_connections "connections to establish"'
 
 # Check we can ping between the Weave bridg IPs on each host
 HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
@@ -71,22 +64,42 @@ assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
-# See if we can get some pods running that connect to the network
-run_on $HOST1 "$KUBECTL run hello --image=weaveworks/hello-world --replicas=3"
-
-wait_for_pods() {
-    for i in $(seq 1 45); do
-        if run_on $HOST1 "$KUBECTL get pods | grep 'hello.*Running'" ; then
-            return
-        fi
-        echo "Waiting for pods"
-        sleep 1
-    done
-    echo "Timed out waiting for pods" >&2
-    exit 1
+check_ready() {
+    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
 }
 
-assert_raises wait_for_pods
+assert_raises 'wait_for_x check_ready "hosts to be ready"'
+
+# See if we can get some pods running that connect to the network
+run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=nettest.default.svc.cluster.local."
+# Create a headless service so they can be found in Kubernetes DNS
+run_on $HOST1 "$KUBECTL create -f -" <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: nettest
+spec:
+  clusterIP: None
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    run: nettest
+EOF
+
+check_all_pods_communicate() {
+    podIP=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).status.podIP}}' 2>/dev/null")
+    if [ -n podIP ] ; then
+        status=$($SSH $HOST1 "curl -s -S http://$podIP:8080/status")
+        if [ $status = "pass" ] ; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 tear_down_kubeadm
 
