@@ -171,16 +171,26 @@ proxy_start_container_with_dns() {
     proxy docker_on $host run "$@" -dt $DNS_IMAGE /bin/sh
 }
 
-wait_for_proxy() {
-    for i in $(seq 1 120); do
-        echo "Waiting for proxy to start"
-        if proxy docker_on $1 info > /dev/null 2>&1 ; then
+# Execute command $1 repeatedly until it returns true; description in $2, optional repeat limit in $3
+wait_for_x() {
+    reps=${3:-45}
+    for i in $(seq 1 $reps); do
+        echo "Waiting for $2"
+        if $1 ; then
             return
         fi
         sleep 1
     done
-    echo "Timed out waiting for proxy to start" >&2
+    echo "Timed out waiting for $2" >&2
     exit 1
+}
+
+check_proxy() {
+    proxy docker_on $1 info >/dev/null 2>&1
+}
+
+wait_for_proxy() {
+    wait_for_x check_proxy "proxy to start" 120
 }
 
 rm_containers() {
@@ -197,18 +207,12 @@ container_pid() {
     docker_on $1 inspect -f '{{.State.Pid}}' $2
 }
 
+check_attached() {
+    exec_on $1 $2 $CHECK_ETHWE_UP >/dev/null 2>&1
+}
+
 wait_for_attached() {
-    host=$1
-    container=$2
-    for i in $(seq 1 10); do
-        echo "Waiting for $container on $host to be attached"
-        if exec_on $host $container $CHECK_ETHWE_UP > /dev/null 2>&1 ; then
-            return
-        fi
-        sleep 1
-    done
-    echo "Timed out waiting for $container on $host to be attached" >&2
-    exit 1
+    wait_for_x "check_attached $1 $2" "$2 on $1 to be attached"
 }
 
 # assert_dns_record <host> <container> <name> [<ip> ...]

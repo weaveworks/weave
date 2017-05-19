@@ -45,19 +45,11 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirn
 
 sleep 5
 
-wait_for_connections() {
-    for i in $(seq 1 45); do
-        if run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\"" ; then
-            return
-        fi
-        echo "Waiting for connections"
-        sleep 1
-    done
-    echo "Timed out waiting for connections to establish" >&2
-    exit 1
+check_connections() {
+    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
 }
 
-assert_raises wait_for_connections
+assert_raises 'wait_for_x check_connections "connections to establish"'
 
 # Check we can ping between the Weave bridg IPs on each host
 HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
