@@ -135,7 +135,7 @@ func root(cmd *cobra.Command, args []string) {
 	ipt, err := iptables.New()
 	handleError(err)
 
-	ips := ipset.New()
+	ips := ipset.New(common.LogLogger())
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
