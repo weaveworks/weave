@@ -28,6 +28,7 @@ var (
 	metricsAddr string
 	logLevel    string
 	allowMcast  bool
+	nodeName    string
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -50,29 +51,6 @@ func resetIPTables(ipt *iptables.IPTables) error {
 	}
 
 	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
-		return err
-	}
-
-	// Configure main chain static rules
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
-	if allowMcast {
-		if err := ipt.Append(npc.TableFilter, npc.MainChain,
-			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
-			return err
-		}
-	}
-
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
-		return err
-	}
-
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
 		return err
 	}
 
@@ -110,9 +88,53 @@ func resetIPSets(ips ipset.Interface) error {
 	return nil
 }
 
+func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
+	// Configure main chain static rules
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if allowMcast {
+		if err := ipt.Append(npc.TableFilter, npc.MainChain,
+			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
+			return err
+		}
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
+		return err
+	}
+
+	// If the destination address is not any of the local pods, let it through
+	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "--match-set", npc.LocalIpset, "src",
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func root(cmd *cobra.Command, args []string) {
 	common.SetLogLevel(logLevel)
-	common.Log.Infof("Starting Weaveworks NPC %s", version)
+	if nodeName == "" {
+		// HOSTNAME is set by Kubernetes for pods in the host network namespace
+		nodeName = os.Getenv("HOSTNAME")
+	}
+	if nodeName == "" {
+		common.Log.Fatalf("Must set node name via --node-name or $HOSTNAME")
+	}
+	common.Log.Infof("Starting Weaveworks NPC %s; node name %q", version, nodeName)
 
 	if err := metrics.Start(metricsAddr); err != nil {
 		common.Log.Fatalf("Failed to start metrics: %v", err)
@@ -131,12 +153,13 @@ func root(cmd *cobra.Command, args []string) {
 	ipt, err := iptables.New()
 	handleError(err)
 
-	ips := ipset.New()
+	ips := ipset.New(common.LogLogger())
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
+	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(ipt, ips)
+	npc := npc.New(nodeName, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -216,6 +239,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
+	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 
 	handleError(rootCmd.Execute())
 }

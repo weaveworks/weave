@@ -43,12 +43,10 @@ func (s *selector) matches(labelMap map[string]string) bool {
 }
 
 func (s *selector) addEntry(entry string) error {
-	common.Log.Infof("adding entry %s to %s", entry, s.spec.ipsetName)
 	return s.ips.AddEntry(s.spec.ipsetName, entry)
 }
 
 func (s *selector) delEntry(entry string) error {
-	common.Log.Infof("deleting entry %s from %s", entry, s.spec.ipsetName)
 	return s.ips.DelEntry(s.spec.ipsetName, entry)
 }
 

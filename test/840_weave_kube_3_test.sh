@@ -101,6 +101,10 @@ check_all_pods_communicate() {
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
+# Check that a pod can contact the outside world
+podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
+assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
+
 tear_down_kubeadm
 
 # Destroy our test ipset, and implicitly check it is still there

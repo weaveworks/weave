@@ -1,6 +1,7 @@
 package ipset
 
 import (
+	"log"
 	"os/exec"
 	"strings"
 
@@ -31,10 +32,11 @@ type Interface interface {
 
 type ipset struct {
 	refCount
+	*log.Logger
 }
 
-func New() Interface {
-	return &ipset{refCount: newRefCount()}
+func New(logger *log.Logger) Interface {
+	return &ipset{refCount: newRefCount(), Logger: logger}
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
@@ -42,6 +44,7 @@ func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string) error {
+	i.Logger.Printf("adding entry %s to %s", entry, ipsetName)
 	if i.inc(ipsetName, entry) > 1 { // already in the set
 		return nil
 	}
@@ -49,6 +52,7 @@ func (i *ipset) AddEntry(ipsetName Name, entry string) error {
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
+	i.Logger.Printf("deleting entry %s from %s", entry, ipsetName)
 	if i.dec(ipsetName, entry) > 0 { // still needed
 		return nil
 	}
