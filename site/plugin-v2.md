@@ -8,7 +8,7 @@ search_type: Documentation
  * [Configuring the Plugin](#configuring)
  * [Running Services or Containers Using the Plugin](#usage)
 
-Docker Engine version 1.12 introduced [a new plugin system (V2)](https://github.com/moby/moby/commit/f37117045c5398fd3dca8016ea8ca0cb47e7312b).
+Docker Engine version 1.12 introduced [a new plugin system (V2)](https://docs.docker.com/engine/extend/).
 This document describes how to use [the Network Plugin V2 of Weave Net](https://store.docker.com/plugins/weave-net-plugin).
 
 Before using the plugin, please keep in mind the plugin works only in Swarm
