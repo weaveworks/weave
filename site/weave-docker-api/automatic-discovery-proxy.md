@@ -19,17 +19,17 @@ For those situations, the proxy provides the following flags:
  * `--hostname-from-label<labelkey>`
  * `--hostname-match <regexp>`
  * `--hostname-replacement <replacement>`
- 
+
 When launching a container, the hostname is initialized to the
 value of the container label using key `<labelkey>`. If no `<labelkey>` was
-provided, then the container name is used. 
+provided, then the container name is used.
 
 Additionally, the hostname is matched against a regular expression `<regexp>` and based on that match,
 `<replacement>` is used to obtain the final hostname, and then handed over to weaveDNS for registration.
 
 For example, you can launch the proxy using all three flags, as follows:
 
-    host1$ weave launch-router && weave launch-proxy --hostname-from-label hostname-label --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
+    host1$ weave launch --hostname-from-label hostname-label --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
     host1$ eval $(weave env)
 
 >**Note:** regexp substitution groups must be pre-pended with a dollar sign

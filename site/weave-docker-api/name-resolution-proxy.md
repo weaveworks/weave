@@ -9,7 +9,7 @@ When starting Weave Net enabled containers, the proxy automatically
 replaces the container's `/etc/hosts` file, and disables Docker's control
 over it. The new file contains an entry for the container's hostname
 and Weave Net IP address, as well as additional entries that have been
-specified using the `--add-host` parameters. 
+specified using the `--add-host` parameters.
 
 This ensures that:
 
@@ -27,9 +27,9 @@ IP instead of the Weave IP, or you require name resolution for
 Docker-managed networks), the proxy must be launched using the
 `--no-rewrite-hosts` flag.
 
-    host1$ weave launch-router && weave launch-proxy --no-rewrite-hosts
-    
+    host1$ weave launch --no-rewrite-hosts
+
 **See Also**
 
- * [Using Automatic Discovery With the Weave Proxy](/site/weave-docker-api/automatic-discovery-proxy.md)    
-    
+ * [Using Automatic Discovery With the Weave Proxy](/site/weave-docker-api/automatic-discovery-proxy.md)
+
