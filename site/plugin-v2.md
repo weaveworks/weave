@@ -57,11 +57,11 @@ To re-enable the plugin run the following command:
 After you have launched the plugin, you can create a network for Docker Swarm
 services by running the following command on any Docker Swarm master node:
 
-    $ docker create network --driver=store/weaveworks/net-plugin:latest_release mynetwork
+    $ docker network create --driver=store/weaveworks/net-plugin:latest_release mynetwork
 
 Or you can create a network for any Docker container with:
 
-    $ docker create network --driver=store/weaveworks/net-plugin:latest_release --attachable mynetwork
+    $ docker network create --driver=store/weaveworks/net-plugin:latest_release --attachable mynetwork
 
 To start a service attached to the network run, for example:
 
