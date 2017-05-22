@@ -28,7 +28,8 @@ Docker containers are started with the --net flag, for example:
 
 Note that if a Docker container is started with the --net flag, then the Weave Docker API Proxy
 is automatically disabled and is not used to attach containers.
-See [Integrating Docker via the Network Plugin](/site/plugin.md).
+See [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md) and
+[Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md).
 
 **3.** Containers can also be attached to the Weave network with `weave attach` commands. This method also
 does not use the Weave Docker API Proxy.
