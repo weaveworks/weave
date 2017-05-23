@@ -126,7 +126,7 @@ docker_run_options() {
 
 exec_options() {
     case "$1" in
-        setup|setup-cni|launch)
+        setup|setup-cni|launch|reset)
             echo -v /:/host -e HOST_ROOT=/host
             ;;
         # All the other commands that may create the bridge and need machine id files.
@@ -1602,6 +1602,7 @@ case "$COMMAND" in
         protect_against_docker_hang
         VOLUME_CONTAINERS=$(docker ps -qa --filter label=weavevolumes)
         [ -n "$VOLUME_CONTAINERS" ] && docker rm -v $VOLUME_CONTAINERS  >/dev/null 2>&1 || true
+        rm -f $HOST_ROOT/var/lib/weave/weave-netdata.db >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
             ip link del ${LOCAL_IFNAME%@*} >/dev/null 2>&1 || true
