@@ -40,11 +40,15 @@ RUN apt-get update \
 		flex \
 		bison
 
+RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt_v1.3.0_linux_amd64 && \
+	echo "b1925c2c405458811f0c227266402cf1868b4de529f114722c2e3a5af4ac7bb2  shfmt" | sha256sum -c && \
+	chmod +x shfmt && \
+	mv shfmt /usr/bin
+
 # Install common Go tools
 RUN go get \
 	github.com/golang/lint/golint \
 	github.com/fzipp/gocyclo \
-	github.com/mvdan/sh/cmd/shfmt \
 	github.com/fatih/hclfmt \
 	github.com/client9/misspell/cmd/misspell
 
