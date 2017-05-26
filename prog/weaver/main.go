@@ -66,9 +66,7 @@ func (c *ipamConfig) Enabled() bool {
 	case !hasRange && hasSubnet:
 		Log.Fatal("--ipalloc-default-subnet specified without --ipalloc-range.")
 	case !hasRange:
-		Log.Fatal("--ipalloc-init or --init-peer-count specified without --ipalloc-range.")
-	case hasMode && hasPeerCount:
-		Log.Fatal("At most one of --ipalloc-init or --init-peer-count may be specified.")
+		Log.Fatal("--ipalloc-init specified without --ipalloc-range.")
 	}
 	if hasMode {
 		if err := c.parseMode(); err != nil {
@@ -187,7 +185,6 @@ func main() {
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
 	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
-	mflag.IntVar(&ipamConfig.PeerCount, []string{"-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&dockerAPI, []string{"-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")

@@ -1306,31 +1306,6 @@ protect_against_docker_hang() {
 }
 
 ######################################################################
-# argument deprecation handling
-######################################################################
-
-deprecation_warning() {
-    echo "Warning: ${1%=*} is deprecated; please use $2" >&2
-}
-
-deprecation_warnings() {
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            # Flags that have a following argument which should not be inspected
-            --password|--nickname|--ipalloc-range|--ipalloc-default-subnet)
-                shift
-                ;;
-            --init-peer-count|--init-peer-count=*)
-                deprecation_warning $1 "--ipalloc-init consensus=<count>"
-                [ ${1#--} = "init-peer-count" ] && shift
-                shift
-                ;;
-        esac
-        shift
-    done
-}
-
-######################################################################
 # main (remote and --local)
 ######################################################################
 
@@ -1393,7 +1368,6 @@ case "$COMMAND" in
         detect_bridge_type && echo $BRIDGE_TYPE
         ;;
     launch)
-        deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         if http_call $HTTP_ADDR GET /status >/dev/null 2>&1 ; then
             echo "Weave Net is already running" >&2
