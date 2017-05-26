@@ -1,81 +1,89 @@
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: weave-net
-  namespace: kube-system
-spec:
-  template:
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ServiceAccount
     metadata:
+      name: weave-net
       labels:
         name: weave-net
-      annotations:
-        scheduler.alpha.kubernetes.io/tolerations: |
-          [
-            {
-              "key": "dedicated",
-              "operator": "Equal",
-              "value": "master",
-              "effect": "NoSchedule"
-            }
-          ]
+  - apiVersion: extensions/v1beta1
+    kind: DaemonSet
+    metadata:
+      name: weave-net
+      labels:
+        name: weave-net
     spec:
-      hostNetwork: true
-      hostPID: true
-      containers:
-        - name: weave
-          image: weaveworks/weave-kube:latest
-          imagePullPolicy: Always
-          command:
-            - /home/weave/launch.sh
-          livenessProbe:
-            initialDelaySeconds: 30
-            httpGet:
-              host: 127.0.0.1
-              path: /status
-              port: 6784
+      template:
+        metadata:
+          annotations:
+            scheduler.alpha.kubernetes.io/tolerations: >-
+              [{"key":"dedicated","operator":"Equal","value":"master","effect":"NoSchedule"}]
+          labels:
+            name: weave-net
+        spec:
+          containers:
+            - name: weave
+              command:
+                - /home/weave/launch.sh
+              env: []
+              image: 'weaveworks/weave-kube:latest'
+              imagePullPolicy: Always
+              livenessProbe:
+                httpGet:
+                  host: 127.0.0.1
+                  path: /status
+                  port: 6784
+                initialDelaySeconds: 30
+              resources:
+                requests:
+                  cpu: 10m
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: weavedb
+                  mountPath: /weavedb
+                - name: cni-bin
+                  mountPath: /host/opt
+                - name: cni-bin2
+                  mountPath: /host/home
+                - name: cni-conf
+                  mountPath: /host/etc
+                - name: dbus
+                  mountPath: /host/var/lib/dbus
+                - name: lib-modules
+                  mountPath: /lib/modules
+            - name: weave-npc
+              image: 'weaveworks/weave-npc:latest'
+              imagePullPolicy: Always
+              resources:
+                requests:
+                  cpu: 10m
+              securityContext:
+                privileged: true
+          hostNetwork: true
+          hostPID: true
+          restartPolicy: Always
           securityContext:
-            privileged: true
-          volumeMounts:
+            seLinuxOptions:
+              type: spc_t
+          serviceAccountName: weave-net
+          volumes:
             - name: weavedb
-              mountPath: /weavedb
+              hostPath:
+                path: /var/lib/weave
             - name: cni-bin
-              mountPath: /host/opt
+              hostPath:
+                path: /opt
             - name: cni-bin2
-              mountPath: /host/home
+              hostPath:
+                path: /home
             - name: cni-conf
-              mountPath: /host/etc
+              hostPath:
+                path: /etc
             - name: dbus
-              mountPath: /host/var/lib/dbus
+              hostPath:
+                path: /var/lib/dbus
             - name: lib-modules
-              mountPath: /lib/modules
-          resources:
-            requests:
-              cpu: 10m
-        - name: weave-npc
-          image: weaveworks/weave-npc:latest
-          imagePullPolicy: Always
-          resources:
-            requests:
-              cpu: 10m
-          securityContext:
-            privileged: true
-      restartPolicy: Always
-      volumes:
-        - name: weavedb
-          hostPath:
-            path: /var/lib/weave
-        - name: cni-bin
-          hostPath:
-            path: /opt
-        - name: cni-bin2
-          hostPath:
-            path: /home
-        - name: cni-conf
-          hostPath:
-            path: /etc
-        - name: dbus
-          hostPath:
-            path: /var/lib/dbus
-        - name: lib-modules
-          hostPath:
-            path: /lib/modules
+              hostPath:
+                path: /lib/modules
