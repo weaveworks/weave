@@ -50,6 +50,26 @@ func setupIface(args []string) error {
 	return weavenet.SetupIface(ifaceName, newIfName)
 }
 
+// setupIfaceAddrs sets up addresses on an interface. It expects to be called inside the container's netns.
+func setupIfaceAddrs(args []string) error {
+	if len(args) < 1 {
+		cmdUsage("setup-iface-addrs", "<iface-name> <with-multicast> <cidr>...")
+	}
+	link, err := netlink.LinkByName(args[0])
+	if err != nil {
+		return err
+	}
+	withMulticastRoute, err := strconv.ParseBool(args[1])
+	if err != nil {
+		return err
+	}
+	cidrs, err := parseCIDRs(args[2:])
+	if err != nil {
+		return err
+	}
+	return weavenet.SetupIfaceAddrs(link, withMulticastRoute, cidrs)
+}
+
 func configureARP(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("configure-arp", "<iface-name-prefix> <root-path>")
