@@ -215,7 +215,6 @@ If the YAML file is from `cloud.weave.works` as described above, then you can cu
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
   - `disable-npc`: boolean (`true|false`). Default: `false`.
-  - `enable-encryption`: boolean (`true|false`). Default: `false`.
   - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
 
 The list of variables you can set is:
