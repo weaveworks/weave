@@ -193,6 +193,32 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 	return nil
 }
 
+// SetupIface is the implementation of the 'setup-iface' call above,
+// running in another process in the container's netns
+func SetupIface(ifaceName, newIfName string) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkSetName(link, newIfName); err != nil {
+		return err
+	}
+	// This is only called by AttachContainer which is only called in host pid namespace
+	if err := ConfigureARPCache("/proc", newIfName); err != nil {
+		return err
+	}
+	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NB: This function can be used only by a process that terminates immediately
 //     after calling the function as it changes netns via WithNetNSLinkUnsafe.
 func DetachContainer(netNSPath, id, ifName string, cidrs []*net.IPNet) error {
