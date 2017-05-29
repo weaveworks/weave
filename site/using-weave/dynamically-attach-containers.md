@@ -5,7 +5,7 @@ search_type: Documentation
 ---
 
 
-When containers may not know the network to which they will be attached, Weave Net enables you to dynamically attach and detach containers to and from a given network, even when a container is already running. 
+When containers may not know the network to which they will be attached, Weave Net enables you to dynamically attach and detach containers to and from a given network, even when a container is already running.
 
 To illustrate...
 
@@ -36,12 +36,6 @@ same way [the proxy does](/site/weave-docker-api/name-resolution-proxy.md)),
 specify `--rewrite-hosts` when running `weave attach`:
 
     host1$ weave attach --rewrite-hosts c1
-
-Weave Net will set the bridge side of the `veth` pair to enable hairpin mode when attaching a container.
-If you do *not* want hairpin mode enabled, e.g. your kernel is one of those that panics for unknown reasons
-when hairpin is enabled on a `veth`, you can set it to false:
-
-host1$ weave attach --hairpin-mode=false c1
 
 
 ### Dynamically Detaching Containers

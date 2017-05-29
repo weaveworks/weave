@@ -56,7 +56,6 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--hostname-replacement <replacement>]
                     [--rewrite-inspect]
                     [--log-level=debug|info|warning|error]
-                    [--hairpin-mode=true|false]
                     <peer> ...
 
 weave prime
@@ -1168,7 +1167,6 @@ launch() {
     ARGS=
     IPRANGE=
     IPRANGE_SPECIFIED=
-    HAIRPIN_MODE=true
 
     [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 
@@ -1201,9 +1199,6 @@ launch() {
             --ipalloc-range=*)
                 IPRANGE="${1#*=}"
                 IPRANGE_SPECIFIED=1
-                ;;
-            --hairpin-mode=*)
-                HAIRPIN_MODE="${1#*=}"
                 ;;
             --no-restart)
                 RESTART_POLICY=
