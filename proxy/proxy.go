@@ -515,7 +515,7 @@ func (proxy *Proxy) attach(containerID string) error {
 
 	pid := container.State.Pid
 	// Passing 0 for mtu means it will be taken from the bridge
-	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, proxy.KeepTXOn)
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, proxy.KeepTXOn, true)
 	if err != nil {
 		return err
 	}

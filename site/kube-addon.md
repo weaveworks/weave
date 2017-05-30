@@ -221,6 +221,10 @@ The list of variables you can set is:
 
 * `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
   versions (default is blank, i.e. check is enabled)
+* `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
+  the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
+  kernel is one of those that can panic if hairpin is enabled, then you can disable it
+  by setting `HAIRPIN_MODE=false`.
 * `IPALLOC_RANGE` - the range of IP addresses used by Weave Net
   and the subnet they are placed in (CIDR format; default `10.32.0.0/12`)
 * `EXPECT_NPC` - set to 0 to disable Network Policy Controller (default is on)
