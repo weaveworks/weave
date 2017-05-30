@@ -19,6 +19,11 @@ weave_on $HOST1 launch
 C0=$(docker_on $HOST1 run --net=none --name=c0 -dt $SMALL_IMAGE /bin/sh)
 C1=$(docker_on $HOST1 run --net=none --privileged --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)
+CH0=$(docker_on $HOST1 run --net=none --name=ch0 -dt $SMALL_IMAGE /bin/sh)
+CH1=$(docker_on $HOST1 run --net=none --name=ch1 -dt $SMALL_IMAGE /bin/sh)
+CH2=$(docker_on $HOST1 run --net=none --name=ch2 -dt $SMALL_IMAGE /bin/sh)
+
+
 # Enable unsolicited ARPs so that ping after the address reuse does not time out
 exec_on $HOST1 c1 sysctl -w net.ipv4.conf.all.arp_accept=1
 
@@ -52,6 +57,29 @@ cni_connect $HOST1 c2 <<EOF
 }
 EOF
 
+# examples to test hairpin
+cni_connect $HOST1 ch0 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net",
+    "hairpinMode": true
+}
+EOF
+cni_connect $HOST1 ch1 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net",
+    "hairpinMode": false
+}
+EOF
+cni_connect $HOST1 ch2 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+}
+EOF
+
+
 C0IP=$(container_ip $HOST1 c0)
 C1IP=$(container_ip $HOST1 c1)
 C2IP=$(container_ip $HOST1 c2)
@@ -84,6 +112,29 @@ C3IP=$(container_ip $HOST1 c3)
 assert_raises "[ $C2IP != $C3IP ]"
 assert_raises "[ $BRIP != $C3IP ]"
 assert_raises "exec_on $HOST1 c1 $PING $C3IP"
+
+#####
+#
+# Hairpin mode tests
+#
+# here we check that the bridge side of the veth is set to hairpin mode (true or false) correctly
+# check for each of
+# - ch0 explicitly true
+# - ch1 explicitly false
+# - ch2 unset, which should default to true
+#
+# we take advantage of the veth name being constructed from the container ID)
+#
+# should this reliance ever fail and we need to get it from the system, do the following for each:
+# CH0_PEER_ID=$(exec_on $HOST1 ch0 cat /sys/class/net/eth0/iflink)
+# CH0_PEER=$($SSH $HOST1 ip link show | awk "/^${CH0_PEER_ID}:/"' {print $2}' | sed 's/@.*$//g' )
+# CH0_HAIRPIN=$($SSH $HOST1 cat /sys/devices/virtual/net/weave/brif/$CH0_PEER/hairpin_mode)
+# assert_raises "[ $CH0_HAIRPIN == 1 ]"
+#
+assert "$SSH $HOST1 cat /sys/devices/virtual/net/weave/brif/vethwepl${CH0:0:7}/hairpin_mode" "1"
+assert "$SSH $HOST1 cat /sys/devices/virtual/net/weave/brif/vethwepl${CH1:0:7}/hairpin_mode" "0"
+assert "$SSH $HOST1 cat /sys/devices/virtual/net/weave/brif/vethwepl${CH2:0:7}/hairpin_mode" "1"
+
 
 
 # Ensure existing containers can reclaim their IP addresses after CNI has been used -- see #2548

@@ -113,7 +113,7 @@ func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
 
 // NB: This function can be used only by a process that terminates immediately
 //     after calling the function as it changes netns via WithNetNSLinkUnsafe.
-func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
+func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool, hairpinMode bool) error {
 	ns, err := netns.GetFromPath(netNSPath)
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
 		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
-		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, func(veth netlink.Link) error {
+		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
@@ -143,6 +143,10 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 		if err != nil {
 			return err
 		}
+		if err = netlink.LinkSetHairpin(veth, hairpinMode); err != nil {
+			return fmt.Errorf("unable to set hairpin mode to %t for bridge side of veth %s: %s", hairpinMode, name, err)
+		}
+
 	}
 
 	if err := WithNetNSLinkUnsafe(ns, ifName, func(veth netlink.Link) error {

@@ -1070,17 +1070,20 @@ create_cni_config() {
     cat >"$1" <<EOF
 {
     "name": "weave",
-    "type": "weave-net"
+    "type": "weave-net",
+    "hairpinMode": $2
 }
 EOF
 }
 
 setup_cni() {
+    # if env var HAIRPIN_MODE is not set, default it to true
+    HAIRPIN_MODE=${HAIRPIN_MODE:-true}
     if install_cni_plugin $CNI_PLUGIN_DIR ; then
         upgrade_cni_plugin $CNI_PLUGIN_DIR
     fi
     if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf
+        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf $HAIRPIN_MODE
     fi
 }
 

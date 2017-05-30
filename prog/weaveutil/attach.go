@@ -14,11 +14,12 @@ import (
 
 func attach(args []string) error {
 	if len(args) < 4 {
-		cmdUsage("attach-container", "[--no-multicast-route] [--keep-tx-on] <container-id> <bridge-name> <mtu> <cidr>...")
+		cmdUsage("attach-container", "[--no-multicast-route] [--keep-tx-on] [--hairpin-mode=true|false] <container-id> <bridge-name> <mtu> <cidr>...")
 	}
 
 	keepTXOn := false
 	withMulticastRoute := true
+	hairpinMode := true
 	for i := 0; i < len(args); {
 		switch args[i] {
 		case "--no-multicast-route":
@@ -26,6 +27,9 @@ func attach(args []string) error {
 			args = append(args[:i], args[i+1:]...)
 		case "--keep-tx-on":
 			keepTXOn = true
+			args = append(args[:i], args[i+1:]...)
+		case "--hairpin-mode=false":
+			hairpinMode = false
 			args = append(args[:i], args[i+1:]...)
 		default:
 			i++
@@ -55,7 +59,7 @@ func attach(args []string) error {
 		return err
 	}
 
-	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn)
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn, hairpinMode)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
 		err = fmt.Errorf("Container %s died", args[0])
