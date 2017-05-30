@@ -59,18 +59,8 @@ teardown:
         parallel: true
 
 deployment:
-  release:
-    branch: /[0-9]+\.[0-9]+/
-    owner: weaveworks
-    commands:
-      - "$SRCDIR/bin/circle-deploy-release"
   master:
     branch: master
     owner: weaveworks
     commands:
       - "$SRCDIR/bin/circle-deploy-master"
-  issues:
-    branch: /.*/
-    owner: weaveworks
-    commands:
-      - "$SRCDIR/bin/circle-deploy-issues"
