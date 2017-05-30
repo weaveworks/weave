@@ -8,7 +8,7 @@ cni_connect() {
     pid=$(container_pid $1 $2)
     id=$(docker_on $1 inspect -f '{{.Id}}' $2)
     run_on $1 sudo CNI_COMMAND=ADD CNI_CONTAINERID=$id CNI_IFNAME=eth0 \
-    CNI_NETNS=/proc/$pid/ns/net CNI_PATH=/opt/cni/bin /opt/cni/bin/weave-net 
+    CNI_NETNS=/proc/$pid/ns/net CNI_PATH=/opt/cni/bin /opt/cni/bin/weave-net
 }
 
 run_on $HOST1 sudo mkdir -p /opt/cni/bin
