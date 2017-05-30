@@ -1,3 +1,33 @@
+## Release 1.9.6
+
+Bug fixes and minor improvements
+
+* Ensure that Kubernetes pods can contact a service implemented within
+  the same pod, by turning on "hairpin mode". This is required because
+  of a quiet change between Kubernetes 1.5 and 1.6. #2993
+* Network Policy Controller (`weave-npc`) now checks local addresses
+  only, so it doesn't interfere with cross-cluster traffic. It should
+  be more efficient too #2622,#2973,#2979
+* Stop reporting back to Kubernetes any issues encountered when
+  deleting a pod's network interface. This is required because
+  of a quiet change between Kubernetes 1.5 and 1.6. #2921,#2928
+* Fixed an issue whereby `weave-npc` couldn't start because one
+  `ipset` was referring to another one and could not be destroyed #2915,#2949
+* Improved the code which checks whether the kernel supports `ipset` #2934,#2935
+* `weave-npc` now creates ipsets with only valid xml characters in the
+  name #2958,#2959
+
+Build and Testing
+
+* In build container use cross-compilers from debian package
+  repository, so they match other components #2940
+* Pin the version of the linting tool `shfmt` so the set of things it
+  checks is stable #2987
+* Fix lint error in script that runs smoke-tests #2962
+* Moved website publishing from Wordpress to Netlify #2986
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/55?closed=1).
+
 ## Release 1.9.5
 
 Bug fixes and minor improvements
