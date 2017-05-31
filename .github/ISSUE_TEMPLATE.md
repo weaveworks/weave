@@ -16,58 +16,10 @@ If you did not find a similar one, please describe in details:
 Do not hesitate, when appropriate, to share the exact commands or API you would like, and/or to share a diagram (e.g.: asciiflow.com): "a picture is worth a thousand words".
 
 ** Is this a BUG REPORT? **
-If so, please search existing bug reports, and if you find a similar one, up-vote it and/or add your comments to it instead.
-If you did not find a similar one, please fill in as much of the template below as you can.
-If you leave out information, we will not be able to help you as well.
-
-In all cases, be ready for follow-up questions and please respond in a timely manner.
-If we cannot reproduce a bug or think a feature already exists, we might close your issue.
-If we are wrong, please feel free to reopen it and explain why.
+Please fill in as much of the template below as you can.
 
 Thank you!
 -->
-
-## Environment:
-
-### Weave:
-```
-$ weave report
-```
-
-### Docker:
-```
-$ docker version
-$ docker-runc --version
-```
-
-### Kubernetes:
-```
-$ kubectl version
-```
-
-### Logs:
-<!-- Anything interesting or unusual output by the below, potentially relevant, commands? -->
-<!-- (If output is long, please consider a Gist.) -->
-```
-$ docker logs weave
-$ journalctl -u docker.service --no-pager
-$ kubectl logs -n kube-system <weave-net-pod> weave
-$ kubectl get events
-```
-
-### OS:
-```
-$ uname -a
-$ cat /etc/*release*
-```
-
-### Network:
-```
-$ ip route
-$ ip -4 -o addr
-```
-<!-- Anything interesting or unusual output by iptables-save? -->
-<!-- (If output is long, please consider a Gist.) -->
 
 ## What you expected to happen?
 
@@ -79,3 +31,35 @@ $ ip -4 -o addr
 
 ## Anything else we need to know?
 <!-- Cloud provider? Hardware? How did you configure your cluster? Kubernetes YAML, KOPS, etc. -->
+
+## Versions:
+<!-- Please paste in the output of these commands; 'kubectl' only if using Kubernetes -->
+```
+$ weave version
+$ docker version
+$ uname -a
+$ kubectl version
+```
+
+## Logs:
+```
+$ docker logs weave
+```
+or, if using Kubernetes:
+```
+$ kubectl logs -n kube-system <weave-net-pod> weave
+```
+<!-- (If output is long, please consider a Gist.) -->
+<!-- Anything interesting or unusual output by the below, potentially relevant, commands?
+$ journalctl -u docker.service --no-pager
+$ journalctl -u kubelet --no-pager
+$ kubectl get events
+-->
+
+## Network:
+<!-- If your problem has anything to do with one network endpoint not being able to contact another, please run the following commands -->
+```
+$ ip route
+$ ip -4 -o addr
+$ sudo iptables-save
+```
