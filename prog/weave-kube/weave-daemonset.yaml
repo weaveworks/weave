@@ -59,6 +59,12 @@ spec:
               cpu: 10m
           securityContext:
             privileged: true
+          env:
+          - name: HOSTNAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
       restartPolicy: Always
       volumes:
         - name: weavedb
