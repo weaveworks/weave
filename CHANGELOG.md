@@ -1,3 +1,9 @@
+## Release 1.9.7
+
+This is identical to 1.9.6 with one additional bug-fix:
+
+* weave-npc would block everything if `kubectl --hostname-override` was used #2995,#2996
+
 ## Release 1.9.6
 
 Bug fixes and minor improvements
