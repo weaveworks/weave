@@ -216,6 +216,7 @@ If the YAML file is from `cloud.weave.works` as described above, then you can cu
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
   - `disable-npc`: boolean (`true|false`). Default: `false`.
   - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
+  - `seLinuxOptions.NAME=VALUE`: add SELinux option `NAME` and set it to `VALUE`, e.g. `seLinuxOptions.type=spc_t`
 
 The list of variables you can set is:
 
