@@ -62,7 +62,12 @@ items:
             - name: weave
               command:
                 - /home/weave/launch.sh
-              env: []
+              env:
+                - name: HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
               image: 'weaveworks/weave-kube:latest'
               imagePullPolicy: Always
               livenessProbe:
