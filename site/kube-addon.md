@@ -241,6 +241,10 @@ The list of variables you can set is:
   a larger size for better performance if your network supports jumbo
   frames - see [here](/site/using-weave/fastdp.md#mtu) for more
   details.
+* `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
+  the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
+  kernel is one of those that can panic if hairpin is enabled, then you can disable it
+  by setting `HAIRPIN_MODE=false`.
 
 Example:
 ```
