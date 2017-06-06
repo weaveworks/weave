@@ -4,13 +4,18 @@
 
 start_suite "Abuse of 'start' operation"
 
+# Temporary hack to work around docker changing this field name until we have
+# docker 1.9 available everywhere tests run.
+DNS_FIELD="DNS"
+[ "$(docker_on $HOST1 version -f {{.Server.Version}})" = "1.9.0" ] || DNS_FIELD="Dns"
+
 weave_on $HOST1 launch
 docker_bridge_ip=$(weave_on $HOST1 docker-bridge-ip)
 proxy_start_container $HOST1 --name=c1
 
 check_hostconfig() {
     docker_on $HOST1 attach $1 >/dev/null 2>&1 || true # Wait for container to exit
-    assert "docker_on $HOST1 inspect -f '{{.HostConfig.Dns}} {{.HostConfig.NetworkMode}} {{.State.Running}} {{.State.ExitCode}}' $1" "[$3] $2 false 0"
+    assert "docker_on $HOST1 inspect -f '{{.HostConfig.$DNS_FIELD}} {{.HostConfig.NetworkMode}} {{.State.Running}} {{.State.ExitCode}}' $1" "[$3] $2 false 0"
 }
 
 # Start c2 with a sneaky HostConfig
