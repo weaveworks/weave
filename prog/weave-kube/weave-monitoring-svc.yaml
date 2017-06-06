@@ -1,0 +1,28 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+   name: weave-monitoring-net
+   namespace: kube-system
+   annotations:
+     prometheus.io.scrape: "true"
+spec:
+   selector:
+      name: weave-net
+   clusterIP: None
+   ports:
+   - port: 6782
+---
+apiVersion: v1
+kind: Service
+metadata:
+   name: weave-monitoring-npc
+   namespace: kube-system
+   annotations:
+     prometheus.io.scrape: "true"
+spec:
+   selector:
+      name: weave-net
+   clusterIP: None
+   ports:
+   - port: 8686
