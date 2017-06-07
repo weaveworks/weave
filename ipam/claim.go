@@ -49,9 +49,20 @@ func (c *claim) Try(alloc *Allocator) bool {
 	}
 
 	if !alloc.ring.Contains(c.cidr.Addr) {
-		// Address not within our universe; assume user knows what they are doing
 		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
-		addOwned()
+		previousOwner := alloc.findOwner(c.cidr.Addr)
+		switch {
+		case previousOwner == "":
+			addOwned()
+		case previousOwner == c.ident: // already owned by this ID
+		case c.ident == api.NoContainerID: // already owned by anonymous container
+			// do nothing (no automatic fall-through in Go)
+		case !alloc.dead[previousOwner].IsZero(): // already owned by dead container
+			alloc.removeOwned(previousOwner, c.cidr.Addr)
+			addOwned()
+		default:
+			c.sendResult(fmt.Errorf("address %s already in use by %s", c.cidr, previousOwner))
+		}
 		c.sendResult(nil)
 		return true
 	}
