@@ -40,10 +40,18 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return true
 	}
 
+	addOwned := func() {
+		if c.ident == api.NoContainerID {
+			alloc.addOwned(c.cidr.Addr.String(), c.cidr, c.isContainer)
+		} else {
+			alloc.addOwned(c.ident, c.cidr, c.isContainer)
+		}
+	}
+
 	if !alloc.ring.Contains(c.cidr.Addr) {
 		// Address not within our universe; assume user knows what they are doing
 		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
-		alloc.addOwned(c.ident, c.cidr, c.isContainer)
+		addOwned()
 		c.sendResult(nil)
 		return true
 	}
@@ -85,11 +93,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// Unused address, we try to claim it:
 		if err := alloc.space.Claim(c.cidr.Addr); err == nil {
 			alloc.debugln("Claimed", c.cidr, "for", c.ident)
-			if c.ident == api.NoContainerID {
-				alloc.addOwned(c.cidr.Addr.String(), c.cidr, c.isContainer)
-			} else {
-				alloc.addOwned(c.ident, c.cidr, c.isContainer)
-			}
+			addOwned()
 			c.sendResult(nil)
 		} else {
 			c.sendResult(err)
