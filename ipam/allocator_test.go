@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
@@ -28,6 +29,10 @@ func (alloc *Allocator) SimplyAllocate(ident string, cidr address.CIDR) (address
 
 func (alloc *Allocator) SimplyClaim(ident string, cidr address.CIDR) error {
 	return alloc.Claim(ident, cidr, true, true, returnFalse)
+}
+
+func (alloc *Allocator) AnonymousClaim(cidr address.CIDR) error {
+	return alloc.Claim(api.NoContainerID, cidr, false, true, returnFalse)
 }
 
 func TestAllocFree(t *testing.T) {
@@ -170,6 +175,8 @@ func TestAllocatorClaim(t *testing.T) {
 		universe   = "10.0.3.0/24"
 		testAddr1  = "10.0.3.5/24"
 		testAddr2  = "10.0.4.2/24"
+		testAddr4  = "10.0.2.3/23"
+		subnet4    = "10.0.2.0/23"
 		testPre    = "10.0.3.1/24"
 	)
 
@@ -203,6 +210,9 @@ func TestAllocatorClaim(t *testing.T) {
 	// claim for a different container should fail
 	err = alloc.SimplyClaim(container1, addr1)
 	require.Error(t, err)
+	// claim for an anonymous container, will assume it's the same one
+	err = alloc.AnonymousClaim(addr1)
+	require.NoError(t, err)
 	// claiming the address allocated on the other peer should fail
 	err = alloc.SimplyClaim(container1, address.MakeCIDR(subnet, addrx))
 	require.Error(t, err, "claiming address allocated on other peer should fail")
@@ -215,6 +225,15 @@ func TestAllocatorClaim(t *testing.T) {
 	addr2, _ := address.ParseCIDR(testAddr2)
 	err = alloc.SimplyClaim(container1, addr2)
 	require.NoError(t, err)
+	err = alloc.SimplyClaim(container3, addr2)
+	require.Error(t, err)
+	// Anonymous claim outside of our universe
+	addr4, _ := address.ParseCIDR(testAddr4)
+	subnet4cidr, _ := address.ParseCIDR(subnet4)
+	require.NoError(t, alloc.AnonymousClaim(addr4))
+	addr5, err := alloc.Allocate(api.NoContainerID, subnet4cidr, false, returnFalse)
+	require.NoError(t, err)
+	require.NotEqual(t, addr4.Start(), addr5)
 }
 
 func (alloc *Allocator) pause() func() {
