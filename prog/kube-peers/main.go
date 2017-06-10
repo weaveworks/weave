@@ -10,15 +10,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func getKubePeers() ([]string, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-	c, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
+func getKubePeers(c *kubernetes.Clientset) ([]string, error) {
 	nodeList, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -50,7 +42,15 @@ func getKubePeers() ([]string, error) {
 }
 
 func main() {
-	peers, err := getKubePeers()
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Could not get cluster config: %v", err)
+	}
+	c, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Could not make Kubernetes connection: %v", err)
+	}
+	peers, err := getKubePeers(c)
 	if err != nil {
 		log.Fatalf("Could not get peers: %v", err)
 	}
