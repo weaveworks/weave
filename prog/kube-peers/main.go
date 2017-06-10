@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -10,12 +11,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func getKubePeers(c *kubernetes.Clientset) ([]string, error) {
-	nodeList, err := c.Nodes().List(api.ListOptions{})
+type nodeInfo struct {
+	name string
+	addr string
+}
+
+// return the IP addresses of all nodes in the cluster
+func getKubePeers(c *kubernetes.Clientset) ([]nodeInfo, error) {
+	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	addresses := make([]string, 0, len(nodeList.Items))
+	addresses := make([]nodeInfo, 0, len(nodeList.Items))
 	for _, peer := range nodeList.Items {
 		var internalIP, externalIP string
 		for _, addr := range peer.Status.Addresses {
@@ -33,15 +40,51 @@ func getKubePeers(c *kubernetes.Clientset) ([]string, error) {
 
 		// Fallback for cases where a Node has an ExternalIP but no InternalIP
 		if internalIP != "" {
-			addresses = append(addresses, internalIP)
+			addresses = append(addresses, nodeInfo{name: peer.Name, addr: internalIP})
 		} else if externalIP != "" {
-			addresses = append(addresses, externalIP)
+			addresses = append(addresses, nodeInfo{name: peer.Name, addr: externalIP})
 		}
 	}
 	return addresses, nil
 }
 
+const (
+	configMapName      = "weave-net"
+	configMapNamespace = "kube-system"
+)
+
+// update the list of all peers that have gone through this code path
+func addMyselfToPeerList(c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
+	cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
+	if err := cml.Init(); err != nil {
+		return nil, err
+	}
+	list, err := cml.GetPeerList()
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Fetched existing peer list", list)
+	if !list.contains(peerName) {
+		list.add(peerName, name)
+		log.Println("Storing new peer list", list)
+		err = cml.UpdatePeerList(*list)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
+
 func main() {
+	var (
+		justReclaim bool
+		peerName    string
+		nodeName    string
+	)
+	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
+	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
+	flag.Parse()
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatalf("Could not get cluster config: %v", err)
@@ -54,7 +97,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not get peers: %v", err)
 	}
-	for _, addr := range peers {
-		fmt.Println(addr)
+	if justReclaim {
+		log.Println("Checking if any peers need to be reclaimed")
+		_, err := addMyselfToPeerList(c, peerName, nodeName)
+		if err != nil {
+			log.Fatalf("Could not get peer list: %v", err)
+		}
+		return
+	}
+	for _, node := range peers {
+		fmt.Println(node.addr)
 	}
 }
