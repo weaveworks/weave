@@ -47,6 +47,44 @@ items:
       - kind: ServiceAccount
         name: weave-net
         namespace: kube-system
+  - apiVersion: rbac.authorization.k8s.io/v1beta1
+    kind: Role
+    metadata:
+      name: weave-net2
+      namespace: kube-system
+      labels:
+        name: weave-net2
+    rules:
+      - apiGroups:
+          - ''
+        resources:
+          - configmaps
+        resourceNames:
+          - weave-net
+        verbs:
+          - get
+          - update
+      - apiGroups:
+          - ''
+        resources:
+          - configmaps
+        verbs:
+          - create
+  - apiVersion: rbac.authorization.k8s.io/v1beta1
+    kind: RoleBinding
+    metadata:
+      name: weave-net2
+      namespace: kube-system
+      labels:
+        name: weave-net2
+    roleRef:
+      kind: Role
+      name: weave-net2
+      apiGroup: rbac.authorization.k8s.io
+    subjects:
+      - kind: ServiceAccount
+        name: weave-net
+        namespace: kube-system
   - apiVersion: extensions/v1beta1
     kind: DaemonSet
     metadata:
