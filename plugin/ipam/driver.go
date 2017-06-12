@@ -87,7 +87,7 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 	}
 	if address != nil { // try to claim specific address requested
 		ip = &net.IPNet{IP: address, Mask: subnet.Mask}
-		if err = i.weave.ClaimIP(api.NoContainerID, ip); err != nil {
+		if err = i.weave.ClaimIP(api.NoContainerID, ip, false); err != nil {
 			return
 		}
 	} else {

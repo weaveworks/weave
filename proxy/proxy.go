@@ -568,7 +568,7 @@ func (proxy *Proxy) claimCIDR(containerID, cidr string) (*net.IPNet, error) {
 		return nil, err
 	}
 	ipnet.IP = ip // we want the specific IP plus the mask
-	err = proxy.weave.ClaimIP(containerID, ipnet)
+	err = proxy.weave.ClaimIP(containerID, ipnet, true)
 	return ipnet, err
 }
 

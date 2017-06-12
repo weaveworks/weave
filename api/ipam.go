@@ -51,8 +51,8 @@ func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
 }
 
 // Claim a specific IP on behalf of the ID
-func (client *Client) ClaimIP(ID string, cidr *net.IPNet) error {
-	_, err := client.httpVerb("PUT", fmt.Sprintf("/ip/%s/%s", ID, cidr), nil)
+func (client *Client) ClaimIP(ID string, cidr *net.IPNet, checkAlive bool) error {
+	_, err := client.httpVerb("PUT", fmt.Sprintf("/ip/%s/%s", ID, cidr), ipamValues(checkAlive))
 	return err
 }
 

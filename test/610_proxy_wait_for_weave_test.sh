@@ -27,6 +27,7 @@ check_iface_ready 10.2.1.1/24
 # Check committed containers only have one weavewait prepended
 proxy_start_container $HOST1 --name c1 -e 'WEAVE_CIDR=10.2.1.1/24'
 COMMITTED_IMAGE=$(proxy docker_on $HOST1 commit c1)
+docker_on $HOST1 stop -t=1 c1
 assert_raises "proxy docker_on $HOST1 run --name c2 $COMMITTED_IMAGE"
 assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
 
