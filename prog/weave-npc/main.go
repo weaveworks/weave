@@ -117,7 +117,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "--match-set", npc.LocalIpset, "src",
 		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
 		return err
 	}
