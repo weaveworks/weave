@@ -110,8 +110,8 @@ items:
               type: spc_t
           serviceAccountName: weave-net
           tolerations:
-            - effect: NoSchedule
-              key: node-role.kubernetes.io/master
+            - operator: "Exists"
+              effect: NoSchedule
           volumes:
             - name: weavedb
               hostPath:
