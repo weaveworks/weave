@@ -1,3 +1,13 @@
+## Release 1.9.8
+
+Bug fixes and minor improvements
+
+* Fix weave-npc blocking NodePort and any other non-local access #3011,#3014
+* Fix bug where IPAM would duplicate a fixed IP address assigned via Docker plugin #3003,#3010
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/56?closed=1).
+
+
 ## Release 1.9.7
 
 This is identical to 1.9.6 with one additional bug-fix:
