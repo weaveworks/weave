@@ -1,24 +1,17 @@
-// Much of this copied from k8s.io/kubernetes/pkg/client/leaderelection/resourcelock/configmaplock.go
 package main
 
 import (
 	"encoding/json"
+	"log"
+	"time"
 
 	"github.com/pkg/errors"
 
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	kubeErrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
 	api "k8s.io/client-go/pkg/api/v1"
 )
-
-type LeaderElectionRecord struct {
-	HolderIdentity       string           `json:"holderIdentity"`
-	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
-	AcquireTime          unversioned.Time `json:"acquireTime"`
-	RenewTime            unversioned.Time `json:"renewTime"`
-}
 
 type configMapAnnotations struct {
 	Name      string
@@ -58,6 +51,8 @@ func (pl *peerList) add(peerName string, name string) {
 }
 
 const (
+	DefaultLeaseDuration = 5 * time.Second
+
 	KubePeersAnnotationKey = "kube-peers.weave.works/peers"
 )
 
@@ -105,14 +100,27 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 
 // Update will update and existing annotation on a given resource.
 func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
-	if cml.cm == nil {
-		return errors.New("endpoint not initialized, call Init first")
-	}
 	recordBytes, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
-	cml.cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	return cml.Update(KubePeersAnnotationKey, recordBytes)
+}
+
+func (cml *configMapAnnotations) Update(key string, recordBytes []byte) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
+	var err error
+	for {
+		cml.cm.Annotations[key] = string(recordBytes)
+		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+		if err != nil && kubeErrors.IsConflict(err) {
+			log.Printf("Optimistic locking conflict: trying again: %s", err)
+			err = cml.Init()
+			continue
+		}
+		break
+	}
 	return err
 }
