@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	_ "github.com/opencontainers/runc/libcontainer/nsenter"
+
 	weavenet "github.com/weaveworks/weave/net"
 )
 
