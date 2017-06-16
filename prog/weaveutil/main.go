@@ -32,6 +32,7 @@ func init() {
 		"check-iface":              checkIface,
 		"del-iface":                delIface,
 		"setup-iface":              setupIface,
+		"setup-iface-addrs":        setupIfaceAddrs,
 		"list-netdevs":             listNetDevs,
 		"cni-net":                  cniNet,
 		"cni-ipam":                 cniIPAM,

@@ -104,19 +104,12 @@ func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
 	return err == nil
 }
 
-// NB: This function can be used only by a process that terminates immediately
-//     after calling the function as it changes netns via WithNetNSLinkUnsafe.
 func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool, hairpinMode bool) error {
 	ns, err := netns.GetFromPath(netNSPath)
 	if err != nil {
 		return err
 	}
 	defer ns.Close()
-
-	ipt, err := iptables.New()
-	if err != nil {
-		return err
-	}
 
 	if !interfaceExistsInNamespace(netNSPath, ifName) {
 		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
@@ -142,51 +135,90 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 
 	}
 
-	if err := WithNetNSLinkUnsafe(ns, ifName, func(veth netlink.Link) error {
-		newAddresses, err := AddAddresses(veth, cidrs)
+	args := []string{ifName, fmt.Sprintf("%t", withMulticastRoute)}
+	for _, cidr := range cidrs {
+		args = append(args, cidr.String())
+	}
+	if _, err := WithNetNS(netNSPath, "setup-iface-addrs", args...); err != nil {
+		return fmt.Errorf("error setting up interface addresses: %s", err)
+	}
+	return nil
+}
+
+// SetupIfaceAddrs is the implementation of the 'setup-iface-addrs' call above,
+// running in another process in the container's netns
+func SetupIfaceAddrs(veth netlink.Link, withMulticastRoute bool, cidrs []*net.IPNet) error {
+	newAddresses, err := AddAddresses(veth, cidrs)
+	if err != nil {
+		return err
+	}
+
+	ifName := veth.Attrs().Name
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+
+	// Add multicast ACCEPT rules for new subnets
+	for _, ipnet := range newAddresses {
+		acceptRule := []string{"-i", ifName, "-s", subnet(ipnet), "-d", "224.0.0.0/4", "-j", "ACCEPT"}
+		exists, err := ipt.Exists("filter", "INPUT", acceptRule...)
 		if err != nil {
 			return err
 		}
-
-		// Add multicast ACCEPT rules for new subnets
-		for _, ipnet := range newAddresses {
-			acceptRule := []string{"-i", ifName, "-s", subnet(ipnet), "-d", "224.0.0.0/4", "-j", "ACCEPT"}
-			exists, err := ipt.Exists("filter", "INPUT", acceptRule...)
-			if err != nil {
+		if !exists {
+			if err := ipt.Insert("filter", "INPUT", 1, acceptRule...); err != nil {
 				return err
 			}
-			if !exists {
-				if err := ipt.Insert("filter", "INPUT", 1, acceptRule...); err != nil {
-					return err
-				}
-			}
 		}
+	}
 
-		if err := netlink.LinkSetUp(veth); err != nil {
+	if err := netlink.LinkSetUp(veth); err != nil {
+		return err
+	}
+	for _, ipnet := range newAddresses {
+		// If we don't wait for a bit here, we see the arp fail to reach the bridge.
+		time.Sleep(1 * time.Millisecond)
+		arping.GratuitousArpOverIfaceByName(ipnet.IP, ifName)
+	}
+	if withMulticastRoute {
+		/* Route multicast packets across the weave network.
+		This must come last in 'attach'. If you change this, change weavewait to match.
+
+		TODO: Add the MTU lock to prevent PMTU discovery for multicast
+		destinations. Without that, the kernel sets the DF flag on
+		multicast packets. Since RFC1122 prohibits sending of ICMP
+		errors for packets with multicast destinations, that causes
+		packets larger than the PMTU to be dropped silently.  */
+
+		_, multicast, _ := net.ParseCIDR("224.0.0.0/4")
+		if err := AddRoute(veth, netlink.SCOPE_LINK, multicast, nil); err != nil {
 			return err
 		}
-		for _, ipnet := range newAddresses {
-			// If we don't wait for a bit here, we see the arp fail to reach the bridge.
-			time.Sleep(1 * time.Millisecond)
-			arping.GratuitousArpOverIfaceByName(ipnet.IP, ifName)
-		}
-		if withMulticastRoute {
-			/* Route multicast packets across the weave network.
-			This must come last in 'attach'. If you change this, change weavewait to match.
+	}
+	return nil
+}
 
-			TODO: Add the MTU lock to prevent PMTU discovery for multicast
-			destinations. Without that, the kernel sets the DF flag on
-			multicast packets. Since RFC1122 prohibits sending of ICMP
-			errors for packets with multicast destinations, that causes
-			packets larger than the PMTU to be dropped silently.  */
+// SetupIface is the implementation of the 'setup-iface' call above,
+// running in another process in the container's netns
+func SetupIface(ifaceName, newIfName string) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
 
-			_, multicast, _ := net.ParseCIDR("224.0.0.0/4")
-			if err := AddRoute(veth, netlink.SCOPE_LINK, multicast, nil); err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkSetName(link, newIfName); err != nil {
+		return err
+	}
+	// This is only called by AttachContainer which is only called in host pid namespace
+	if err := ConfigureARPCache("/proc", newIfName); err != nil {
+		return err
+	}
+	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
 		return err
 	}
 

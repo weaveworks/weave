@@ -108,5 +108,8 @@ For more information, see the
 
 ### Caveats
 
+- The program `nsenter` must be present on the host; it is required by
+  the CNI plugin.  In some distros (e.g. Alpine, Ubuntu) it is in the
+  util-linux package
 - The Weave Net router container must be running for CNI to allocate addresses
 - The CNI plugin does not add entries to weaveDNS.

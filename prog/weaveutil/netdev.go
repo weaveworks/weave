@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 
@@ -48,27 +47,27 @@ func setupIface(args []string) error {
 	ifaceName := args[0]
 	newIfName := args[1]
 
-	ipt, err := iptables.New()
+	return weavenet.SetupIface(ifaceName, newIfName)
+}
+
+// setupIfaceAddrs sets up addresses on an interface. It expects to be called inside the container's netns.
+func setupIfaceAddrs(args []string) error {
+	if len(args) < 1 {
+		cmdUsage("setup-iface-addrs", "<iface-name> <with-multicast> <cidr>...")
+	}
+	link, err := netlink.LinkByName(args[0])
 	if err != nil {
 		return err
 	}
-
-	link, err := netlink.LinkByName(ifaceName)
+	withMulticastRoute, err := strconv.ParseBool(args[1])
 	if err != nil {
 		return err
 	}
-	if err := netlink.LinkSetName(link, newIfName); err != nil {
+	cidrs, err := parseCIDRs(args[2:])
+	if err != nil {
 		return err
 	}
-	// This is only called by AttachContainer which is only called in host pid namespace
-	if err := weavenet.ConfigureARPCache("/proc", newIfName); err != nil {
-		return err
-	}
-	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
-		return err
-	}
-
-	return nil
+	return weavenet.SetupIfaceAddrs(link, withMulticastRoute, cidrs)
 }
 
 func configureARP(args []string) error {
