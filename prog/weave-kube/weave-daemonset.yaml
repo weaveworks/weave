@@ -70,8 +70,7 @@ items:
           hostPID: true
           restartPolicy: Always
           securityContext:
-            seLinuxOptions:
-              type: spc_t
+            seLinuxOptions: {}
           serviceAccountName: weave-net
           volumes:
             - name: weavedb
