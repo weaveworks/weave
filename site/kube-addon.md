@@ -212,6 +212,13 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 If the YAML file is from `cloud.weave.works` as described above, then you can customise it by passing some of Weave Net's options, arguments and environment variables as query parameters:
 
   - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time from `cloud.weave.works`.
+  - `password-secret`: name of the Kubernetes secret containing your password.
+     Example:
+
+        $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd.txt
+        $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd.txt
+        $ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
+
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
   - `disable-npc`: boolean (`true|false`). Default: `false`.
