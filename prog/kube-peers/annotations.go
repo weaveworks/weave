@@ -11,6 +11,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	kubeErrors "k8s.io/client-go/pkg/api/errors"
 	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/util/wait"
 )
 
 type configMapAnnotations struct {
@@ -52,6 +53,8 @@ func (pl *peerList) add(peerName string, name string) {
 
 const (
 	DefaultLeaseDuration = 5 * time.Second
+	retryPeriod          = time.Second * 2
+	jitterFactor         = 1.0
 
 	KubePeersAnnotationKey = "kube-peers.weave.works/peers"
 )
@@ -98,29 +101,40 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 	return &record, nil
 }
 
-// Update will update and existing annotation on a given resource.
 func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
 	recordBytes, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
-	return cml.Update(KubePeersAnnotationKey, recordBytes)
+	cm := cml.cm
+	cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
+	cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err == nil {
+		cml.cm = cm
+	}
+	return err
 }
 
-func (cml *configMapAnnotations) Update(key string, recordBytes []byte) error {
-	if cml.cm == nil {
-		return errors.New("endpoint not initialized, call Init first")
-	}
+// Loop with jitter, fetching the cml data and calling f() until it
+// doesn't get an optimistic locking conflict.
+// If it succeeds or gets any other kind of error, stop the loop.
+func (cml *configMapAnnotations) LoopUpdate(f func() error) error {
+	stop := make(chan struct{})
 	var err error
-	for {
-		cml.cm.Annotations[key] = string(recordBytes)
-		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	wait.JitterUntil(func() {
+		if err = cml.Init(); err != nil {
+			close(stop)
+			return
+		}
+		err = f()
 		if err != nil && kubeErrors.IsConflict(err) {
 			log.Printf("Optimistic locking conflict: trying again: %s", err)
-			err = cml.Init()
-			continue
+			return
 		}
-		break
-	}
+		close(stop)
+	}, retryPeriod, jitterFactor, true, stop)
 	return err
 }

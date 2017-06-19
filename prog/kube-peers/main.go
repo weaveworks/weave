@@ -56,23 +56,25 @@ const (
 // update the list of all peers that have gone through this code path
 func addMyselfToPeerList(c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
 	cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
-	if err := cml.Init(); err != nil {
-		return nil, err
-	}
-	list, err := cml.GetPeerList()
-	if err != nil {
-		return nil, err
-	}
-	log.Println("Fetched existing peer list", list)
-	if !list.contains(peerName) {
-		list.add(peerName, name)
-		log.Println("Storing new peer list", list)
-		err = cml.UpdatePeerList(*list)
+	var list *peerList
+	err := cml.LoopUpdate(func() error {
+		var err error
+		list, err = cml.GetPeerList()
 		if err != nil {
-			return nil, err
+			return err
 		}
-	}
-	return list, nil
+		log.Println("Fetched existing peer list", list)
+		if !list.contains(peerName) {
+			list.add(peerName, name)
+			log.Println("Storing new peer list", list)
+			err = cml.UpdatePeerList(*list)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return list, err
 }
 
 // For each of those peers that is no longer listed as a node by
