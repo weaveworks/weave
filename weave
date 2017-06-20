@@ -95,6 +95,8 @@ where <peer>     = <ip_address_or_fqdn>[:<port>]
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
       <peer_id>  = <nickname> | <weave internal peer ID>
       <mode>     = consensus[=<count>] | seed=<mac>,... | observer
+
+To troubleshoot and visualize Weave networks, try Weave Cloud: http://www.weave.works/product/cloud/
 EOF
 }
 
