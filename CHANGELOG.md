@@ -1,3 +1,84 @@
+## Release 2.0.0
+
+### New Features
+
+### Peer Discovery via Weave Cloud
+
+You can now get all your Weave Net peers to find each other via the Weave Cloud service, instead of maintaining a list of peers at startup. #2799,#2827
+
+See the [docs page](https://github.com/weaveworks/weave/blob/master/site/using-weave/weave-cloud.md) for more details
+
+### New Docker Plugin
+
+Docker has a [new plugin system](https://docs.docker.com/engine/extend/) which improves the installation UX and solves some issues around startup.  This means Weave Net 2.0 can now run with Docker in "swarm mode" and supports the `docker service` command. #2396,#2397,#2651,#2727,#2805,#2816,#2905, #2906,#2929,#2932,#2945,#2950,#2956,#2963,#2964,#2966
+
+The previous Docker Plugin is still available and can be installed as before.
+
+### All of Weave Net now runs in one container
+
+Previously we had three separate containers for routing, Docker API
+proxy and Docker plugin. Running everything in one simplifies start-up and removes the need to detect various error conditions. #1642,#2897,#2936,#2945,#2946,#2951,#2960
+
+The individual commands ‘weave launch-router’, ‘weave launch-plugin’, etc., have been removed. You can turn off the plugin and proxy with new command-line options. In keeping with Semantic Versioning, we have changed the major version number for this release.
+
+#### Other new features
+
+* Kubernetes configuration now comes from our “Launch Generator” that allows different options to be selected via URL. #2754,#2903,#3000,#3001
+* `weave-kube` now stores data about IP allocation in `/var/lib/weave` on the host instead of in a Kubernetes volume.  This means that the data will persist across pod deletion and re-creation, e.g. during an upgrade of Weave Net, which makes restarts more reliable. #2610,#2967
+
+#### Features removed
+
+* `weave run` has been removed.  This was the original method provided to start containers with Weave Net, but it always required care over timing of start-up, and we now provide three alternative, better, ways. You can replicate the effect by calling `docker run` then `weave attach`.  Similarly `weave start` and `weave restart` were removed. #2353,#2885
+* Everything deprecated more than one release ago has been removed, so if you use it now you get an error rather than a warning. This includes the ‘create-bridge’ command and older command-line arguments, e.g. `--iprange` was replaced by `--ipalloc-range` #2901,#2909,#2913,#2942,#2989,#2991
+
+#### Functions moved from shell-script to Go code.
+
+This enables more precise error-checking and runs a bit faster. It has also enabled us to shrink the size of images downloaded: `weave-kube` is 101MB compared to 163MB previously #2953,#2954,#2974
+
+Specific items that moved from shell-script to Go:
+* Setting up the `weave` bridge #1958,#2975,#2977,#2978
+* Container attachment #2947
+* Creation of the ’weave’ default plugin network #2920
+
+#### Minor improvements
+
+* You can now restart the Weave Net router without requiring the proxy to be enabled #2112
+* Plugin (legacy version) now respects `--ipalloc-default-subnet` option #2919
+* The `weave` script now detects and issues an error message if
+  `weave-kube` is running and you attempt to launch again from the script. #2709/#2966
+* It is now possible to choose the the MAC address of the `weave` bridge using `--name`, in case your hosts have identical unique IDs. #2900
+* Relaxed Kubernetes tolerations for Weave Net's daemonset in order to match any node (previously, only taints directed at master). #3018
+* Kubernetes' `seLinuxOptions` configuration is now empty by default, to reduce spurious failures on hosts not using seLinux. #3001
+* Improved reliability of namespace changes via `nsenter`. #2992
+* `weave ps` now fetches the list container IDs internally, rather than calling out to `docker ps` #2814,#2898
+* at startup, actively remove dead containers’ Weave Net IP addresses from IPAM #3013
+* at startup, only check live containers to see if they have an existing Weave Net IP address #2815,#2829
+* Weave Net CNI plugin now logs but does not raise an error if anything goes wrong during network interface delete, to be more compatible with Kubernetes 1.6. #2928
+* Stop running a shell in “privileged” mode when it’s only writing a file #2838
+* New internal REST endpoint to return all IP address mappings. #1350
+* Changed the wording where we do not log the password #2833
+* Fixed typo in plugin error messages #2894
+
+#### Build and test
+
+* Weave Net is now built with Go version 1.8, which has better code generation and garbage collection #2914
+* During smoke-tests, use a webserver instead of just `ping` so we get a more realistic test that the Weave network is working #2918
+* When installing dependencies for the build container, use a keyserver port that's better for firewalls #2812
+* Kubernetes test script now scales up to more hosts, and works with Kubernetes 1.6 #2837,#2853,#2923
+* Other minor build improvements and refactoring #2760,#2910
+
+### External Contributors
+
+Thanks to the following who contributed changes during this release:
+@bjhaid
+@dlmiddlecote
+@mattjtodd
+@mgalgs
+@mikebryant
+@Shimi
+@stuart-warren
+
+
 ## Release 1.9.8
 
 Bug fixes and minor improvements
