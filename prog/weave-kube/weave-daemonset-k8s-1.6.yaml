@@ -109,8 +109,8 @@ items:
             seLinuxOptions: {}
           serviceAccountName: weave-net
           tolerations:
-            - operator: "Exists"
-              effect: NoSchedule
+            - effect: NoSchedule
+              operator: Exists
           volumes:
             - name: weavedb
               hostPath:
@@ -130,3 +130,5 @@ items:
             - name: lib-modules
               hostPath:
                 path: /lib/modules
+      updateStrategy:
+        type: RollingUpdate
