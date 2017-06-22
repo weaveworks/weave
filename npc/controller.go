@@ -66,7 +66,7 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		newNs, err := newNS(name, npc.ipt, npc.ips, npc.nsSelectors)
+		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors)
 		if err != nil {
 			return err
 		}
@@ -85,21 +85,10 @@ func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	return nil
 }
 
-func (npc *controller) checkLocalPod(obj *coreapi.Pod, event string) bool {
-	if obj.Spec.NodeName != npc.nodeName {
-		common.Log.Debugf("%s ignored for pod %s/%s on node %s", event, obj.ObjectMeta.Namespace, obj.ObjectMeta.Name, obj.Spec.NodeName)
-		return false
-	}
-	return true
-}
-
 func (npc *controller) AddPod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	if !npc.checkLocalPod(obj, "AddPod") {
-		return nil
-	}
 	common.Log.Debugf("EVENT AddPod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.addPod(obj), "add pod")
@@ -110,10 +99,6 @@ func (npc *controller) UpdatePod(oldObj, newObj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	// Pods don't move across nodes so we only check the new version
-	if !npc.checkLocalPod(newObj, "UpdatePod") {
-		return nil
-	}
 	common.Log.Debugf("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updatePod(oldObj, newObj), "update pod")
@@ -124,9 +109,6 @@ func (npc *controller) DeletePod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	if !npc.checkLocalPod(obj, "DeletePod") {
-		return nil
-	}
 	common.Log.Debugf("EVENT DeletePod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.deletePod(obj), "delete pod")
