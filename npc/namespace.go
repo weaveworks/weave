@@ -19,6 +19,7 @@ type ns struct {
 	ips ipset.Interface    // interface to ipset
 
 	name      string                               // k8s Namespace name
+	nodeName  string                               // my node name
 	namespace *coreapi.Namespace                   // k8s Namespace object
 	pods      map[types.UID]*coreapi.Pod           // k8s Pod objects by UID
 	policies  map[types.UID]*extnapi.NetworkPolicy // k8s NetworkPolicy objects by UID
@@ -32,7 +33,7 @@ type ns struct {
 	rules           *ruleSet
 }
 
-func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
+func newNS(name, nodeName string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
 	allPods, err := newSelectorSpec(&unversioned.LabelSelector{}, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors
 		ipt:         ipt,
 		ips:         ips,
 		name:        name,
+		nodeName:    nodeName,
 		pods:        make(map[types.UID]*coreapi.Pod),
 		policies:    make(map[types.UID]*extnapi.NetworkPolicy),
 		uid:         uuid.NewUUID(),
@@ -89,10 +91,21 @@ func (ns *ns) onNewPodSelector(selector *selector) error {
 	return nil
 }
 
+func (ns *ns) checkLocalPod(obj *coreapi.Pod, event string) bool {
+	if obj.Spec.NodeName != ns.nodeName {
+		common.Log.Debugf("%s ignored for pod %s/%s on node %s", event, obj.ObjectMeta.Namespace, obj.ObjectMeta.Name, obj.Spec.NodeName)
+		return false
+	}
+	return true
+}
+
 func (ns *ns) addToMatching(obj *coreapi.Pod) error {
 	err := ns.srcPodSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 	if err != nil {
 		return err
+	}
+	if !ns.checkLocalPod(obj, "add") {
+		return nil
 	}
 	err = ns.dstPodSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 	return err
@@ -102,6 +115,9 @@ func (ns *ns) delFromMatching(obj *coreapi.Pod) error {
 	err := ns.srcPodSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 	if err != nil {
 		return err
+	}
+	if !ns.checkLocalPod(obj, "del") {
+		return nil
 	}
 	err = ns.dstPodSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 	return err
