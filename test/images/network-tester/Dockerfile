@@ -13,6 +13,9 @@
 # limitations under the License.
 
 FROM bash
+RUN apk add --update \
+    curl \
+  && rm -rf /var/cache/apk/*
 ADD webserver webserver
 EXPOSE 8080
 ENTRYPOINT ["/webserver"]
