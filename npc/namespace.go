@@ -234,10 +234,12 @@ func bypassRule(nsIpsetName ipset.Name) []string {
 }
 
 func (ns *ns) ensureBypassRule(nsIpsetName ipset.Name) error {
+	common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, nsIpsetName)
 	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
 }
 
 func (ns *ns) deleteBypassRule(nsIpsetName ipset.Name) error {
+	common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, nsIpsetName)
 	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
 }
 
@@ -261,6 +263,7 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 	newDefaultDeny := isDefaultDeny(newObj)
 
 	if oldDefaultDeny != newDefaultDeny {
+		common.Log.Infof("namespace DefaultDeny changed from %t to %t", oldDefaultDeny, newDefaultDeny)
 		if oldDefaultDeny {
 			return ns.ensureBypassRule(ns.allPods.ipsetName)
 		}
