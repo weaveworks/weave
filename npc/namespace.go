@@ -26,9 +26,10 @@ type ns struct {
 	uid     types.UID     // surrogate UID to own allPods selector
 	allPods *selectorSpec // hash:ip ipset of all pod IPs in this namespace
 
-	nsSelectors  *selectorSet
-	podSelectors *selectorSet
-	rules        *ruleSet
+	nsSelectors     *selectorSet
+	srcPodSelectors *selectorSet
+	dstPodSelectors *selectorSet
+	rules           *ruleSet
 }
 
 func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
@@ -48,9 +49,13 @@ func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors
 		nsSelectors: nsSelectors,
 		rules:       newRuleSet(ipt)}
 
-	ns.podSelectors = newSelectorSet(ips, ns.onNewPodSelector)
+	ns.srcPodSelectors = newSelectorSet(ips, ns.onNewPodSelector)
+	ns.dstPodSelectors = newSelectorSet(ips, ns.onNewPodSelector)
 
-	if err := ns.podSelectors.provision(ns.uid, nil, map[string]*selectorSpec{ns.allPods.key: ns.allPods}); err != nil {
+	if err := ns.srcPodSelectors.provision(ns.uid, nil, map[string]*selectorSpec{ns.allPods.key: ns.allPods}); err != nil {
+		return nil, err
+	}
+	if err := ns.dstPodSelectors.provision(ns.uid, nil, map[string]*selectorSpec{ns.allPods.key: ns.allPods}); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +67,10 @@ func (ns *ns) empty() bool {
 }
 
 func (ns *ns) destroy() error {
-	if err := ns.podSelectors.deprovision(ns.uid, map[string]*selectorSpec{ns.allPods.key: ns.allPods}, nil); err != nil {
+	if err := ns.srcPodSelectors.deprovision(ns.uid, map[string]*selectorSpec{ns.allPods.key: ns.allPods}, nil); err != nil {
+		return err
+	}
+	if err := ns.dstPodSelectors.deprovision(ns.uid, map[string]*selectorSpec{ns.allPods.key: ns.allPods}, nil); err != nil {
 		return err
 	}
 	return nil
@@ -81,6 +89,24 @@ func (ns *ns) onNewPodSelector(selector *selector) error {
 	return nil
 }
 
+func (ns *ns) addToMatching(obj *coreapi.Pod) error {
+	err := ns.srcPodSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	if err != nil {
+		return err
+	}
+	err = ns.dstPodSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return err
+}
+
+func (ns *ns) delFromMatching(obj *coreapi.Pod) error {
+	err := ns.srcPodSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	if err != nil {
+		return err
+	}
+	err = ns.dstPodSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return err
+}
+
 func (ns *ns) addPod(obj *coreapi.Pod) error {
 	ns.pods[obj.ObjectMeta.UID] = obj
 
@@ -88,8 +114,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	ns.ips.AddEntry(LocalIpset, obj.Status.PodIP)
-	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return ns.addToMatching(obj)
 }
 
 func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
@@ -102,36 +127,46 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 
 	if hasIP(oldObj) && !hasIP(newObj) {
 		ns.ips.DelEntry(LocalIpset, oldObj.Status.PodIP)
-		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.Labels, oldObj.Status.PodIP)
+		return ns.delFromMatching(oldObj)
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
 		ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP)
-		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP)
+		return ns.addToMatching(newObj)
 	}
 
 	if !equals(oldObj.ObjectMeta.Labels, newObj.ObjectMeta.Labels) ||
 		oldObj.Status.PodIP != newObj.Status.PodIP {
 
-		for _, ps := range ns.podSelectors.entries {
-			oldMatch := ps.matches(oldObj.ObjectMeta.Labels)
-			newMatch := ps.matches(newObj.ObjectMeta.Labels)
-			if oldMatch == newMatch && oldObj.Status.PodIP == newObj.Status.PodIP {
-				continue
-			}
-			if oldMatch {
-				if err := ps.delEntry(oldObj.Status.PodIP); err != nil {
-					return err
-				}
-			}
-			if newMatch {
-				if err := ps.addEntry(newObj.Status.PodIP); err != nil {
-					return err
-				}
-			}
+		if err := updatePodForSelectorSet(ns.srcPodSelectors, oldObj, newObj); err != nil {
+			return err
+		}
+		if err := updatePodForSelectorSet(ns.dstPodSelectors, oldObj, newObj); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func updatePodForSelectorSet(set *selectorSet, oldObj, newObj *coreapi.Pod) error {
+	for _, ps := range set.entries {
+		oldMatch := ps.matches(oldObj.ObjectMeta.Labels)
+		newMatch := ps.matches(newObj.ObjectMeta.Labels)
+		if oldMatch == newMatch && oldObj.Status.PodIP == newObj.Status.PodIP {
+			continue
+		}
+		if oldMatch {
+			if err := ps.delEntry(oldObj.Status.PodIP); err != nil {
+				return err
+			}
+		}
+		if newMatch {
+			if err := ps.addEntry(newObj.Status.PodIP); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -143,23 +178,27 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 	}
 
 	ns.ips.DelEntry(LocalIpset, obj.Status.PodIP)
-	return ns.podSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return ns.delFromMatching(obj)
 }
 
 func (ns *ns) addNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	ns.policies[obj.ObjectMeta.UID] = obj
 
 	// Analyse policy, determine which rules and ipsets are required
-	rules, nsSelectors, podSelectors, err := ns.analysePolicy(obj)
+	rules, nsSelectors, srcPodSelectors, dstSelector, err := ns.analysePolicy(obj)
 	if err != nil {
 		return err
 	}
+	dstPodSelectors := map[string]*selectorSpec{dstSelector.key: dstSelector}
 
 	// Provision required resources in dependency order
 	if err := ns.nsSelectors.provision(obj.ObjectMeta.UID, nil, nsSelectors); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.provision(obj.ObjectMeta.UID, nil, podSelectors); err != nil {
+	if err := ns.srcPodSelectors.provision(obj.ObjectMeta.UID, nil, srcPodSelectors); err != nil {
+		return err
+	}
+	if err := ns.dstPodSelectors.provision(obj.ObjectMeta.UID, nil, dstPodSelectors); err != nil {
 		return err
 	}
 	if err := ns.rules.provision(obj.ObjectMeta.UID, nil, rules); err != nil {
@@ -174,14 +213,16 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
 	ns.policies[newObj.ObjectMeta.UID] = newObj
 
 	// Analyse the old and the new policy so we can determine differences
-	oldRules, oldNsSelectors, oldPodSelectors, err := ns.analysePolicy(oldObj)
+	oldRules, oldNsSelectors, oldSrcPodSelectors, oldDstSelector, err := ns.analysePolicy(oldObj)
 	if err != nil {
 		return err
 	}
-	newRules, newNsSelectors, newPodSelectors, err := ns.analysePolicy(newObj)
+	newRules, newNsSelectors, newSrcPodSelectors, newDstSelector, err := ns.analysePolicy(newObj)
 	if err != nil {
 		return err
 	}
+	oldDstPodSelectors := map[string]*selectorSpec{oldDstSelector.key: oldDstSelector}
+	newDstPodSelectors := map[string]*selectorSpec{newDstSelector.key: newDstSelector}
 
 	// Deprovision unused and provision newly required resources in dependency order
 	if err := ns.rules.deprovision(oldObj.ObjectMeta.UID, oldRules, newRules); err != nil {
@@ -190,13 +231,19 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
 	if err := ns.nsSelectors.deprovision(oldObj.ObjectMeta.UID, oldNsSelectors, newNsSelectors); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.deprovision(oldObj.ObjectMeta.UID, oldPodSelectors, newPodSelectors); err != nil {
+	if err := ns.srcPodSelectors.deprovision(oldObj.ObjectMeta.UID, oldSrcPodSelectors, newSrcPodSelectors); err != nil {
+		return err
+	}
+	if err := ns.dstPodSelectors.deprovision(oldObj.ObjectMeta.UID, oldDstPodSelectors, newDstPodSelectors); err != nil {
 		return err
 	}
 	if err := ns.nsSelectors.provision(oldObj.ObjectMeta.UID, oldNsSelectors, newNsSelectors); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.provision(oldObj.ObjectMeta.UID, oldPodSelectors, newPodSelectors); err != nil {
+	if err := ns.srcPodSelectors.provision(oldObj.ObjectMeta.UID, oldSrcPodSelectors, newSrcPodSelectors); err != nil {
+		return err
+	}
+	if err := ns.dstPodSelectors.provision(oldObj.ObjectMeta.UID, oldDstPodSelectors, newDstPodSelectors); err != nil {
 		return err
 	}
 	if err := ns.rules.provision(oldObj.ObjectMeta.UID, oldRules, newRules); err != nil {
@@ -210,10 +257,11 @@ func (ns *ns) deleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	delete(ns.policies, obj.ObjectMeta.UID)
 
 	// Analyse network policy to free resources
-	rules, nsSelectors, podSelectors, err := ns.analysePolicy(obj)
+	rules, nsSelectors, srcPodSelectors, dstSelector, err := ns.analysePolicy(obj)
 	if err != nil {
 		return err
 	}
+	dstPodSelectors := map[string]*selectorSpec{dstSelector.key: dstSelector}
 
 	// Deprovision unused resources in dependency order
 	if err := ns.rules.deprovision(obj.ObjectMeta.UID, rules, nil); err != nil {
@@ -222,7 +270,10 @@ func (ns *ns) deleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	if err := ns.nsSelectors.deprovision(obj.ObjectMeta.UID, nsSelectors, nil); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.deprovision(obj.ObjectMeta.UID, podSelectors, nil); err != nil {
+	if err := ns.srcPodSelectors.deprovision(obj.ObjectMeta.UID, srcPodSelectors, nil); err != nil {
+		return err
+	}
+	if err := ns.dstPodSelectors.deprovision(obj.ObjectMeta.UID, dstPodSelectors, nil); err != nil {
 		return err
 	}
 

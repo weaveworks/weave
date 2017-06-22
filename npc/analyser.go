@@ -12,18 +12,18 @@ import (
 
 func (ns *ns) analysePolicy(policy *extnapi.NetworkPolicy) (
 	rules map[string]*ruleSpec,
-	nsSelectors, podSelectors map[string]*selectorSpec,
+	nsSelectors, srcPodSelectors map[string]*selectorSpec,
+	dstSelector *selectorSpec,
 	err error) {
 
 	nsSelectors = make(map[string]*selectorSpec)
-	podSelectors = make(map[string]*selectorSpec)
+	srcPodSelectors = make(map[string]*selectorSpec)
 	rules = make(map[string]*ruleSpec)
 
-	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, ns.name, ipset.HashIP)
+	dstSelector, err = newSelectorSpec(&policy.Spec.PodSelector, ns.name, ipset.HashIP)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	podSelectors[dstSelector.key] = dstSelector
 
 	for _, ingressRule := range policy.Spec.Ingress {
 		if ingressRule.Ports != nil && len(ingressRule.Ports) == 0 {
@@ -58,14 +58,14 @@ func (ns *ns) analysePolicy(policy *extnapi.NetworkPolicy) (
 				if peer.PodSelector != nil {
 					srcSelector, err = newSelectorSpec(peer.PodSelector, ns.name, ipset.HashIP)
 					if err != nil {
-						return nil, nil, nil, err
+						return nil, nil, nil, nil, err
 					}
-					podSelectors[srcSelector.key] = srcSelector
+					srcPodSelectors[srcSelector.key] = srcSelector
 				}
 				if peer.NamespaceSelector != nil {
 					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, "", ipset.ListSet)
 					if err != nil {
-						return nil, nil, nil, err
+						return nil, nil, nil, nil, err
 					}
 					nsSelectors[srcSelector.key] = srcSelector
 				}
@@ -86,7 +86,7 @@ func (ns *ns) analysePolicy(policy *extnapi.NetworkPolicy) (
 		}
 	}
 
-	return rules, nsSelectors, podSelectors, nil
+	return rules, nsSelectors, srcPodSelectors, dstSelector, nil
 }
 
 func withNormalisedProtoAndPort(npps []extnapi.NetworkPolicyPort, f func(proto, port string)) {
