@@ -4,6 +4,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -71,7 +72,19 @@ func (i *ipset) FlushAll() error {
 
 func (i *ipset) Destroy(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	return doExec("destroy", string(ipsetName))
+	// Loop until we get an err other than inUseErrStr or 20 attempts
+	var attempt = 1
+	var err error
+	for {
+		if err = doExec("destroy", string(ipsetName)); !isErrInUse(err) {
+			return err
+		}
+		if attempt >= 20 {
+			return err
+		}
+		time.Sleep(time.Millisecond * 500)
+		attempt++
+	}
 }
 
 func (i *ipset) DestroyAll() error {
@@ -95,6 +108,18 @@ func (i *ipset) List(prefix string) ([]Name, error) {
 	}
 
 	return selected, err
+}
+
+var inUseErrStr = "Set cannot be destroyed: it is in use by a kernel component"
+
+// to catch inUseErrStr error
+func isErrInUse(err error) bool {
+	if ierr, ok := err.(*exec.ExitError); ok {
+		if strings.HasSuffix(ierr.Error(), inUseErrStr) {
+			return true
+		}
+	}
+	return false
 }
 
 func doExec(args ...string) error {

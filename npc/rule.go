@@ -49,8 +49,14 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
 				common.Log.Infof("deleting rule: %v", spec.args)
-				if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); err != nil {
-					return err
+				// Loop until we get an exit code other than "temporarily unavailable"
+				for {
+					if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); !common.IsErrExitCode4(err) {
+						if err != nil {
+							return err
+						}
+						break
+					}
 				}
 				delete(rs.users, key)
 			}
@@ -65,8 +71,14 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
 				common.Log.Infof("adding rule: %v", spec.args)
-				if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); err != nil {
-					return err
+				// Loop until we get an exit code other than "temporarily unavailable"
+				for {
+					if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); !common.IsErrExitCode4(err) {
+						if err != nil {
+							return err
+						}
+						break
+					}
 				}
 				rs.users[key] = make(map[types.UID]struct{})
 			}
