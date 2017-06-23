@@ -74,6 +74,14 @@
           "value"
       ],
       "value": ""
+    },
+    {
+      "description": "The range of IP addresses used by Weave Net",
+      "name": "IPALLOC_RANGE",
+      "settable": [
+          "value"
+      ],
+      "value": ""
     }
   ],
   "network": {
