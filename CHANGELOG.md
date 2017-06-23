@@ -19,7 +19,7 @@ system](https://docs.docker.com/engine/extend/) which improves the
 installation UX and solves some issues around startup.  This means
 Weave Net 2.0 can now run with Docker in "swarm mode" and supports the
 `docker service` command. #2396,#2397,#2651,#2727,#2805,#2816,#2905,
-#2906,#2929,#2932,#2945,#2950,#2956,#2963,#2964,#2966
+#2906,#2929,#2932,#2945,#2950,#2956,#2963,#2964,#2966,#3019
 
 The previous Docker Plugin is still available and can be installed as before.
 
@@ -45,6 +45,14 @@ Other new features
   data will persist across pod deletion and re-creation, e.g. during
   an upgrade of Weave Net, which makes restarts more
   reliable. #2610,#2967
+* `weave-kube` turned on rolling updates, so careful manual handling
+  of updates is no longer required. #3024
+
+Bug fixes
+
+* Kubernetes Network Policies which allowed a specific set of pods to
+  connect would block all pods on other hosts. Revert the change in
+  v1.9.6 which ignored pods on other hosts #3025,#3028
 
 Features removed
 
