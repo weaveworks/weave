@@ -87,7 +87,12 @@ you will need to re-make your changes against the new version.
 
 ### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 
-Kubernetes does not currently support rolling upgrades of daemon sets,
+For Kubernetes 1.6 and above the DaemonSet definition specifies
+[Rolling Updates](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/),
+so when you apply a new version Kubernetes will automatically restart
+the Weave Net pods one by one.
+
+Kubernetes v1.5 and below does not support rolling upgrades of daemon sets,
 and so you will need to perform the procedure manually:
 
 * Apply the updated addon manifest `kubectl apply -f https://git.io/weave-kube`
