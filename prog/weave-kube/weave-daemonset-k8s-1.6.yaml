@@ -45,7 +45,7 @@ items:
     subjects:
       - kind: ServiceAccount
         name: weave-net
-        namespace: kube-system
+        namespace: default
   - apiVersion: extensions/v1beta1
     kind: DaemonSet
     metadata:
