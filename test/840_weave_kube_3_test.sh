@@ -70,6 +70,30 @@ assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
+# Set up a simple network policy so all our test pods can talk to each other
+run_on $HOST1 "$KUBECTL annotate ns default net.beta.kubernetes.io/network-policy='{\"ingress\":{\"isolation\":\"DefaultDeny\"}}'"
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+  name: test840
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: run
+          operator: In
+          values:
+          - nettest
+    ports:
+    - port: 8080
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      run: nettest
+EOF
+
 check_ready() {
     run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
 }
@@ -94,10 +118,11 @@ spec:
     run: nettest
 EOF
 
+podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
+
 check_all_pods_communicate() {
-    podIP=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).status.podIP}}' 2>/dev/null")
     if [ -n podIP ] ; then
-        status=$($SSH $HOST1 "curl -s -S http://$podIP:8080/status")
+        status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
         if [ $status = "pass" ] ; then
             return 0
         fi
@@ -108,7 +133,6 @@ check_all_pods_communicate() {
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # Check that a pod can contact the outside world
-podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
 tear_down_kubeadm

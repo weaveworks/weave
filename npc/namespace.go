@@ -19,6 +19,7 @@ type ns struct {
 	ips ipset.Interface    // interface to ipset
 
 	name      string                               // k8s Namespace name
+	nodeName  string                               // my node name
 	namespace *coreapi.Namespace                   // k8s Namespace object
 	pods      map[types.UID]*coreapi.Pod           // k8s Pod objects by UID
 	policies  map[types.UID]*extnapi.NetworkPolicy // k8s NetworkPolicy objects by UID
@@ -31,7 +32,7 @@ type ns struct {
 	rules        *ruleSet
 }
 
-func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
+func newNS(name, nodeName string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
 	allPods, err := newSelectorSpec(&unversioned.LabelSelector{}, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ func newNS(name string, ipt *iptables.IPTables, ips ipset.Interface, nsSelectors
 		ipt:         ipt,
 		ips:         ips,
 		name:        name,
+		nodeName:    nodeName,
 		pods:        make(map[types.UID]*coreapi.Pod),
 		policies:    make(map[types.UID]*extnapi.NetworkPolicy),
 		uid:         uuid.NewUUID(),
@@ -81,6 +83,13 @@ func (ns *ns) onNewPodSelector(selector *selector) error {
 	return nil
 }
 
+func (ns *ns) checkLocalPod(obj *coreapi.Pod) bool {
+	if obj.Spec.NodeName != ns.nodeName {
+		return false
+	}
+	return true
+}
+
 func (ns *ns) addPod(obj *coreapi.Pod) error {
 	ns.pods[obj.ObjectMeta.UID] = obj
 
@@ -88,7 +97,9 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	ns.ips.AddEntry(LocalIpset, obj.Status.PodIP)
+	if ns.checkLocalPod(obj) {
+		ns.ips.AddEntry(LocalIpset, obj.Status.PodIP)
+	}
 	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 }
 
@@ -101,12 +112,16 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if hasIP(oldObj) && !hasIP(newObj) {
-		ns.ips.DelEntry(LocalIpset, oldObj.Status.PodIP)
+		if ns.checkLocalPod(oldObj) {
+			ns.ips.DelEntry(LocalIpset, oldObj.Status.PodIP)
+		}
 		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.Labels, oldObj.Status.PodIP)
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
-		ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP)
+		if ns.checkLocalPod(newObj) {
+			ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP)
+		}
 		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP)
 	}
 
@@ -142,7 +157,9 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	ns.ips.DelEntry(LocalIpset, obj.Status.PodIP)
+	if ns.checkLocalPod(obj) {
+		ns.ips.DelEntry(LocalIpset, obj.Status.PodIP)
+	}
 	return ns.podSelectors.delFromMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 }
 
@@ -234,10 +251,12 @@ func bypassRule(nsIpsetName ipset.Name) []string {
 }
 
 func (ns *ns) ensureBypassRule(nsIpsetName ipset.Name) error {
+	common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, nsIpsetName)
 	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
 }
 
 func (ns *ns) deleteBypassRule(nsIpsetName ipset.Name) error {
+	common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, nsIpsetName)
 	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
 }
 
@@ -261,6 +280,7 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 	newDefaultDeny := isDefaultDeny(newObj)
 
 	if oldDefaultDeny != newDefaultDeny {
+		common.Log.Infof("namespace DefaultDeny changed from %t to %t", oldDefaultDeny, newDefaultDeny)
 		if oldDefaultDeny {
 			return ns.ensureBypassRule(ns.allPods.ipsetName)
 		}
