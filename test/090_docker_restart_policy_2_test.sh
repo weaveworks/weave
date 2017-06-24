@@ -12,7 +12,7 @@ assert_raises "check_restart $HOST1 weave"
 # in the old containers being removed and new ones created
 weave_on $HOST1 stop
 weave_on $HOST1 launch --no-restart
-assert "docker_on $HOST1 inspect -f '{{.HostConfig.RestartPolicy.Name}}' weave weaveproxy" "no"
+assert "docker_on $HOST1 inspect -f '{{.HostConfig.RestartPolicy.Name}}' weave" "no"
 assert_raises "! check_restart $HOST1 weave"
 
 # Relaunch to prevent the `weave stop` in `end_suite`
