@@ -37,7 +37,6 @@ coverage.html
 prog/weaver/weaver
 prog/weavedns/weavedns
 prog/weavehosts/weavehosts
-prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/weavewait/weavewait_noop
@@ -55,7 +54,6 @@ releases
 weave*.tar.gz
 prog/weaver/weave
 prog/weaveexec/weavehosts
-prog/weaveexec/weaveproxy
 prog/weaveexec/weavewait
 prog/weaveexec/weavewait_noop
 prog/weaveexec/weavewait_nomcast
