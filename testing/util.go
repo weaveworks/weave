@@ -35,8 +35,9 @@ func stackTrace(all bool) string {
 	return string(buf[:stacklen])
 }
 
-// TrimTestArgs finds the first -- in os.Args and trim all args before that
-func TrimTestArgs() {
+// TrimTestArgs finds the first -- in os.Args and trim all args before
+// that, returning true when a -- was in fact found.
+func TrimTestArgs() bool {
 	i, l := 0, len(os.Args)
 	for ; i < l; i++ {
 		if os.Args[i] == "--" {
@@ -44,7 +45,8 @@ func TrimTestArgs() {
 		}
 	}
 	if i == l {
-		panic("Specify weave args after --")
+		return false
 	}
 	os.Args = append(os.Args[:1], os.Args[i+1:l]...)
+	return true
 }
