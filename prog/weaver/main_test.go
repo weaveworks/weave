@@ -7,6 +7,7 @@ import (
 )
 
 func TestMain(t *testing.T) {
-	weavetest.TrimTestArgs()
-	main()
+	if weavetest.TrimTestArgs() {
+		main()
+	}
 }
