@@ -108,7 +108,7 @@ $SSH $HOST1<<EOF
     docker network create --driver="${PLUGIN_NAME}:latest" $NETWORK || true
     # Otherwise no containers will be scheduled on host2
     sleep 20
-    docker service create --name=$SERVICE --network=$NETWORK --replicas=2 nginx || true
+    docker service create --name=$SERVICE --network=$NETWORK --replicas=2 weaveworks/network-tester:latest || true
     journalctl -r -u docker.service -n30
 EOF
 
