@@ -5,12 +5,14 @@ items:
     kind: ServiceAccount
     metadata:
       name: weave-net
+      namespace: kube-system
       labels:
         name: weave-net
   - apiVersion: extensions/v1beta1
     kind: DaemonSet
     metadata:
       name: weave-net
+      namespace: kube-system
       labels:
         name: weave-net
     spec:
