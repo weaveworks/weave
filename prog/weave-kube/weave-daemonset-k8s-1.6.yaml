@@ -5,9 +5,9 @@ items:
     kind: ServiceAccount
     metadata:
       name: weave-net
-      namespace: kube-system
       labels:
         name: weave-net
+      namespace: kube-system
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRole
     metadata:
@@ -51,9 +51,9 @@ items:
     kind: DaemonSet
     metadata:
       name: weave-net
-      namespace: kube-system
       labels:
         name: weave-net
+      namespace: kube-system
     spec:
       template:
         metadata:
