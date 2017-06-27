@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
 
@@ -47,7 +48,7 @@ func createBridge(args []string) error {
 		NPC:              args[9] == "--expect-npc",
 	}
 	procPath := args[8]
-	bridgeType, err := weavenet.EnsureBridge(procPath, &config)
+	bridgeType, err := weavenet.EnsureBridge(procPath, &config, common.Log)
 	if err != nil {
 		return err
 	}
