@@ -1059,7 +1059,6 @@ host_arg() {
 }
 
 proxy_parse_args() {
-    args=""
     while [ $# -gt 0 ]; do
         case "$1" in
           -H)
@@ -1098,16 +1097,15 @@ proxy_parse_args() {
             tls_arg "${1%%=*}" "${1#*=}" key
             ;;
           *)
-            args="$args $1"
+            REMAINING_ARGS="$REMAINING_ARGS $1"
             ;;
         esac
         shift
     done
-    # Merge proxy options and other args, keeping $args at the end, as these could contain peers:
-    PROXY_ARGS="$PROXY_ARGS $args"
 }
 
 proxy_args() {
+    REMAINING_ARGS=""
     PROXY_VOLUMES=""
     PROXY_ARGS=""
     PROXY_TLS_ENABLED=""
@@ -1291,7 +1289,8 @@ launch() {
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
-        $PROXY_ARGS)
+        $PROXY_ARGS \
+        $REMAINING_ARGS)
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
 }
 
