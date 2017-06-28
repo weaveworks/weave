@@ -77,7 +77,7 @@ func peerDiscoveryDelete(discoveryEndpoint, token, peername string) error {
 
 func HandleHTTPPeer(router *mux.Router, alloc *ipam.Allocator, discoveryEndpoint, token, peername string) {
 	router.Methods("DELETE").Path("/peer").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if discoveryEndpoint != "" {
+		if discoveryEndpoint != "" && token != "" {
 			if err := peerDiscoveryDelete(discoveryEndpoint, token, peername); err != nil {
 				Log.Errorf("Error while deleting self from peer discovery: %s", err)
 			}
@@ -90,7 +90,7 @@ func HandleHTTPPeer(router *mux.Router, alloc *ipam.Allocator, discoveryEndpoint
 
 	router.Methods("DELETE").Path("/peer/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ident := mux.Vars(r)["id"]
-		if discoveryEndpoint != "" {
+		if discoveryEndpoint != "" && token != "" {
 			// TODO: deal with this being either a peername or a nickname
 			if err := peerDiscoveryDelete(discoveryEndpoint, token, ident); err != nil {
 				Log.Errorf("Error while deleting self from peer discovery: %s", err)
