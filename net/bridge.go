@@ -62,7 +62,8 @@ type Bridge interface {
 	String() string                  // human-readable type string
 }
 
-var errBridgeFallback = errors.New("special error value used to trigger a fallback to bridge type")
+// Used to indicate a fallback to the Bridge type
+var errBridgeNotSupported = errors.New("bridge not supported")
 
 type bridgeImpl struct{ bridge netlink.Link }
 type fastdpImpl struct{ datapathName string }
@@ -226,7 +227,7 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 	}
 }
 
-func EnsureBridge(procPath string, config *BridgeConfig) (Bridge, error) {
+func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Bridge, error) {
 	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
 	if bridgeType != nil || err != nil {
 		return bridgeType, err
@@ -235,7 +236,8 @@ func EnsureBridge(procPath string, config *BridgeConfig) (Bridge, error) {
 	bridgeType = config.configuredBridgeType()
 	for {
 		if err := bridgeType.init(config); err != nil {
-			if err == errBridgeFallback {
+			if errors.Cause(err) == errBridgeNotSupported {
+				log.Warnf("Skipping bridge creation of %q due to: %s", bridgeType, err)
 				bridgeType = bridgeImpl{}
 				continue
 			}
@@ -333,11 +335,15 @@ func (b bridgeImpl) init(config *BridgeConfig) error {
 
 func (f fastdpImpl) init(config *BridgeConfig) error {
 	odpSupported, err := odp.CreateDatapath(f.datapathName)
+	if !odpSupported {
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		return errors.Wrap(errBridgeNotSupported, msg)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "creating datapath %q", f.datapathName)
-	}
-	if !odpSupported {
-		return errBridgeFallback
 	}
 	datapath, err := netlink.LinkByName(f.datapathName)
 	if err != nil {
