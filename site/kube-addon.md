@@ -55,20 +55,17 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-**Note:** The URLs:
+**Note:** We also maintain the URLs:
 
 - [https://git.io/weave-kube](https://git.io/weave-kube), and
 - [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6)
 
-point to:
-
-- [https://cloud.weave.works/k8s/v1.5/net](https://cloud.weave.works/k8s/v1.5/net), and
-- [https://cloud.weave.works/k8s/v1.6/net](https://cloud.weave.works/k8s/v1.6/net).
-
-In the past, these URLs pointed to the static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively:
+which point to the static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively:
 
 - [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and
-- [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml).
+- [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml),
+
+and can be used with `kubectl apply -f` as well.
 
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
