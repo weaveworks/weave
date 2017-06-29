@@ -95,7 +95,7 @@ the Weave Net pods one by one.
 Kubernetes v1.5 and below does not support rolling upgrades of daemon sets,
 and so you will need to perform the procedure manually:
 
-* Apply the updated addon manifest `kubectl apply -f https://git.io/weave-kube`
+* Apply the updated addon manifest `kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"`
 * Kill each Weave Net pod with `kubectl delete` and then wait for it to reboot before moving on to the next pod.
 
 **Note:** If you delete all Weave Net pods at the same time they will
