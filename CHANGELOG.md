@@ -1,3 +1,16 @@
+## Release 2.0.1
+
+Bug fixes and minor improvements
+
+* Fall back to slower data path (`sleeve`), rather than crashing, when the machine lacks VXLAN support (required for “fast data path”, `fastdp`)  #3043
+* Fix bug in processing of arguments when Docker has TLS enabled, rather than crashing with invalid peers list, e.g. `lookup --tlsverify: no such host` #3039
+* Add `kube-system` namespace back to `weave-kube`'s YAMLs, preventing omissions leading to errors like `error contacting APIServer: the server does not allow access to the requested resource` #3033,#3042
+* Fix release script to prevent ARM64 binaries to end up in AMD64 `net-plugin`, leading to `Error response from daemon: dial unix /run/docker/plugins/<id>/weave.sock: connect: no such file or directory` when installing `net-plugin` #3045
+* `weave reset` and `weave rmpeer` now only contact Weave Cloud when Weave Net is configured with a Weave Cloud token, preventing unnecessary requests and potentially confusing `401 Unauthorized` errors in Weave Net’s logs #3044
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/58?closed=1).
+
+
 ## Release 2.0.0
 
 New Features
