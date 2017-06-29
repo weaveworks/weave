@@ -22,7 +22,7 @@ Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
 ```
-$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
 After a few seconds, a Weave Net pod should be running on each
@@ -222,7 +222,7 @@ If the YAML file is from `cloud.weave.works` as described above, then you can cu
 
         $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd.txt
         $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd.txt
-        $ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
+        $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
 
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
@@ -257,7 +257,7 @@ The list of variables you can set is:
 
 Example:
 ```
-$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
 ```
 This command -- notice `&env.WEAVE_MTU=1337` at the end of the URL -- generates a YAML file containing, among others:
 
