@@ -97,6 +97,12 @@ items:
                 - name: lib-modules
                   mountPath: /lib/modules
             - name: weave-npc
+              env:
+                - name: HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
               image: 'weaveworks/weave-npc:latest'
               imagePullPolicy: Always
               resources:
