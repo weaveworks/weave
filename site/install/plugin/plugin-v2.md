@@ -1,6 +1,6 @@
 ---
 title: Integrating Docker via the Network Plugin (V2)
-menu_order: 65
+menu_order: 20
 search_type: Documentation
 ---
 
