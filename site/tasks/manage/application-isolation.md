@@ -1,6 +1,6 @@
 ---
 title: Isolating Applications on a Weave Network
-menu_order: 30
+menu_order: 5
 search_type: Documentation
 ---
 
