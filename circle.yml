@@ -40,22 +40,22 @@ test:
         parallel: true
         background: true
   override:
-    - "$SRCDIR/bin/circle-test-unit":
+    - x"$SRCDIR/bin/circle-test-unit":
         parallel: true
-    - "$SRCDIR/bin/circle-test-smoke":
+    - x"$SRCDIR/bin/circle-test-smoke":
         parallel: true
         timeout: 300
   post:
-    - "$SRCDIR/bin/circle-test-teardown":
+    - x"$SRCDIR/bin/circle-test-teardown":
         parallel: true
 
 teardown:
   pre:
     # Destroy testing VMs:
-    - "cd $SRCDIR/test && ./run-integration-tests.sh destroy":
+    - x"cd $SRCDIR/test && ./run-integration-tests.sh destroy":
         parallel: true
         background: true
-    - "$SRCDIR/bin/circle-teardown-pre":
+    - x"$SRCDIR/bin/circle-teardown-pre":
         parallel: true
 
 deployment:
