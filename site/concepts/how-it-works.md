@@ -1,10 +1,8 @@
 ---
-title: Understanding how Weave Net Works
-menu_order: 90
+title: Understanding Weave Net
+menu_order: 10
 search_type: Documentation
 ---
-
-
 
 A Weave network consists of a number of 'peers' - Weave Net routers
 residing on different hosts. Each peer has a name, which tends to
