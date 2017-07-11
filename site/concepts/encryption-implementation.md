@@ -1,6 +1,6 @@
 ---
 title: How Weave Net Implements Encryption
-menu_order: 70
+menu_order: 60
 search_type: Documentation
 ---
 
