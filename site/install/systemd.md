@@ -1,6 +1,6 @@
 ---
 title: Using Weave with Systemd
-menu_order: 130
+menu_order: 40
 search_type: Documentation
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: Using Weave Cloud to get started with Weave Net
-menu_order: 10
+menu_order: 30
 search_type: Documentation
 ---
 

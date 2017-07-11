@@ -1,6 +1,6 @@
 ---
-title: Using Weave Net
-menu_order: 40
+title: Launching Weave Net
+menu_order: 20
 search_type: Documentation
 ---
 
@@ -12,7 +12,6 @@ This section contains the following topics:
  * [Creating Peer Connections Between Hosts](#peer-connections)
  * [Testing Container Communications](#testing)
  * [Starting the Netcat Service](#start-netcat)
-
 
 ### <a name="launching"></a>Launching Weave Net
 
