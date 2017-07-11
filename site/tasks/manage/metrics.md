@@ -1,6 +1,6 @@
 ---
 title: Monitoring with Prometheus
-menu_order: 105
+menu_order: 90
 search_type: Documentation
 ---
 

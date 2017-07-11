@@ -1,6 +1,6 @@
 ---
-title: Using IP Routing on an Amazon Web Services Virtual Private Cloud
-menu_order: 110
+title: Configuring IP Routing on an Amazon Web Services Virtual Private Cloud
+menu_order: 80
 search_type: Documentation
 ---
 

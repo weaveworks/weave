@@ -1,6 +1,6 @@
 ---
 title: Integrating with the Host Network
-menu_order: 60
+menu_order: 20
 search_type: Documentation
 ---
 

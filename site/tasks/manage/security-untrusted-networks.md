@@ -1,6 +1,6 @@
 ---
 title: Securing Connections Across Untrusted Networks
-menu_order: 80
+menu_order: 40
 search_type: Documentation
 ---
 

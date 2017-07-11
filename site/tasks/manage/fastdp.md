@@ -1,6 +1,6 @@
 ---
 title: Using Fast Datapath
-menu_order: 96
+menu_order: 60
 search_type: Documentation
 ---
 
