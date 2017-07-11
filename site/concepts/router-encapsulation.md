@@ -1,6 +1,6 @@
 ---
 title: Weave Net Router Sleeve Encapsulation
-menu_order: 10
+menu_order: 15
 search_type: Documentation
 ---
 
