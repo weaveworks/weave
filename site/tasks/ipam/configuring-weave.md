@@ -1,6 +1,6 @@
 ---
 title: Allocating IPs in a Specific Range
-menu_order: 15
+menu_order: 10
 search_type: Documentation
 ---
 
