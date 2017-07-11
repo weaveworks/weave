@@ -1,6 +1,6 @@
 ---
 title: Integrating Kubernetes via the Addon
-menu_order: 63
+menu_order: 20
 search_type: Documentation
 ---
 
