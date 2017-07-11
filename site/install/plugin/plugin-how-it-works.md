@@ -1,6 +1,6 @@
 ---
 title: How the Weave Net Docker Network Plugins Work
-menu_order: 20
+menu_order: 10
 search_type: Documentation
 ---
 
