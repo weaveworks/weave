@@ -1,6 +1,6 @@
 ---
 title: Integrating Docker via the Network Plugin (Legacy)
-menu_order: 60
+menu_order: 30
 search_type: Documentation
 ---
 
