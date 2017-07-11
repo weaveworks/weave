@@ -1,5 +1,5 @@
 ---
-title: How Fast Datapath Works
+title: Fast Datapath & Weave Net
 menu_order: 30
 search_type: Documentation
 ---
