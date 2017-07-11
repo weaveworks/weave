@@ -222,9 +222,11 @@ kill_container() {
 
 [ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
-# "--help|help" are special because we always want to process them
-# at the client end.
-handle_help_arg "$1" || handle_help_arg "--$1"
+# "--help|help" and "<command> --help" are special because we always want to
+# process them at the client end.
+handle_help_arg "$1"
+handle_help_arg "--$1"
+handle_help_arg "$2"
 
 if [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
     # non-local "version" is special because we want to show the
@@ -1342,8 +1344,6 @@ fi
 [ $# -gt 0 ] || usage
 COMMAND=$1
 shift 1
-
-handle_help_arg "$1"
 
 case "$COMMAND" in
     setup)
