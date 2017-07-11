@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting the IP Allocator
-menu_order: 30
+menu_order: 50
 search_type: Documentation
 ---
 
