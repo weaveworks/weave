@@ -1,6 +1,6 @@
 ---
 title: Integrating Docker via the API Proxy
-menu_order: 50
+menu_order: 5
 search_type: Documentation
 ---
 

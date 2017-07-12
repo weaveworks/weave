@@ -1,6 +1,6 @@
 ---
 title: Using Automatic Discovery With the Weave Net Proxy
-menu_order: 30
+menu_order: 40
 search_type: Documentation
 ---
 
