@@ -1,6 +1,6 @@
 ---
 title: Launching Containers With Weave Run (without the Proxy)
-menu_order: 50
+menu_order: 60
 search_type: Documentation
 ---
 

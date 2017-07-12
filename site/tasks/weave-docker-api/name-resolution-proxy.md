@@ -1,6 +1,6 @@
 ---
 title: Name resolution via `/etc/hosts`
-menu_order: 40
+menu_order: 50
 search_type: Documentation
 ---
 
