@@ -26,6 +26,7 @@ NAME=${NAME:-"$(whoami | sed -e 's/[\.\_]*//g' | cut -c 1-4)"}
 PROVIDER=${PROVIDER:-gcp} # Provision using provided provider, or Google Cloud Platform by default.
 NUM_HOSTS=${NUM_HOSTS:-3}
 PLAYBOOK=${PLAYBOOK:-setup_weave-net_test.yml}
+PLAYBOOK_DOCKER_INSTALL_ROLE=${PLAYBOOK_DOCKER_INSTALL_ROLE:-docker-from-get.docker.com}
 TESTS=${TESTS:-}
 RUNNER_ARGS=${RUNNER_ARGS:-""}
 # Dependencies' versions:
@@ -269,7 +270,7 @@ function provision() {
 function configure_with_ansible() {
     ansible-playbook -u "$1" -i "$2" --private-key="$3" --forks="${4:-$NUM_HOSTS}" \
         --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-        --extra-vars "docker_version=$DOCKER_VERSION kubernetes_version=$KUBERNETES_VERSION kubernetes_cni_version=$KUBERNETES_CNI_VERSION" \
+        --extra-vars "docker_version=$DOCKER_VERSION kubernetes_version=$KUBERNETES_VERSION kubernetes_cni_version=$KUBERNETES_CNI_VERSION docker_install_role=$PLAYBOOK_DOCKER_INSTALL_ROLE" \
         "$DIR/../tools/config_management/$PLAYBOOK"
 }
 
