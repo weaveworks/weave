@@ -265,7 +265,9 @@ func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 
 	// Insert a rule to bypass policies if namespace is DefaultAllow
 	if !isDefaultDeny(obj) {
-		return ns.ensureBypassRule(ns.allPods.ipsetName)
+		if err := ns.ensureBypassRule(ns.allPods.ipsetName); err != nil {
+			return err
+		}
 	}
 
 	// Add namespace ipset to matching namespace selectors
@@ -282,10 +284,14 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 	if oldDefaultDeny != newDefaultDeny {
 		common.Log.Infof("namespace DefaultDeny changed from %t to %t", oldDefaultDeny, newDefaultDeny)
 		if oldDefaultDeny {
-			return ns.ensureBypassRule(ns.allPods.ipsetName)
+			if err := ns.ensureBypassRule(ns.allPods.ipsetName); err != nil {
+				return err
+			}
 		}
 		if newDefaultDeny {
-			return ns.deleteBypassRule(ns.allPods.ipsetName)
+			if err := ns.deleteBypassRule(ns.allPods.ipsetName); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -318,7 +324,9 @@ func (ns *ns) deleteNamespace(obj *coreapi.Namespace) error {
 
 	// Remove bypass rule
 	if !isDefaultDeny(obj) {
-		return ns.deleteBypassRule(ns.allPods.ipsetName)
+		if err := ns.deleteBypassRule(ns.allPods.ipsetName); err != nil {
+			return err
+		}
 	}
 
 	// Remove namespace ipset from any matching namespace selectors
