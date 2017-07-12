@@ -16,7 +16,6 @@ function install_terraform() {
 }
 
 function install_ansible() {
-    sudo apt-get update || true
     sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev && pip install --user -U cffi && pip install --user ansible
     export PATH="$PATH:$HOME/.local/bin"
 }
