@@ -55,18 +55,6 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-**Note:** We also maintain the URLs:
-
-- [https://git.io/weave-kube](https://git.io/weave-kube), and
-- [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6)
-
-which point to the static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively:
-
-- [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and
-- [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml),
-
-and can be used with `kubectl apply -f` as well.
-
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
 In version 1.6, Kubernetes has increased security, so we need to
@@ -211,7 +199,7 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 
 #### Using `cloud.weave.works`
 
-If the YAML file is from `cloud.weave.works` as described above, then you can customise it by passing some of Weave Net's options, arguments and environment variables as query parameters:
+You can customise the YAML you get from `cloud.weave.works` by passing some of Weave Net's options, arguments and environment variables as query parameters:
 
   - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time from `cloud.weave.works`.
   - `password-secret`: name of the Kubernetes secret containing your password.
