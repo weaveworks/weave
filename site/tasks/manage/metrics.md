@@ -5,8 +5,8 @@ search_type: Documentation
 ---
 
 Two endpoints are exposed: one for the Weave Net router, and, when deployed as
-a [Kubernetes Addon](/site/kube-addon.md), one for the [network policy
-controller](/site/kube-addon.md#npc).
+a [Kubernetes Addon](/site/kubernetes/kube-addon.md), one for the [network policy
+controller](/site/kubernetes/kube-addon.md#npc).
 
 ### Router Metrics
 
