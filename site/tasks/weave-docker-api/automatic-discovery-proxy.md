@@ -4,9 +4,9 @@ menu_order: 40
 search_type: Documentation
 ---
 
-Containers launched via the proxy use [weaveDNS](/site/weavedns.md)
+Containers launched via the proxy use [weaveDNS](/site/tasks/weavedns/weavedns.md)
 automatically if it is running when they are started -
-see the [weaveDNS usage](/site/weavedns.md#usage) section for an in depth
+see the [weaveDNS usage](/site/tasks/weavedns/weavedns.md#usage) section for an in depth
 explanation of the behaviour and how to control it.
 
 Typically, the proxy passes on container names as-is to weaveDNS
@@ -57,4 +57,4 @@ to the proxy, the specified label takes precedence over the container's name.
 **See Also**
 
  * [Name resolution via `/etc/hosts`](/site/weave-docker-api/name-resolution-proxy.md)
- * [How Weave Finds Containers](/site/weavedns/how-works-weavedns.md)
+ * [How Weave Finds Containers](/site/tasks/weavedns/how-works-weavedns.md)

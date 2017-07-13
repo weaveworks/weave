@@ -78,6 +78,6 @@ weaveDNS instance will receive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weavedns/how-works-weavedns.md)
- * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
- * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)
+ * [How Weave Finds Containers](/site/tasks/weavedns/how-works-weavedns.md)
+ * [Load Balancing and Fault Resilience with WeaveDNS](/site/tasks/weavedns/load-balance-fault-weavedns.md)
+ * [Managing Domains](/site/tasks/weavedns/managing-domains-weavedns.md)
