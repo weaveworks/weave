@@ -19,7 +19,7 @@ const (
 
 type Interface interface {
 	Create(ipsetName Name, ipsetType Type) error
-	AddEntry(ipsetName Name, entry string) error
+	AddEntry(ipsetName Name, entry string, comment string) error
 	DelEntry(ipsetName Name, entry string) error
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
@@ -40,15 +40,15 @@ func New(logger *log.Logger) Interface {
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
-	return doExec("create", string(ipsetName), string(ipsetType))
+	return doExec("create", string(ipsetName), string(ipsetType), "comment")
 }
 
-func (i *ipset) AddEntry(ipsetName Name, entry string) error {
+func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
 	i.Logger.Printf("adding entry %s to %s", entry, ipsetName)
 	if i.inc(ipsetName, entry) > 1 { // already in the set
 		return nil
 	}
-	return doExec("add", string(ipsetName), entry)
+	return doExec("add", string(ipsetName), entry, "comment", comment)
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {

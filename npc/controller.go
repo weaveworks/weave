@@ -54,7 +54,7 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 	for _, ns := range npc.nss {
 		if ns.namespace != nil {
 			if selector.matches(ns.namespace.ObjectMeta.Labels) {
-				if err := ns.ips.AddEntry(selector.spec.ipsetName, string(ns.allPods.ipsetName)); err != nil {
+				if err := selector.addEntry(string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
 					return err
 				}
 			}
