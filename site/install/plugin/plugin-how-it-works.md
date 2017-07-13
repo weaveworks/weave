@@ -11,7 +11,7 @@ named `weave` that can only work with one (like Docker's overlay driver), while
 the V2 plugin provides *one* - `store/weaveworks/net-plugin:latest_release`
 operating only in swarm mode.
 
-### `weavemesh` driver
+### weavemesh driver
 
 * Weave Net handles all co-ordination between hosts (referred to by Docker as a "local scope" driver)
 * Supports a single network only. A network named `weave` is automatically created for you.
@@ -19,7 +19,7 @@ operating only in swarm mode.
 
 If you do create additional networks using the `weavemesh` driver, containers attached to them will be able to communicate with containers attached to `weave`. There is no isolation between those networks.
 
-### `weave` driver
+### weave driver
 
 * This runs in what Docker calls "global scope", which requires an external cluster store
 * Supports multiple networks that must be created using `docker network create --driver weave ...`
@@ -41,7 +41,7 @@ The plugin accepts the following options via `docker network create ... --opt`:
    network created when the plugin is first launched has the multicast
    option turned on, but for any networks you create it defaults to off.
 
-### `store/weaveworks/net-plugin:latest_release` driver
+### store/weaveworks/net-plugin:latest_release driver
 
 * The driver runs within the plugin V2.
 * Requires Docker to run in [swarm mode](https://docs.docker.com/engine/swarm/swarm-mode/).
