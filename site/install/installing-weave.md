@@ -1,6 +1,6 @@
 ---
 title: Installing Weave Net
-menu_order: 30
+menu_order: 20
 search_type: Documentation
 ---
 
