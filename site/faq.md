@@ -19,7 +19,7 @@ See [Troubleshooting Weave - List attached containers](/site/troubleshooting.md#
 
 You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). 
 
-For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manual-ip-address.md). 
+For more information, refer to [Manually Specifying the IP Address of a Container](/site/tasks/ipam/manual-ip-address.md). 
 
 
 <a name="expose-container"></a>
@@ -45,7 +45,7 @@ Yet another option is to expose a port from the container on host B and then con
 
 Under normal circumstances, this should never happen, but it can occur if `weave rmpeer` was run on more than one host. 
 
-For more information see [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md).
+For more information see [Starting, Stopping and Removing Peers](/site/tasks/ipam/stop-remove-peers-ipam.md).
 
 
 <a name="dead-node"></a>
@@ -53,7 +53,7 @@ For more information see [Starting, Stopping and Removing Peers](/site/ipam/stop
 
 When a node goes out of service, the best option is to call `weave rmpeer` on one host and then `weave forget` on all the other hosts.
 
-See [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md) for an in-depth discussion.
+See [Starting, Stopping and Removing Peers](/site/tasks/ipam/stop-remove-peers-ipam.md) for an in-depth discussion.
 
 
 <a name="performance"></a>
@@ -116,6 +116,6 @@ Ubuntu image with those two commands added.
 **See Also**
 
  * [Troubleshooting Weave](/site/troubleshooting.md)
- * [Troubleshooting IPAM](/site/ipam.md)
+ * [Troubleshooting IPAM](/site/tasks/ipam/ipam.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
  

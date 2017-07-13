@@ -8,7 +8,7 @@ search_type: Documentation
 Weave Net runs containers on a private network, which means that IP addresses are isolated from the rest of the
 Internet, and that you don't have to worry about addresses clashing. 
 
-You can of course also manually change the IP of any given container or subnet on a Weave network.  See, [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md)
+You can of course also manually change the IP of any given container or subnet on a Weave network.  See, [How to Manually Specify IP Addresses and Subnets](/site/tasks/ipam/manual-ip-address.md)
 
 ### Some Definitions
 
@@ -64,4 +64,4 @@ find a match, so uses the default rule.
 
 **See Also**
 
- * [Allocating IPs in a Specific Range](/site/using-weave/configuring-weave.md)
+ * [Allocating IPs in a Specific Range](/site/tasks/ipam/configuring-weave.md)

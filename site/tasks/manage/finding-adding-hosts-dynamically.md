@@ -69,4 +69,4 @@ with `weave launch` and `weave connect` run:
 **See Also**
 
  * [Enabling Multi-Cloud, Multi-Hop Networking and Routing](/site/tasks/manage/multi-cloud-multi-hop.md)
- * [Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md)
+ * [Stopping and Removing Peers](/site/tasks/ipam/stop-remove-peers-ipam.md)

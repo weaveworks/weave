@@ -110,12 +110,12 @@ error message in its log and exit. To check the logs run:
     host1$ docker logs weave
 
 When a Weave Net instance is formed for the first time, the peers must
-initialize the [IP Allocation Manager](/site/ipam.md). This process,
+initialize the [IP Allocation Manager](/site/tasks/ipam/ipam.md). This process,
 and the configuration options available, are unchanged when using
 Weave Cloud.
 
 When you shut down a peer for good, use [the `weave reset`
-command](/site/ipam/stop-remove-peers-ipam.md) and it will be removed
+command](/site/tasks/ipam/stop-remove-peers-ipam.md) and it will be removed
 from the Weave Cloud database so future peers will not attempt to
 connect to it.
 

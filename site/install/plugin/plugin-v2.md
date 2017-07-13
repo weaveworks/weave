@@ -45,7 +45,7 @@ The parameters include:
   details.
 * `IPALLOC_RANGE` - the range of IP addresses used by Weave Net and the subnet
   they are placed in (CIDR format; default 10.32.0.0/12).
-  See [here](/site/using-weave/configuring-weave.md) for more details.
+  See [here](/site/tasks/ipam/configuring-weave.md) for more details.
 
 Before setting any parameter, the plugin has to be disabled with:
 

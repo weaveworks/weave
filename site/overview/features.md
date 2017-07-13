@@ -100,9 +100,9 @@ See [Integrating Kubernetes and Mesos via the CNI Plugin](/site/kubernetes.md) f
 Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave, run `weave ps`.
 
 Instead of allowing Weave to automatically allocate addresses, an IP address and a network can be explicitly 
-specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
+specified. See [How to Manually Specify IP Addresses and Subnets](/site/tasks/ipam/manual-ip-address.md) for instructions. 
 
-For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam.md). And also review the 
+For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/tasks/ipam/ipam.md). And also review the 
 [the basics of IP addressing](/site/concepts/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
