@@ -59,6 +59,6 @@ hosts.
 
 **See Also**
 
- * [Using Weave Net](/site/install/using-weave.md)
+ * [Launching Weave Net](/site/install/using-weave.md)
  * [General information on IP Addresses, Routes and Networks](/site/concepts/ip-addresses.md)
  * [Managing Services - Exporting, Importing, Binding and Routing](/site/tasks/manage/service-management.md)

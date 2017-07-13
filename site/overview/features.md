@@ -26,7 +26,7 @@ search_type: Documentation
  * [Container Mobility](#container-mobility)
  * [Fault Tolerance](#fault-tolerance) 
 
-For step-by-step instructions on how to use Weave Net, see [Using Weave Net](/site/install/using-weave.md).
+For step-by-step instructions on how to use Weave Net, see [Launching Weave Net](/site/install/using-weave.md).
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -45,7 +45,7 @@ Broadcast and Multicast protocols can also be used
 over Weave Net.
 
 To start using Weave Net, see [Installing Weave Net](/site/install/installing-weave.md) 
-and [Using Weave Net](/site/install/using-weave.md).
+and [Launching Weave Net](/site/install/using-weave.md).
 
 ### <a name="fast-data-path"></a>Fast Datapath
 

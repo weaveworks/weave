@@ -19,7 +19,7 @@ documentation](https://docs.docker.com/installation/mac/#from-your-shell) or ref
 
 After your VM is setup with Docker Machine, Weave Net can be launched directly from the OSX host. Weave Net respects the environment variable `DOCKER_HOST`, so that you can run and control a Weave Network locally on a remote host. See [Using The Weave Docker API Proxy](/site/tasks/weave-docker-api/using-proxy.md).
 
-With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Using Weave Net](/site/install/using-weave.md).
+With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Launching Weave Net](/site/install/using-weave.md).
 
 ### Quick Start Screencast
 
@@ -64,7 +64,7 @@ To make encryption in fast datapath work on Google Cloud Platform, see
 
 **See Also** 
 
- * [Using Weave Net](/site/install/using-weave.md)
+ * [Launching Weave Net](/site/install/using-weave.md)
  * [Tutorials](https://www.weave.works/docs/tutorials/)
  * [Features](/site/overview/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
