@@ -75,7 +75,7 @@ your cluster.
   is all or nothing.  In this mode, all hosts in a cluster must be AWS
   instances. (We hope to ease this limitation in future.)
 - The `weave launch` command waits until the
-  [IP address manager](/site//operational-guide/concepts.md#ip-address-manager-ipam)
+  [IP address manager](/site/operational-guide/concepts.md#ip-address-manager-ipam)
   is ready, i.e. until after this peer has been able to make contact
   with other peers and confirm that it has joined the cluster the
   bridge.  Without AWS-VPC, `weave launch` returns without waiting.
