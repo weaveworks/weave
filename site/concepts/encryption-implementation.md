@@ -5,7 +5,7 @@ search_type: Documentation
 ---
 
 This section describes some details of Weave Net's built-in
-[encryption](/site/how-it-works/encryption.md):
+[encryption](/site/concepts/encryption.md):
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)
@@ -148,7 +148,7 @@ follows:
     | Frame N: Captured payload         |  |
     +-----------------------------------+ -+
 
-This is very similar to the [non-crypto encapsulation](/site/how-it-works/router-encapsulation.md).
+This is very similar to the [non-crypto encapsulation](/site/concepts/router-encapsulation.md).
 
 All of the frames on a connection are encrypted with the same
 ephemeral session key, and a nonce constructed from a message sequence

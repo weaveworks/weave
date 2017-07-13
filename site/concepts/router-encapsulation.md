@@ -62,4 +62,4 @@ MAC discovery.
 
 **See Also**
 
- * [How Weave Net Interprets Network Topology](/site/how-it-works/network-topology.md)
+ * [How Weave Net Interprets Network Topology](/site/concepts/network-topology.md)
