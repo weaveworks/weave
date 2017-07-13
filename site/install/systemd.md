@@ -65,6 +65,6 @@ context with the commands shown below. You will need to have the
 **See Also**
 
  * [Using Weave Net](/site/install/using-weave.md)
- * [Getting Started Guides](http://www.weave.works/guides/)
+ * [Tutorials](https://www.weave.works/docs/tutorials/)
  * [Features](/site/overview/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
