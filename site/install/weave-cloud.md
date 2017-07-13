@@ -124,5 +124,5 @@ connect to it.
  * [Installing Weave Net](/site/install/installing-weave.md)
  * [Using Weave Net](/site/using-weave.md)
  * [Using Fastdp With Weave Net](/site/using-weave/fastdp.md)
- * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
- * [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md)
+ * [Integrating Docker via the Network Plugin (Legacy)](/site/install/plugin/plugin.md)
+ * [Integrating Docker via the Network Plugin (V2)](/site/install/plugin/plugin-v2.md)

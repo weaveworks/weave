@@ -51,6 +51,6 @@ The plugin accepts the following options via `docker network create ... --opt`:
 
 **See Also**
 
- * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
- * [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md)
+ * [Integrating Docker via the Network Plugin (Legacy)](/site/install/plugin/plugin.md)
+ * [Integrating Docker via the Network Plugin (V2)](/site/install/plugin/plugin-v2.md)
 
