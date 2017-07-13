@@ -1,5 +1,5 @@
 ---
-title: Using Weave Cloud to get started with Weave Net
+title: Visualizing Weave Net in Weave Cloud
 menu_order: 30
 search_type: Documentation
 ---
