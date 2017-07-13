@@ -53,5 +53,5 @@ Be aware that:
 
 **See Also**
 
- * [Weave Encryption](/site/how-it-works/encryption.md)
+ * [Weave Encryption](/site/concepts/encryption.md)
  * [Using Fast Datapath](/site/using-weave/fastdp.md)

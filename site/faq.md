@@ -63,7 +63,7 @@ All virtualization techniques have some overhead, and Weave's overhead is typica
 
 Weave Net also automatically uses the fastest datapath between two hosts. When Weave Net can't use the fast datapath between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast datapath within the data centers, but not for the more constrained network link between them.
 
-For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
+For more information about fast datapath see [How Fast Datapath Works](/site/concepts/fastdp-how-it-works.md).
 
 
 <a name="query-fastdp"></a>

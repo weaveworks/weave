@@ -95,7 +95,7 @@ can be overridden by using the `--nickname` argument at `weave
 launch`.
 
  * **Encryption** - indicates whether
-[encryption](/site/how-it-works/encryption.md) is in use for communication
+[encryption](/site/concepts/encryption.md) is in use for communication
 between peers.
 
  * **PeerDiscovery** - indicates whether

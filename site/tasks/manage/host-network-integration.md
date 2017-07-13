@@ -60,5 +60,5 @@ hosts.
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
- * [General information on IP Addresses, Routes and Networks](/site/how-it-works/ip-addresses.md)
+ * [General information on IP Addresses, Routes and Networks](/site/concepts/ip-addresses.md)
  * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
