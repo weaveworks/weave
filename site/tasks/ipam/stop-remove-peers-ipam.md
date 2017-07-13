@@ -24,7 +24,7 @@ later rejoin the Weave network, the same IP address may be allocated
 twice.
 
 Assume you had started the three peers in the
-[overview example](/site/ipam.md), and then host3
+[overview example](/site/tasks/ipam/ipam.md), and then host3
 caught fire, you can go to one of the other hosts and run:
 
     host1$ weave rmpeer host3
@@ -56,6 +56,6 @@ dropping attempted connections with peers in other cliques.
 
 **See Also**
 
- * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
- * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
+ * [Address Allocation with IP Address Management (IPAM)](/site/tasks/ipam/ipam.md)
+ * [Automatic Allocation Across Multiple Subnets](/site/tasks/ipam/allocation-multi-ipam.md)
  * [Isolating Applications on a Weave Network](/site/tasks/manage/application-isolation.md)

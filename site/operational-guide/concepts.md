@@ -85,7 +85,7 @@ partition, healing automatically once the partition is over.
 
 ## <a name="ip-address-manager"></a>IP Address Manager (IPAM)
 
-[IPAM](/site/ipam.md) is the subsystem responsible for dividing up a
+[IPAM](/site/tasks/ipam/ipam.md) is the subsystem responsible for dividing up a
 large contiguous block of IP addresses (known as the IP allocation
 range) amongst peers so that individual addresses may be uniquely
 assigned to containers anywhere on the overlay network.

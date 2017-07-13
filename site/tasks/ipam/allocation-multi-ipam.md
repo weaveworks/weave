@@ -63,6 +63,6 @@ for manual allocation.
 
 **See Also**
 
- * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
+ * [Address Allocation with IP Address Management (IPAM)](/site/tasks/ipam/ipam.md)
  * [Isolating Applications on a Weave Network](/site/tasks/manage/application-isolation.md)
- * [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md)
+ * [Starting, Stopping and Removing Peers](/site/tasks/ipam/stop-remove-peers-ipam.md)
