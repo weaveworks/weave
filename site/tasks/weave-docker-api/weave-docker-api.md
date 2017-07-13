@@ -33,7 +33,7 @@ See [Integrating Docker via the Network Plugin (Legacy)](/site/install/plugin/pl
 
 **3.** Containers can also be attached to the Weave network with `weave attach` commands. This method also
 does not use the Weave Docker API Proxy.
-See [Dynamically Attaching and Detaching Containers](/site/using-weave/dynamically-attach-containers.md).
+See [Dynamically Attaching and Detaching Containers](/site/tasks/manage/dynamically-attach-containers.md).
 
 ### <a name="weave-api-proxy"></a>Setting Up The Weave Net Docker API Proxy
 

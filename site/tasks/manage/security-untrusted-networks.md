@@ -54,4 +54,4 @@ Be aware that:
 **See Also**
 
  * [Weave Encryption](/site/concepts/encryption.md)
- * [Using Fast Datapath](/site/using-weave/fastdp.md)
+ * [Using Fast Datapath](/site/tasks/manage/fastdp.md)

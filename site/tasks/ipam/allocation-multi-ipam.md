@@ -10,7 +10,7 @@ puts all containers into a subnet that spans the entire allocation
 range, so that every Weave-attached container can communicate with every other
 Weave-attached container.
 
-If you want some [isolation](/site/using-weave/application-isolation.md), you
+If you want some [isolation](/site/tasks/manage/application-isolation.md), you
 can choose to run containers on different subnets.  To request the
 allocation of an address from a particular subnet, set the
 `WEAVE_CIDR` environment variable to `net:<subnet>` when creating the
@@ -64,5 +64,5 @@ for manual allocation.
 **See Also**
 
  * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
- * [Isolating Applications on a Weave Network](/site/using-weave/application-isolation.md)
+ * [Isolating Applications on a Weave Network](/site/tasks/manage/application-isolation.md)
  * [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md)

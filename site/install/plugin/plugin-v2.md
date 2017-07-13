@@ -34,14 +34,14 @@ There are several configuration parameters which can be set with:
 The parameters include:
 
 * `WEAVE_PASSWORD` - if non empty, it will instruct Weave Net to encrypt
-   traffic - see [here](/site/using-weave/security-untrusted-networks.md) for
+   traffic - see [here](/site/tasks/manage/security-untrusted-networks.md) for
    more details.
 * `WEAVE_MULTICAST` - set to 1 on each host running the plugin to enable
   multicast traffic on any Weave Net network.
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
-  frames - see [here](/site/using-weave/fastdp.md#mtu) for more
+  frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
   details.
 * `IPALLOC_RANGE` - the range of IP addresses used by Weave Net and the subnet
   they are placed in (CIDR format; default 10.32.0.0/12).

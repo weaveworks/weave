@@ -61,4 +61,4 @@ hosts.
 
  * [Using Weave Net](/site/using-weave.md)
  * [General information on IP Addresses, Routes and Networks](/site/concepts/ip-addresses.md)
- * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Managing Services - Exporting, Importing, Binding and Routing](/site/tasks/manage/service-management.md)

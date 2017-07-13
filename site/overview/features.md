@@ -53,7 +53,7 @@ Weave Net automatically chooses the fastest available method to
 transport data between peers. The best performing of these 
 (the 'fast datapath') offers near-native throughput and latency.
 
-See [Using Fast Datapath](/site/using-weave/fastdp.md) and
+See [Using Fast Datapath](/site/tasks/manage/fastdp.md) and
 [How Fast Datapath Works](/site/concepts/fastdp-how-it-works.md).
 
 ### <a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
@@ -132,7 +132,7 @@ _isolation-through-subnets_ technique. This common strategy
  techniques can be used to deploy your applications to 
  containers.
 
-See [Isolating Applications](/site/using-weave/application-isolation.md) 
+See [Isolating Applications](/site/tasks/manage/application-isolation.md) 
 for information on how to use the isolation-through-subnets 
 technique with Weave Net.
 
@@ -149,7 +149,7 @@ given container in advance. In these cases, you can take
 advantage of Weave's ability to attach and detach running 
 containers to and from any network. 
 
-See [Dynamically Attaching and Detaching Containers](/site/using-weave/dynamically-attach-containers.md) 
+See [Dynamically Attaching and Detaching Containers](/site/tasks/manage/dynamically-attach-containers.md) 
 for details. 
 
 
@@ -176,7 +176,7 @@ running alongside Weave.
 Weave Net implements encryption and security using the Go version of [Daniel J.  Bernstein's NaCl library](http://nacl.cr.yp.to/index.html),
 and, additionally in the case of encrypted fast datapath using [the cryptography framework of the Linux kernel](https://en.wikipedia.org/wiki/Crypto_API_(Linux)).
 
-For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/site/concepts/encryption.md) and [How Weave Implements Encryption](/site/concepts/encryption-implementation.md).
+For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/tasks/manage/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/site/concepts/encryption.md) and [How Weave Implements Encryption](/site/concepts/encryption-implementation.md).
 
 
 ### <a name="host-network-integration"></a>Host Network Integration
@@ -193,7 +193,7 @@ See [Integrating with the Host Network](/site/using-weave/host-network-integrati
  * **Binding Services** - A container can be bound to a particular IP and port without having to change your application code, while at the same time will maintain its original endpoint. 
  * **Routing Services** - By combining the importing and exporting features, you can connect to disjointed networks, even when separated by firewalls and where there may be overlapping IP addresses.  
 
-See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md) for instructions on how to manage services on a Weave container network. 
+See [Managing Services - Exporting, Importing, Binding and Routing](/site/tasks/manage/service-management.md) for instructions on how to manage services on a Weave container network. 
 
 ### <a name="multi-cloud-networking"></a>Multi-Cloud Networking
 
@@ -203,7 +203,7 @@ of containers that run on [Google Compute Engine](https://cloud.google.com/compu
 (GCE), [Amazon Elastic Compute Cloud](https://aws.amazon.com/ec2/) 
 (EC2) and in a local data centre all at the same time.
 
-See [Enabling Multi-Cloud networking and Muti-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
+See [Enabling Multi-Cloud networking and Muti-hop Routing](/site/tasks/manage/multi-cloud-multi-hop.md).
 
 
 ### <a name="multi-hop-routing"></a>Multi-Hop Routing
@@ -213,7 +213,7 @@ even when there is only partial connectivity between the hosts. Weave Net
 routes traffic between containers as long as there is at least one *path* 
 of connected hosts between them.
 
-See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
+See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/tasks/manage/multi-cloud-multi-hop.md).
 
 
 ### <a name="dynamic-topologies"></a>Dynamic Topologies
@@ -230,7 +230,7 @@ reconfiguration or, in many cases, restarts of other containers.
 All that is required is for the migrated container to be started 
 with the same IP address as it was given originally.
 
-See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md), in particular, Routing Services for more information on container mobility. 
+See [Managing Services - Exporting, Importing, Binding and Routing](/site/tasks/manage/service-management.md), in particular, Routing Services for more information on container mobility. 
 
 
 ### <a name="fault-tolerance"></a>Fault Tolerance
