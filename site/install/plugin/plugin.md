@@ -25,7 +25,7 @@ After you've launched Weave Net and peered your hosts,  you can start containers
 on any of the hosts, and they can all communicate with each other
 using any protocol, even multicast.
 
-In order to use Weave Net's [Service Discovery](/site/weavedns.md) you
+In order to use Weave Net's [Service Discovery](/site/tasks/weavedns/weavedns.md) you
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 

@@ -55,7 +55,7 @@ route, add the `--no-multicast-route` flag to `weave launch`.
 
 ### Other Weave Proxy options
 
- * `--without-dns` -- stop telling containers to use [WeaveDNS](/site/weavedns.md)
+ * `--without-dns` -- stop telling containers to use [WeaveDNS](/site/tasks/weavedns/weavedns.md)
  * `--log-level=debug|info|warning|error` -- controls how much
    information to emit for debugging
  * `--no-restart` -- remove the default policy of `--restart=always`, if
