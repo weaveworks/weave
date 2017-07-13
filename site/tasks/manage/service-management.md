@@ -24,7 +24,7 @@ located.
 Returning to the [netcat example service](/site/using-weave.md), 
 you can expose the netcat service running on `HOST1` and make it accessible to the outside world via `$HOST2`. 
 
-First, expose the application network to `$HOST2`, as explained in [Integrating with the Host Network](/site/using-weave/host-network-integration.md):
+First, expose the application network to `$HOST2`, as explained in [Integrating with the Host Network](/site/tasks/manage/host-network-integration.md):
 
     host2$ weave expose
     10.2.1.132
@@ -53,7 +53,7 @@ Expanding on the [netcat service example](/site/using-weave.md), you now decide 
 
 An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make the `$HOST3` service available to an application that is running in a container on `$HOST2`.
 
-To satisfy this scenario, first [expose the application network to the host](/site/using-weave/host-network-integration.md) by running the following on `$HOST1`: 
+To satisfy this scenario, first [expose the application network to the host](/site/tasks/manage/host-network-integration.md) by running the following on `$HOST1`: 
 
     host1$ weave expose -h host1.weave.local
     10.2.1.3
