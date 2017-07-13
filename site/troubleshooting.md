@@ -99,7 +99,7 @@ launch`.
 between peers.
 
  * **PeerDiscovery** - indicates whether
-[automatic peer discovery](/site/ipam/allocation-multi-ipam.md) is
+[automatic peer discovery](/site/tasks/ipam/allocation-multi-ipam.md) is
 enabled (which is the default).
 
  * **Targets** - are the number of hosts that the local Weave Router has been
@@ -307,5 +307,5 @@ and the container image versions as git hashes.
 
 **See Also**
 
- * [Troubleshooting IPAM](/site/ipam/troubleshooting-ipam.md)
+ * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)

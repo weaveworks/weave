@@ -53,7 +53,7 @@ for example,  `10.2.0.0/16` or `10.32.0.0/12` and,
  * `<exposing-host>` is the address of the machine on which you ran `weave expose`.
 
 >**Note:** You must ensure that the [IP subnet used by Weave
-Net](/site/ipam.md#range) does not clash with anything on those other
+Net](/site/tasks/ipam/ipam.md#range) does not clash with anything on those other
 hosts.
 
 

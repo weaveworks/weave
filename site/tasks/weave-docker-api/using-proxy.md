@@ -10,7 +10,7 @@ modified to wait for the Weave network interface to become
 available.
 
 When they are started via the Weave Net proxy, containers are
-[automatically assigned IP addresses](/site/ipam.md) and connected to the
+[automatically assigned IP addresses](/site/tasks/ipam/ipam.md) and connected to the
 Weave network.
 
 ### Creating and Starting Containers with the Weave Net Proxy

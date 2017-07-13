@@ -64,4 +64,4 @@ Columns are as follows:
   ipam` was run; whilst this could be a transient condition due to a
   partition, it may be because the peer has failed and needs to be
   removed administratively - see [Starting, Stopping and Removing
-  Peers](/site/ipam/stop-remove-peers-ipam.md) for more details.
+  Peers](/site/tasks/ipam/stop-remove-peers-ipam.md) for more details.
