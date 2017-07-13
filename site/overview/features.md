@@ -184,7 +184,7 @@ For information on how to secure your Docker network connections, see [Securing 
 Weave Net application networks can be integrated with a host's network, and establish connectivity between the host and 
 application containers anywhere.
 
-See [Integrating with the Host Network](/site/using-weave/host-network-integration.md).
+See [Integrating with the Host Network](/site/tasks/manage/host-network-integration.md).
 
 ### <a name="services"></a>Managing Services: Exporting, Importing, Binding and Routing
  
