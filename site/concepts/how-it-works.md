@@ -13,7 +13,7 @@ the router is concerned, although the name defaults to a MAC address.
 
 Weave Net routers establish TCP connections with each other, over which they
 perform a protocol handshake and subsequently exchange
-[topology](/site/router-topology/network-topology.md) information. 
+[topology](/site/concepts/network-topology.md) information. 
 These connections are encrypted if
 so configured. Peers also establish UDP "connections", possibly
 encrypted, which carry encapsulated network packets. These
