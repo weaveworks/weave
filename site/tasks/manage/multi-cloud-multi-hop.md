@@ -39,6 +39,6 @@ traffic via the local data center.
 
 **See Also** 
 
- * [Finding and Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md)
+ * [Finding and Adding Hosts Dynamically](/site/tasks/manage/finding-adding-hosts-dynamically.md)
 
 
