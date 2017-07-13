@@ -134,7 +134,7 @@ Weave Net supports *any* protocol, and it doesn't have to be over TCP/IP. For ex
 
 **See Also** 
 
- * [Installing Weave Net](/site/installing-weave.md)
+ * [Installing Weave Net](/site/install/installing-weave.md)
  * [Using Weave Cloud to get started with Weave Net](/site/using-weave/weave-cloud.md)
  * [Using Fastdp With Weave Net](/site/using-weave/fastdp.md)
  * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
