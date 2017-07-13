@@ -5,7 +5,7 @@ search_type: Documentation
 ---
 
 > The recommended way of using Weave with Kubernetes is via the new
-> [Kubernetes Addon](/site/kube-addon.md). The instructions below
+> [Kubernetes Addon](/site/kubernetes/kube-addon.md). The instructions below
 > remain valid however, and are still the recommended method for
 > integrating with Mesos.
 
