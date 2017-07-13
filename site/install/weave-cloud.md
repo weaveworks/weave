@@ -86,7 +86,7 @@ first and automatically create a connection to it.
 
 >**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6784, which are Weave’s control and data ports.
 
-Now you can proceed to [test container communications](/site/using-weave#testing)
+Now you can proceed to [test container communications](/site/install/using-weave#testing)
 
 ### <a name="how-it-works"></a>How Peer Discovery Works
 
