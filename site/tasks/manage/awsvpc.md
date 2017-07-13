@@ -101,5 +101,5 @@ In AWS-VPC mode you can run the following:
 
 **See Also**
 
- * [Using Weave Net](/site/using-weave.md)
+ * [Using Weave Net](/site/install/using-weave.md)
 

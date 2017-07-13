@@ -16,7 +16,7 @@ networking plugins, does not require an external cluster store.
 To create a network which can span multiple Docker hosts, Weave Net peers must be connected to each other, by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/tasks/manage/finding-adding-hosts-dynamically.md).
 
-See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on peer connections. 
+See [Using Weave Net](/site/install/using-weave.md#peer-connections) for a discussion on peer connections. 
 
 After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 

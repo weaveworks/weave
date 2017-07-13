@@ -14,7 +14,7 @@ techniques can still be used to deploy applications to a container network.
 To begin isolating an application (or parts of an application),  
 configure Weave Net's IP allocator to manage multiple subnets. 
 
-Using [the netcat example](/site/using-weave.md), configure multiple subsets:
+Using [the netcat example](/site/install/using-weave.md), configure multiple subsets:
 
     host1$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.1.0/24
     host1$ eval $(weave env)
