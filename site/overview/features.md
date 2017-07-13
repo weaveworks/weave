@@ -84,8 +84,8 @@ named `weave` is created by `weave launch`, which is used as follows:
 Using the Weave plugin enables you to take advantage of [Docker's network functionality](https://docs.docker.com/engine/extend/plugins_network/).
 
 There are two plugin implementations for Weave Net: the
-["Legacy"](/site/plugin.md) plugin which doesn't require an external
-cluster store, and the ["V2"](/site/plugin-v2.md) plugin which
+["Legacy"](/site/install/plugin/plugin.md) plugin which doesn't require an external
+cluster store, and the ["V2"](/site/install/plugin/plugin-v2.md) plugin which
 supports Docker swarm mode.
 
 ### <a name="cniplugin"></a>Weave Network CNI Plugin

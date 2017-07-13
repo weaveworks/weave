@@ -76,5 +76,5 @@ Or to start a container:
 
 **See Also**
 
- * [Integrating Docker via the Network Plugin (Legacy)](/site/plugin.md)
- * [How the Weave Network Plugins Work](/site/plugin/plugin-how-it-works.md)
+ * [Integrating Docker via the Network Plugin (Legacy)](/site/install/plugin/plugin.md)
+ * [How the Weave Network Plugins Work](/site/install/plugin/plugin-how-it-works.md)

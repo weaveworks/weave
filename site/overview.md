@@ -27,7 +27,7 @@ Weave Net implements service discovery by providing a fast "micro DNS" server at
 All other Docker networking plugins, including Docker's own "Overlay" driver, require that you set up Docker with a cluster store – a central database like Consul or Zookeeper – before you can even use them. Besides being difficult to set up, maintain and manage, every Docker host must also be in constant contact with the cluster store: if you lose the connection, even temporarily, then you cannot start or stop any containers.
 
 Weave Net is bundled with a Docker Network plugin that doesn't require an external cluster store. You can get started right away and you can start and stop containers even when there are network connectivity problems.  
-For information about the Weave Docker Plugin, see [How The Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md).
+For information about the Weave Docker Plugin, see [How The Weave Network Plugin Works](/site/install/plugin/plugin-how-it-works.md).
 
 ### Operates in Partially Connected Networks
 
