@@ -9,7 +9,7 @@ The most important thing to know about fast datapath is that you don't need to c
 
 When Weave Net cannot use the fast data path between two hosts, it falls back to a slower packet forwarding approach called `sleeve`. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
 
-See [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
+See [How Fastdp Works](/site/concepts/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
 
 ### Disabling Fast Datapath
 
@@ -26,7 +26,7 @@ Each encrypted dataplane packet is encapsulated into [ESP](https://tools.ietf.or
 thus in some networks a firewall rule for allowing ESP traffic needs to be installed. E.g. Google
 Cloud Platform denies ESP packets by default.
 
-See [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
+See [How Weave Implements Encryption](/site/concepts/encryption-implementation.md)
 for more details for the fastdp encryption.
 
 ### Viewing Connection Mode Fastdp or Sleeve
@@ -72,5 +72,5 @@ frame" configuration:
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
- * [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md)
+ * [How Fastdp Works](/site/concepts/fastdp-how-it-works.md)
  * [Performance measurements](/blog/weave-docker-networking-performance-fast-data-path/)

@@ -40,4 +40,4 @@ Networks](https://en.wikipedia.org/wiki/Private_network).  For example
 
 **See Also**
 
- * [IP Addresses, Routes and Networks](/site/how-it-works/ip-addresses.md)
+ * [IP Addresses, Routes and Networks](/site/concepts/ip-addresses.md)

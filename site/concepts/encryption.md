@@ -41,5 +41,5 @@ the IP transformation framework (XFRM).
 
 **See Also**
 
- * [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
+ * [How Weave Implements Encryption](/site/concepts/encryption-implementation.md)
  * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
