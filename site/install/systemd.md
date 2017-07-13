@@ -5,7 +5,7 @@ search_type: Documentation
 ---
 
 
-Having installed Weave Net as per [Installing Weave](/site/installing-weave.md), you might find it convenient to configure the
+Having installed Weave Net as per [Installing Weave](/site/install/installing-weave.md), you might find it convenient to configure the
 init daemon to start Weave on boot. Most recent Linux distribution releases ship with [systemd](http://www.freedesktop.org/wiki/Software/systemd/). The information below provides you with some initial guidance on getting a Weave Net service configured on a systemd-based OS.
 
 ## Weave Net Service Unit and Configuration
