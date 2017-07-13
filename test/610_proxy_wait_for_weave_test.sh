@@ -46,6 +46,6 @@ assert "echo $((dirs_with_proxy-3))" $dirs_sans_proxy
 # Check errors are returned (when docker returns an error code)
 assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.3/24' $SMALL_IMAGE foo 2>&1 | grep 'exec: \"foo\": executable file not found in \$PATH'"
 # Check errors still happen when no command is specified
-assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.3/24' $SMALL_IMAGE 2>&1 | grep 'Error response from daemon: No command specified'"
+assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.3/24' weaveworks/no-cmd 2>&1 | grep 'Error response from daemon: No command specified'"
 
 end_suite
