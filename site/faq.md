@@ -117,5 +117,5 @@ Ubuntu image with those two commands added.
 
  * [Troubleshooting Weave](/site/troubleshooting.md)
  * [Troubleshooting IPAM](/site/tasks/ipam/ipam.md)
- * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
+ * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)
  

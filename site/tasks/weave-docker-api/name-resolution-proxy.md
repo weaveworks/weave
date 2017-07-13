@@ -31,5 +31,5 @@ Docker-managed networks), the proxy must be launched using the
 
 **See Also**
 
- * [Using Automatic Discovery With the Weave Proxy](/site/weave-docker-api/automatic-discovery-proxy.md)
+ * [Using Automatic Discovery With the Weave Proxy](/site/tasks/weave-docker-api/automatic-discovery-proxy.md)
 

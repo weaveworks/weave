@@ -58,7 +58,7 @@ See [Using Fast Datapath](/site/tasks/manage/fastdp.md) and
 
 ### <a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
-Weave Net includes a [Docker API Proxy](/site/weave-docker-api.md), which can be 
+Weave Net includes a [Docker API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md), which can be 
 used to start containers using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/), and attach them to the Weave network before they begin execution.
 
 To use the proxy, run:
@@ -71,7 +71,7 @@ Containers started in this way that subsequently restart, either
 by an explicit `docker restart` command or by Docker restart 
 policy, are re-attached to the Weave network by the `Weave Docker API Proxy`.
 
-See [Integrating Docker via the API Proxy](/site/weave-docker-api.md).
+See [Integrating Docker via the API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md).
 
 
 ### <a name="plugin"></a>Weave Network Docker Plugin

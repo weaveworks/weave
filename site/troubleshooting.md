@@ -286,7 +286,7 @@ on reboot. This can be disabled via:
 
 Note that the Weave Net router will create the `weave` network bridge
 if necessary when it restarts, and the [Weave Net Docker API
-Proxy](/site/weave-docker-api.md) will re-attach any application
+Proxy](/site/tasks/weave-docker-api/weave-docker-api.md) will re-attach any application
 containers that it originally attached to the Weave network when they
 restart.
 
@@ -308,4 +308,4 @@ and the container image versions as git hashes.
 **See Also**
 
  * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
- * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
+ * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)

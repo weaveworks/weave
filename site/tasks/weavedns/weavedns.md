@@ -45,5 +45,5 @@ disable weaveDNS itself, launch weave with the `--no-dns` option.
 
 **See Also**
 
- * [Integrating Docker via the API Proxy](/site/weave-docker-api.md)
+ * [Integrating Docker via the API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/tasks/weavedns/load-balance-fault-weavedns.md)

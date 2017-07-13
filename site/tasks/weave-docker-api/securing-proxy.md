@@ -56,4 +56,4 @@ proxy port.
 
 **See Also**
 
- * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api.md)
+ * [Setting Up The Weave Docker API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md)
