@@ -32,7 +32,7 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
 Weave Net [periodically contacts Weaveworks servers for available
 versions](https://github.com/weaveworks/go-checkpoint).  New versions
 are announced in the log and in [the status
-summary](/site/troubleshooting.md#weave-status).
+summary](/site/troubleshooting#weave-status).
 
 The information sent in this check is:
 
