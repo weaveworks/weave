@@ -32,7 +32,7 @@ create the `/etc/sysconfig/weave` environment file using the following format:
 
     PEERS="HOST1 HOST2 .. HOSTn"
 
-You can also use the [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md) command to add participating hosts dynamically.
+You can also use the [`weave connect`](/site/tasks/manage/finding-adding-hosts-dynamically.md) command to add participating hosts dynamically.
 
 Additionally, if you want to enable [encryption](/site/tasks/manage/security-untrusted-networks.md) specify a
 password using `WEAVE_PASSWORD="wfvAwt7sj"` in the `/etc/sysconfig/weave` environment file, and it will get picked up by

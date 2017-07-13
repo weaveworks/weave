@@ -55,7 +55,7 @@ for the latest Weave AMIs and [here](https://www.weave.works/docs/tutorials/old-
 
 If you're on Amazon EC2, the standard installation instructions at the
 top of this page, provide the simplest setup and the most flexibility.
-A [special no-overlay mode for EC2](/site/using-weave/awsvpc.md) can
+A [special no-overlay mode for EC2](/site/tasks/manage/awsvpc.md) can
 optionally be enabled, which allows containers to communicate at the
 full speed of the underlying network.
 
