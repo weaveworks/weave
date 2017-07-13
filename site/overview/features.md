@@ -92,7 +92,7 @@ supports Docker swarm mode.
 
 Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes and Mesosphere.
 
-See [Integrating Kubernetes and Mesos via the CNI Plugin](/site/cni-plugin.md) for more details.
+See [Integrating Kubernetes and Mesos via the CNI Plugin](/site/kubernetes.md) for more details.
 
 
 ### <a name="addressing"></a>IP Address Management (IPAM)
@@ -138,7 +138,7 @@ technique with Weave Net.
 
 ### <a name="network-policy"></a>Network Policy
 
-The Weave [Kubernetes Addon](/site/kube-addon.md) includes a network
+The Weave [Kubernetes Addon](/site/kubernetes/kube-addon.md) includes a network
 policy controller that implements [Kubernetes Network
 Policies](http://kubernetes.io/docs/user-guide/networkpolicies/).
 

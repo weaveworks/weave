@@ -43,7 +43,7 @@ recommend your master node has at least two CPU cores.
 > Alternatively, you can [configure CNI yourself](http://kubernetes.io/docs/admin/network-plugins/#cni)
 
 **Note:** If using the [Weave CNI
-Plugin](/site/cni-plugin.md) from a prior full install of Weave Net with your
+Plugin](/site/kubernetes.md) from a prior full install of Weave Net with your
 cluster, you must first uninstall it before applying the Weave-kube addon.
 Shut down Kubernetes, and _on all nodes_ perform the following:
 
