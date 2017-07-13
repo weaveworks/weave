@@ -71,6 +71,6 @@ frame" configuration:
 
 **See Also**
 
- * [Using Weave Net](/site/using-weave.md)
+ * [Using Weave Net](/site/install/using-weave.md)
  * [How Fastdp Works](/site/concepts/fastdp-how-it-works.md)
  * [Performance measurements](/blog/weave-docker-networking-performance-fast-data-path/)

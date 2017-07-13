@@ -25,7 +25,7 @@ and partitions.
 ### Scaling Out
 
 On the additional dynamic peer, at boot, via
-[systemd](/site/installing-weave/systemd.md) or equivalent:
+[systemd](/site/install/systemd.md) or equivalent:
 
     weave launch --no-restart --ipalloc-init=observer $PEERS
 
