@@ -66,7 +66,7 @@ To make encryption in fast datapath work on Google Cloud Platform, see
 
  * [Using Weave Net](/site/using-weave.md)
  * [Getting Started Guides](http://www.weave.works/guides/)
- * [Features](/site/features.md)
+ * [Features](/site/overview/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
  * [Building](/site/building.md)
  * [Using Weave with Systemd](/site/installing-weave/systemd.md)

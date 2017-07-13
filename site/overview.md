@@ -60,7 +60,7 @@ With Weave Net, deploy your applications - whether peer-to-peer file sharing, vo
 Weave Net is a good choice if you want one tool for everything.  For example: In addition to Docker plugins, you can also use Weave as a Kubernetes plugin.  You can also use Weave with Amazon ECS or with Mesos and Marathon.  
 Refer to our Getting Started and Integration Guides for more information.
 
-For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features.md).
+For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/overview/features.md).
 
 
 
