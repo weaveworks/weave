@@ -43,6 +43,6 @@ $ sudo DOCKER_BRIDGE=someother weave attach ...
 
 **See Also**
 
- * [Using WeaveDNS](/site/weavedns.md)
- * [Load Balancing with weaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
- * [Managing Domain Entries](/site/weavedns/managing-domains-weavedns.md)
+ * [Using WeaveDNS](/site/tasks/weavedns/weavedns.md)
+ * [Load Balancing with weaveDNS](/site/tasks/weavedns/load-balance-fault-weavedns.md)
+ * [Managing Domain Entries](/site/tasks/weavedns/managing-domains-weavedns.md)
