@@ -252,7 +252,7 @@ The list of variables you can set is:
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
-  frames - see [here](/site/using-weave/fastdp.md#mtu) for more
+  frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
   details.
 
 Example:

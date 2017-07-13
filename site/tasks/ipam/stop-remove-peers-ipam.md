@@ -58,4 +58,4 @@ dropping attempted connections with peers in other cliques.
 
  * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
- * [Isolating Applications on a Weave Network](/site/using-weave/application-isolation.md)
+ * [Isolating Applications on a Weave Network](/site/tasks/manage/application-isolation.md)

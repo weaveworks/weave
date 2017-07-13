@@ -93,7 +93,7 @@ Standard firewall rules can be deployed to restrict access to the
 Weave Net control and data ports.
 
 For communication across untrusted networks, connections can be
-[encrypted](/site/using-weave/security-untrusted-networks.md).
+[encrypted](/site/tasks/manage/security-untrusted-networks.md).
 
 ### <a name="testing"></a>Testing Container Communications
 
@@ -136,6 +136,6 @@ Weave Net supports *any* protocol, and it doesn't have to be over TCP/IP. For ex
 
  * [Installing Weave Net](/site/install/installing-weave.md)
  * [Using Weave Cloud to get started with Weave Net](/site/using-weave/weave-cloud.md)
- * [Using Fastdp With Weave Net](/site/using-weave/fastdp.md)
+ * [Using Fastdp With Weave Net](/site/tasks/manage/fastdp.md)
  * [Integrating Docker via the Network Plugin (Legacy)](/site/install/plugin/plugin.md)
  * [Integrating Docker via the Network Plugin (V2)](/site/install/plugin/plugin-v2.md)

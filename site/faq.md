@@ -25,7 +25,7 @@ For more information, refer to [Manually Specifying the IP Address of a Containe
 <a name="expose-container"></a>
 **Q: How do I expose one of my containers to the outside world?**
 
-Exposing a container to the outside world is described in [Exporting Services](/site/using-weave/service-management.md#exporting).
+Exposing a container to the outside world is described in [Exporting Services](/site/tasks/manage/service-management.md#exporting).
 
 
 <a name="legacy-network"></a>
@@ -37,7 +37,7 @@ For example, you have a Weave network that runs on hosts A, B, C. and you have a
 
 A simple way to accomplish this would be to run Weave on the host and then run, `weave expose` to expose the network to any running containers. Or you set up a route from P to one of A, B or C. See [Integrating a Network Host](/site/using-weave/host-network-integration.md).
 
-Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/using-weave/service-management.md#exporting).
+Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/tasks/manage/service-management.md#exporting).
 
 
 <a name="duplicate-ip"></a>
@@ -71,7 +71,7 @@ For more information about fast datapath see [How Fast Datapath Works](/site/con
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
 
-For more information on this command, see [Using Fast Datapath](/site/using-weave/fastdp.md).
+For more information on this command, see [Using Fast Datapath](/site/tasks/manage/fastdp.md).
 
 
 <a name="encrypted-fastdp"></a>
@@ -79,12 +79,12 @@ For more information on this command, see [Using Fast Datapath](/site/using-weav
 
 Yes, 1.9 version of Weave Net added the encryption feature to fastdp.
 
-See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information.
+See [Using Fast Datapath](/site/tasks/manage/fastdp.md) for more information.
 
 <a name="app-isolation"></a>
 **Q: Can I create multiple networks where containers can communicate on one network, but are isolated from containers on other networks?**
 
-Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md).
+Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/tasks/manage/application-isolation.md).
 
 
 **<a name="ports"></a>Q: Which ports does Weave Net use (e.g. if I am configuring a firewall) ?**

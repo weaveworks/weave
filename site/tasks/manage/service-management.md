@@ -114,5 +114,5 @@ For example, you can move the netcat service to `$HOST4:2211`  and it will retai
 **See Also**
 
  * [Adding and Removing Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md)
- * [Enabling Multi-Cloud, Multi-Hop Networking and Routing](/site/using-weave/multi-cloud-multi-hop.md)
+ * [Enabling Multi-Cloud, Multi-Hop Networking and Routing](/site/tasks/manage/multi-cloud-multi-hop.md)
 
