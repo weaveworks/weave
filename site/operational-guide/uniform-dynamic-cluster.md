@@ -18,7 +18,7 @@ A uniform dynamic cluster has the following characteristics:
 ## Bootstrapping
 
 On each initial peer N, at boot, via
-[systemd](/site/installing-weave/systemd.md):
+[systemd](/site/install/systemd.md):
 
     hostN$ weave launch --no-restart --name ::N --ipalloc-init seed=$SEED $PEERS
 
@@ -45,7 +45,7 @@ Where
 ## Adding a Peer
 
 On each new peer, at boot, via
-[systemd](/site/installing-weave/systemd.md):
+[systemd](/site/install/systemd.md):
 
     hostN$ weave launch --no-restart --name ::N --ipalloc-init seed=$SEED $PEERS
 
