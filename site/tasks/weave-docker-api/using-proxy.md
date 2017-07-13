@@ -70,5 +70,5 @@ If for some reason you need to disable the proxy, but still want to start other 
 
 **See Also**
 
- * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api.md)
- * [Securing Docker Communications With TLS](/site/weave-docker-api/securing-proxy.md)
+ * [Setting Up The Weave Docker API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md)
+ * [Securing Docker Communications With TLS](/site/tasks/weave-docker-api/securing-proxy.md)

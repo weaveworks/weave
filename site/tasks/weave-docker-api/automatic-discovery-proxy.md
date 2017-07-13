@@ -56,5 +56,5 @@ to the proxy, the specified label takes precedence over the container's name.
 
 **See Also**
 
- * [Name resolution via `/etc/hosts`](/site/weave-docker-api/name-resolution-proxy.md)
+ * [Name resolution via `/etc/hosts`](/site/tasks/weave-docker-api/name-resolution-proxy.md)
  * [How Weave Finds Containers](/site/tasks/weavedns/how-works-weavedns.md)

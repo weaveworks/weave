@@ -32,7 +32,7 @@ with the `--without-dns` argument).
     10.32.0.1
 
 If you would like `/etc/hosts` to contain the Weave Net address (the
-same way [the proxy does](/site/weave-docker-api/name-resolution-proxy.md)),
+same way [the proxy does](/site/tasks/weave-docker-api/name-resolution-proxy.md)),
 specify `--rewrite-hosts` when running `weave attach`:
 
     host1$ weave attach --rewrite-hosts c1
