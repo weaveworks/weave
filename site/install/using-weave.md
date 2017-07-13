@@ -81,7 +81,7 @@ For example:
 
     host2$ weave launch <ip address> <ip address> 
 
-Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md) for more information.
+Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/tasks/manage/finding-adding-hosts-dynamically.md) for more information.
 
 #### Restricting Access
 

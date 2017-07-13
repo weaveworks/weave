@@ -34,7 +34,7 @@ Then run:
 
 To create a network that spans multiple hosts, the Weave peers must be connected to each other.  
 This is accomplished by specifying the other hosts during `weave launch` or via
-[`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
+[`weave connect`](/site/tasks/manage/finding-adding-hosts-dynamically.md).
 
 See [Creating Peer Connections Between Hosts](/site/using-weave.md#peer-connections) 
 for a discussion on peer connections. 

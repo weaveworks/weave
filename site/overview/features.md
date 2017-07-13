@@ -220,7 +220,7 @@ See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/tasks/manage/m
 
 Hosts can be added to or removed from a Weave network without stopping
 or reconfiguring the remaining hosts. See [Adding and Removing Hosts
-Dynamically.](/site/using-weave/finding-adding-hosts-dynamically.md)
+Dynamically.](/site/tasks/manage/finding-adding-hosts-dynamically.md)
 
 
 ### <a name="container-mobility"></a>Container Mobility

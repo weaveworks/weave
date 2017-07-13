@@ -72,7 +72,7 @@ detail below.
 Peer discovery is a mechanism that allows peers to learn about new
 Weave Net hosts from existing peers without being explicitly told. Peer
 discovery is
-[enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
+[enabled by default](/site/tasks/manage/finding-adding-hosts-dynamically.md).
 
 ## <a name="network-partition"></a>Network Partition
 

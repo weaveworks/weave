@@ -92,7 +92,7 @@ Yes, of course!  Weave allows you to run isolated networks and still allow open 
 You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
 which are Weave’s control and data ports.
 
-The daemon also uses TCP port 6782 for [metrics](/site/metrics.md), but
+The daemon also uses TCP port 6782 for [metrics](/site/tasks/manage/metrics.md), but
 you would only need to open up this port if you wish to collect metrics
 from another host.
 
