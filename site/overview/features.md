@@ -44,7 +44,7 @@ a container network.
 Broadcast and Multicast protocols can also be used
 over Weave Net.
 
-To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md) 
+To start using Weave Net, see [Installing Weave Net](/site/install/installing-weave.md) 
 and [Using Weave Net](/site/using-weave.md).
 
 ### <a name="fast-data-path"></a>Fast Datapath
