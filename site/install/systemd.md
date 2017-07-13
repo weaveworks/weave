@@ -34,9 +34,9 @@ create the `/etc/sysconfig/weave` environment file using the following format:
 
 You can also use the [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md) command to add participating hosts dynamically.
 
-Additionally, if you want to enable [encryption](/site/using-weave/security-untrusted-networks.md) specify a
+Additionally, if you want to enable [encryption](/site/tasks/manage/security-untrusted-networks.md) specify a
 password using `WEAVE_PASSWORD="wfvAwt7sj"` in the `/etc/sysconfig/weave` environment file, and it will get picked up by
-Weave Net on launch. Recommendations for choosing a suitably strong password can be found [here](/site/using-weave/security-untrusted-networks.md).
+Weave Net on launch. Recommendations for choosing a suitably strong password can be found [here](/site/tasks/manage/security-untrusted-networks.md).
 
 You can now launch Weave Net using
 

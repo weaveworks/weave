@@ -8,7 +8,7 @@ search_type: Documentation
 Weave Net peers
 [communicate with each other over both TCP and UDP](/site/concepts/how-it-works.md). This
 communication
-[can be encrypted](/site/using-weave/security-untrusted-networks.md).
+[can be encrypted](/site/tasks/manage/security-untrusted-networks.md).
 
 Encryption of control plane traffic (TCP) and data plane traffic (UDP) of sleeve
 overlay is accomplished using the [NaCl](http://nacl.cr.yp.to/)
@@ -42,4 +42,4 @@ the IP transformation framework (XFRM).
 **See Also**
 
  * [How Weave Implements Encryption](/site/concepts/encryption-implementation.md)
- * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
+ * [Securing Containers Across Untrusted Networks](/site/tasks/manage/security-untrusted-networks.md)

@@ -14,7 +14,7 @@ limitations, we have removed `weave run`.
 If you have scripts using `weave run`, you can achieve exactly the
 same effect by combining `docker run` and `weave attach`; see
 [Dynamically Attaching and Detaching
-Containers](/site/using-weave/dynamically-attach-containers.md) for
+Containers](/site/tasks/manage/dynamically-attach-containers.md) for
 details.
 
 The `weave start` and `weave restart` commands have also been removed,

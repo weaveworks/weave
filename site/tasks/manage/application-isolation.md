@@ -67,4 +67,4 @@ isolation between application containers, that feature needs to be disabled by [
 **See Also** 
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
- * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Managing Services - Exporting, Importing, Binding and Routing](/site/tasks/manage/service-management.md)

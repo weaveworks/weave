@@ -211,4 +211,4 @@ Integrity Check Value of AES-GCM.
 
  * [architecture documentation](https://github.com/weaveworks/weave/blob/master/docs/architecture.txt)
  * [fastdp encryption](https://github.com/weaveworks/weave/blob/master/docs/fastdp-crypto.md)
- * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
+ * [Securing Containers Across Untrusted Networks](/site/tasks/manage/security-untrusted-networks.md)
