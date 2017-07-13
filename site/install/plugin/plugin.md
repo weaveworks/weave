@@ -63,7 +63,7 @@ this between hosts requires that you run Docker in ["swarm mode"](https://docs.d
 ["key-value store"](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#/set-up-a-key-value-store).
 
 To operate in swarm mode, you are required to use the plugin v2 of Weave Net.
-See [Integrating Docker via the Network Plugin (V2)](/site/plugin-v2.md) for
+See [Integrating Docker via the Network Plugin (V2)](/site/install/plugin/plugin-v2.md) for
 more details.
 
 If your Docker installation has a key-value store, create a network
@@ -96,4 +96,4 @@ If you are using `systemd` with Docker 1.9, it is advised that you modify the Do
 
 **See Also**
 
- * [How the Weave Network Plugins Work](/site/plugin/plugin-how-it-works.md)
+ * [How the Weave Network Plugins Work](/site/install/plugin/plugin-how-it-works.md)
