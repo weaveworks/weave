@@ -1,6 +1,6 @@
 ---
 title: Launching Weave Net
-menu_order: 10
+menu_order: 20
 search_type: Documentation
 ---
 
