@@ -3,10 +3,10 @@ package npc
 import (
 	"strings"
 
-	"github.com/coreos/go-iptables/iptables"
 	"k8s.io/client-go/pkg/types"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/npc/iptables"
 )
 
 type ruleSpec struct {
@@ -35,11 +35,11 @@ func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, ds
 }
 
 type ruleSet struct {
-	ipt   *iptables.IPTables
+	ipt   iptables.Interface
 	users map[string]map[types.UID]struct{}
 }
 
-func newRuleSet(ipt *iptables.IPTables) *ruleSet {
+func newRuleSet(ipt iptables.Interface) *ruleSet {
 	return &ruleSet{ipt, make(map[string]map[types.UID]struct{})}
 }
 
