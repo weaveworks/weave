@@ -10,13 +10,13 @@
 [Weaveworks](https://www.weave.works) is the company that delivers the most productive way for developers to connect, observe and control
 Docker containers.
 
-This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, and with over 8 million downloads to date, it enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
+This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, and with over 8 million downloads to date, enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
 
 ## Weave Cloud: 
 
 [Weave Cloud](https://www.weave.works/product/cloud/) is software-as-a-service that simplifies deployment, monitoring and management for containers and microservices. It extends and complements popular orchestrators, and enables developers and DevOps to realize faster deployments, insightful monitoring, visualization and networking.
 
-Weave Cloud is built using these Open Source projects: [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container monitoring tool that automatically maps Docker containers and their interactions, [Weave Cortex](https://github.com/weaveworks/cortex), a horizontally-scalable version of Prometheus, and [Weave Flux](https://www.weave.works/products/weave-flux/), a continuous deployment tool that works with Kubernetes.
+Weave Cloud is built using these Open Source projects: [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container visualization tool that automatically maps Docker containers and their interactions, [Weave Cortex](https://github.com/weaveworks/cortex), a horizontally-scalable version of Prometheus, and [Weave Flux](https://www.weave.works/products/weave-flux/), a continuous deployment tool that works with Kubernetes.
 
 # Weave Net
 
@@ -28,7 +28,7 @@ Services provided by application containers on the Weave network can be exposed 
 
 If you have any questions about, feedback for or a problem with Weave Net:
 
-- Read [the Weave Net docs](https://www.weave.works/docs/net/latest/introducing-weave/).
+- Read [the Weave Net docs](https://www.weave.works/docs/net/latest/overview).
 - Invite yourself to the <a href="https://weaveworks.github.io/community-slack/" target="_blank"> #weave-community </a> slack channel.
 - Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community</a> slack channel.
 - Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area.
@@ -39,5 +39,5 @@ Your feedback is always welcome!
 
 ## Further Information
 
-* [Installing Weave Net](https://www.weave.works/docs/net/latest/installing-weave/)
-* [Weave Net Product Overview](https://www.weave.works/products/weave-net/)
+* [Installing Weave Net](https://www.weave.works/docs/net/latest/install/installing-weave)
+* [Weave Net Product Overview](https://www.weave.works/products/weave-net)
