@@ -21,7 +21,7 @@ Install Weave Net from the command line on its own or if you are using Docker, K
 * [Integrating Docker via the Network Plugin (V2)](https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/)
      * [Installation](https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/#installation)
      * [Configuring the Plugin](https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/#configuring)
-     * [Running Services or Containers Using the Plugin]((https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/#usage)
+     * [Running Services or Containers Using the Plugin](https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/#usage)
 * [Integrating Docker via the Network Plugin (Legacy)](https://www.weave.works/docs/net/latest/install/plugin/plugin/)
      * [Launching Weave Net and Running Containers Using the Plugin](https://www.weave.works/docs/net/latest/install/plugin/plugin/#launching)
      * [Restarting the Plugin](https://www.weave.works/docs/net/latest/install/plugin/plugin/#restarting)
