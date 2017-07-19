@@ -39,7 +39,7 @@ func (i *mockIPSet) Create(ipsetName ipset.Name, ipsetType ipset.Type) error {
 	return nil
 }
 
-func (i *mockIPSet) AddEntry(ipsetName ipset.Name, entry string) error {
+func (i *mockIPSet) AddEntry(ipsetName ipset.Name, entry string, comment string) error {
 	log.Printf("adding entry %s to %s", entry, ipsetName)
 	if _, ok := i.sets[entry]; !ok {
 		return errors.Errorf("ipset %s does not exist", entry)

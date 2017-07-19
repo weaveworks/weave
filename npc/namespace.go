@@ -2,6 +2,7 @@ package npc
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	coreapi "k8s.io/client-go/pkg/api/v1"
@@ -74,7 +75,7 @@ func (ns *ns) onNewPodSelector(selector *selector) error {
 	for _, pod := range ns.pods {
 		if hasIP(pod) {
 			if selector.matches(pod.ObjectMeta.Labels) {
-				if err := selector.addEntry(pod.Status.PodIP); err != nil {
+				if err := selector.addEntry(pod.Status.PodIP, podComment(pod)); err != nil {
 					return err
 				}
 			}
@@ -98,9 +99,9 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 	}
 
 	if ns.checkLocalPod(obj) {
-		ns.ips.AddEntry(LocalIpset, obj.Status.PodIP)
+		ns.ips.AddEntry(LocalIpset, obj.Status.PodIP, podComment(obj))
 	}
-	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP, podComment(obj))
 }
 
 func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
@@ -120,9 +121,9 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 
 	if !hasIP(oldObj) && hasIP(newObj) {
 		if ns.checkLocalPod(newObj) {
-			ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP)
+			ns.ips.AddEntry(LocalIpset, newObj.Status.PodIP, podComment(newObj))
 		}
-		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP)
+		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
 	}
 
 	if !equals(oldObj.ObjectMeta.Labels, newObj.ObjectMeta.Labels) ||
@@ -140,7 +141,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 				}
 			}
 			if newMatch {
-				if err := ps.addEntry(newObj.Status.PodIP); err != nil {
+				if err := ps.addEntry(newObj.Status.PodIP, podComment(newObj)); err != nil {
 					return err
 				}
 			}
@@ -246,18 +247,18 @@ func (ns *ns) deleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	return nil
 }
 
-func bypassRule(nsIpsetName ipset.Name) []string {
-	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT"}
+func bypassRule(nsIpsetName ipset.Name, namespace string) []string {
+	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace}
 }
 
 func (ns *ns) ensureBypassRule(nsIpsetName ipset.Name) error {
 	common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, nsIpsetName)
-	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
+	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName, ns.name)...)
 }
 
 func (ns *ns) deleteBypassRule(nsIpsetName ipset.Name) error {
 	common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, nsIpsetName)
-	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName)...)
+	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ns.allPods.ipsetName, ns.name)...)
 }
 
 func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
@@ -271,7 +272,7 @@ func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 	}
 
 	// Add namespace ipset to matching namespace selectors
-	return ns.nsSelectors.addToMatching(obj.ObjectMeta.Labels, string(ns.allPods.ipsetName))
+	return ns.nsSelectors.addToMatching(obj.ObjectMeta.Labels, string(ns.allPods.ipsetName), namespaceComment(ns))
 }
 
 func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
@@ -309,7 +310,7 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 				}
 			}
 			if newMatch {
-				if err := selector.addEntry(string(ns.allPods.ipsetName)); err != nil {
+				if err := selector.addEntry(string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
 					return err
 				}
 			}
@@ -367,4 +368,12 @@ func isDefaultDeny(namespace *coreapi.Namespace) bool {
 	return nnp.Ingress != nil &&
 		nnp.Ingress.Isolation != nil &&
 		*(nnp.Ingress.Isolation) == DefaultDeny
+}
+
+func namespaceComment(namespace *ns) string {
+	return "namespace: " + namespace.name
+}
+
+func podComment(pod *coreapi.Pod) string {
+	return fmt.Sprintf("namespace: %s, pod: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
 }

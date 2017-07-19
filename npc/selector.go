@@ -15,6 +15,7 @@ type selectorSpec struct {
 
 	ipsetType ipset.Type // type of ipset to provision
 	ipsetName ipset.Name // generated ipset name
+	nsName    string     // Namespace name
 }
 
 func newSelectorSpec(json *unversioned.LabelSelector, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
@@ -30,7 +31,8 @@ func newSelectorSpec(json *unversioned.LabelSelector, nsName string, ipsetType i
 		// the shortname because you can specify the same selector in multiple
 		// namespaces - we need those to map to distinct ipsets
 		ipsetName: ipset.Name(IpsetNamePrefix + shortName(nsName+":"+key)),
-		ipsetType: ipsetType}, nil
+		ipsetType: ipsetType,
+		nsName:    nsName}, nil
 }
 
 type selector struct {
@@ -42,8 +44,8 @@ func (s *selector) matches(labelMap map[string]string) bool {
 	return s.spec.selector.Matches(labels.Set(labelMap))
 }
 
-func (s *selector) addEntry(entry string) error {
-	return s.ips.AddEntry(s.spec.ipsetName, entry)
+func (s *selector) addEntry(entry string, comment string) error {
+	return s.ips.AddEntry(s.spec.ipsetName, entry, comment)
 }
 
 func (s *selector) delEntry(entry string) error {
@@ -67,10 +69,10 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn) *selectorSet 
 		entries:       make(map[string]*selector)}
 }
 
-func (ss *selectorSet) addToMatching(labelMap map[string]string, entry string) error {
+func (ss *selectorSet) addToMatching(labelMap map[string]string, entry string, comment string) error {
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
-			if err := s.addEntry(entry); err != nil {
+			if err := s.addEntry(entry, comment); err != nil {
 				return err
 			}
 		}
