@@ -12,8 +12,9 @@ The following topics are discussed:
  * [CPU and Memory Requirements](#resources)
  * [Pod Eviction](#eviction)
 * [Network Policy Controller](#npc)
+* [Troubleshooting](#troubleshooting)
  * [Troubleshooting Blocked Connections](#blocked-connections)
- * [Changing Configuration Options](#configuration-options)
+* [Changing Configuration Options](#configuration-options)
 
 
 ## <a name="install"></a> Installation
@@ -163,6 +164,75 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
   all multicast traffic) by adding `--allow-mcast=false` as an
   argument to `weave-npc` in the YAML configuration.
 
+## <a name="troubleshooting"></a><a name="troubleshooting"></a> Troubleshooting
+
+When using the Kubernetes addon, Weave Net's peers are managed via Kubernetes and very little effort should be required from your end to operate your network.
+
+However, should you need it, you can still run `weave` CLI commands to, for example, confirm Weave Net' status. This can be done in various ways:
+
+1. You could [install the `weave` script](/site/installing-weave.md) and run the same commands you would run without Kubernetes:
+
+```
+$ weave status
+        Version: 2.0.1 (up to date; next check at 2017/07/10 13:49:29)
+
+        Service: router
+       Protocol: weave 1..2
+           Name: 42:8e:e8:c4:52:1b(host-0)
+     Encryption: disabled
+  PeerDiscovery: enabled
+        Targets: 3
+    Connections: 3 (2 established, 1 failed)
+          Peers: 3 (with 6 established connections)
+ TrustedSubnets: none
+
+        Service: ipam
+         Status: ready
+          Range: 10.32.0.0/12
+  DefaultSubnet: 10.32.0.0/12
+```
+
+2. If you do not want to install anything else on your hosts, you can use the following `kubectl` commands, which will produce the exact same outcome as the previous example:
+
+```
+### Identify the Weave Net pods:
+
+$ kubectl get pods --all-namespaces -o wide | grep weave
+kube-system  weave-net-1jkl6  2/2  Running  0  1d  10.128.0.4  host-0
+kube-system  weave-net-bskbv  2/2  Running  0  1d  10.128.0.5  host-1
+kube-system  weave-net-m4x1b  2/2  Running  0  1d  10.128.0.6  host-2
+
+### The above shows all Weave Net pods available in your cluster.
+### You can see Kubernetes has deployed one Weave Net pod per host, in order to interconnect all hosts.
+
+### You then need to:
+### - choose which pod you want to run your command from (e.g.: here, pod weave-net-1jkl6, running on host-0), and
+### - make sure you pass --local to weave, in addition to your command:
+
+$ kubectl exec -n kube-system weave-net-1jkl6 -- /home/weave/weave --local status
+Defaulting container name to weave.
+Use 'kubectl describe pod/weave-net-1jkl6' to see all of the containers in this pod.
+
+        Version: 2.0.1 (up to date; next check at 2017/07/10 13:49:29)
+
+        Service: router
+       Protocol: weave 1..2
+           Name: 42:8e:e8:c4:52:1b(host-0)
+     Encryption: disabled
+  PeerDiscovery: enabled
+        Targets: 3
+    Connections: 3 (2 established, 1 failed)
+          Peers: 3 (with 6 established connections)
+ TrustedSubnets: none
+
+        Service: ipam
+         Status: ready
+          Range: 10.32.0.0/12
+  DefaultSubnet: 10.32.0.0/12
+```
+
+3. Finally you could also use [Weave Cloud](https://cloud.weave.works/) and monitor all your pods, including Weave Net's ones, from there.
+
 ### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, the first thing to do is check the `weave-npc` container's logs.
@@ -195,7 +265,7 @@ TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 ```
 
-### <a name="configuration-options"></a> Changing Configuration Options
+## <a name="configuration-options"></a> Changing Configuration Options
 
 #### Using `cloud.weave.works`
 
@@ -277,72 +347,3 @@ For example,
             - name: IPALLOC_RANGE
               value: 10.0.0.0/16
 ```
-
-## <a name="operations"></a> Operations
-
-When using the Kubernetes addon, Weave Net's peers are managed via Kubernetes and very little effort should be required from your end to operate your network.
-
-However, should you need it, you can still run `weave` CLI commands to, for example, confirm Weave Net' status. This can be done in various ways:
-
-1. You could [install the `weave` script](/site/installing-weave.md) and run the same commands you would run without Kubernetes:
-
-```
-$ weave status
-        Version: 2.0.1 (up to date; next check at 2017/07/10 13:49:29)
-
-        Service: router
-       Protocol: weave 1..2
-           Name: 42:8e:e8:c4:52:1b(host-0)
-     Encryption: disabled
-  PeerDiscovery: enabled
-        Targets: 3
-    Connections: 3 (2 established, 1 failed)
-          Peers: 3 (with 6 established connections)
- TrustedSubnets: none
-
-        Service: ipam
-         Status: ready
-          Range: 10.32.0.0/12
-  DefaultSubnet: 10.32.0.0/12
-```
-
-2. If you do not want to install anything else on your hosts, you can use the following `kubectl` commands, which will produce the exact same outcome as the previous example:
-
-```
-### Identify the Weave Net pods:
-
-$ kubectl get pods --all-namespaces -o wide | grep weave
-kube-system  weave-net-1jkl6  2/2  Running  0  1d  10.128.0.4  host-0
-kube-system  weave-net-bskbv  2/2  Running  0  1d  10.128.0.5  host-1
-kube-system  weave-net-m4x1b  2/2  Running  0  1d  10.128.0.6  host-2
-
-### The above shows all Weave Net pods available in your cluster.
-### You can see Kubernetes has deployed one Weave Net pod per host, in order to interconnect all hosts.
-
-### You then need to:
-### - choose which pod you want to run your command from (e.g.: here, pod weave-net-1jkl6, running on host-0), and
-### - make sure you pass --local to weave, in addition to your command:
-
-$ kubectl exec -n kube-system weave-net-1jkl6 -- /home/weave/weave --local status
-Defaulting container name to weave.
-Use 'kubectl describe pod/weave-net-1jkl6' to see all of the containers in this pod.
-
-        Version: 2.0.1 (up to date; next check at 2017/07/10 13:49:29)
-
-        Service: router
-       Protocol: weave 1..2
-           Name: 42:8e:e8:c4:52:1b(host-0)
-     Encryption: disabled
-  PeerDiscovery: enabled
-        Targets: 3
-    Connections: 3 (2 established, 1 failed)
-          Peers: 3 (with 6 established connections)
- TrustedSubnets: none
-
-        Service: ipam
-         Status: ready
-          Range: 10.32.0.0/12
-  DefaultSubnet: 10.32.0.0/12
-```
-
-3. Finally you could also use [Weave Cloud](https://cloud.weave.works/) and monitor all your pods, including Weave Net's ones, from there.
