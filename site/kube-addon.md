@@ -22,7 +22,7 @@ Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
 ```
-$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
 After a few seconds, a Weave Net pod should be running on each
@@ -55,21 +55,6 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-**Note:** The URLs:
-
-- [https://git.io/weave-kube](https://git.io/weave-kube), and
-- [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6)
-
-point to:
-
-- [https://cloud.weave.works/k8s/v1.5/net](https://cloud.weave.works/k8s/v1.5/net), and
-- [https://cloud.weave.works/k8s/v1.6/net](https://cloud.weave.works/k8s/v1.6/net).
-
-In the past, these URLs pointed to the static YAML files for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon, respectively:
-
-- [`latest_release/weave-daemonset.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset.yaml) and
-- [`latest_release/weave-daemonset-k8s-1.6.yaml`](https://github.com/weaveworks/weave/releases/download/latest_release/weave-daemonset-k8s-1.6.yaml).
-
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
 In version 1.6, Kubernetes has increased security, so we need to
@@ -95,7 +80,7 @@ the Weave Net pods one by one.
 Kubernetes v1.5 and below does not support rolling upgrades of daemon sets,
 and so you will need to perform the procedure manually:
 
-* Apply the updated addon manifest `kubectl apply -f https://git.io/weave-kube`
+* Apply the updated addon manifest `kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"`
 * Kill each Weave Net pod with `kubectl delete` and then wait for it to reboot before moving on to the next pod.
 
 **Note:** If you delete all Weave Net pods at the same time they will
@@ -214,7 +199,7 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 
 #### Using `cloud.weave.works`
 
-If the YAML file is from `cloud.weave.works` as described above, then you can customise it by passing some of Weave Net's options, arguments and environment variables as query parameters:
+You can customise the YAML you get from `cloud.weave.works` by passing some of Weave Net's options, arguments and environment variables as query parameters:
 
   - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time from `cloud.weave.works`.
   - `password-secret`: name of the Kubernetes secret containing your password.
@@ -222,7 +207,7 @@ If the YAML file is from `cloud.weave.works` as described above, then you can cu
 
         $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd.txt
         $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd.txt
-        $ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
+        $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
 
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
@@ -257,7 +242,7 @@ The list of variables you can set is:
 
 Example:
 ```
-$ kubectl apply -n kube-system -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
+$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
 ```
 This command -- notice `&env.WEAVE_MTU=1337` at the end of the URL -- generates a YAML file containing, among others:
 
