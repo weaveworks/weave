@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	weaveapi "github.com/weaveworks/weave/api"
+	"github.com/weaveworks/weave/common"
 )
 
 type nodeInfo struct {
@@ -54,8 +58,7 @@ const (
 )
 
 // update the list of all peers that have gone through this code path
-func addMyselfToPeerList(c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
-	cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
+func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
 	var list *peerList
 	err := cml.LoopUpdate(func() error {
 		var err error
@@ -79,27 +82,78 @@ func addMyselfToPeerList(c *kubernetes.Clientset, peerName, name string) (*peerL
 
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
-func reclaimRemovedPeers(apl *peerList, nodes []nodeInfo) error {
-	// TODO
-	// Outline of function:
-	// 1. Compare peers stored in the peerList against all peers reported by k8s now.
-	// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
-	// 3. Check if there is an existing annotation with key X
-	// 4.   If annotation already contains my identity, ok;
-	// 5.   If non-existent, write an annotation with key X and contents "my identity"
-	// 6.   If step 4 or 5 succeeded, rmpeer X
-	// 7aa.   Remove any annotations Z* that have contents X
-	// 7a.    Remove X from peerList
-	// 7b.    Remove annotation with key X
-	// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
-	// 9. Go back to step 1 until there is no difference between the two sets
+func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName string) error {
+	for {
+		// 1. Compare peers stored in the peerList against all peers reported by k8s now.
+		storedPeerList, err := cml.GetPeerList()
+		if err != nil {
+			return err
+		}
+		peerMap := make(map[string]peerInfo, len(storedPeerList.Peers))
+		for _, peer := range storedPeerList.Peers {
+			peerMap[peer.NodeName] = peer
+		}
+		for _, node := range nodes {
+			delete(peerMap, node.name)
+		}
+		log.Println("Nodes that have disappeared:", peerMap)
+		if len(peerMap) == 0 {
+			break
+		}
+		// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
+		for _, peer := range peerMap {
+			common.Log.Debugln("Preparing to remove disappeared peer", peer)
+			okToRemove := false
+			// 3. Check if there is an existing annotation with key X
+			if existingAnnotation, found := cml.cm.Annotations[peer.PeerName]; found {
+				common.Log.Debugln("Existing annotation", existingAnnotation)
+				// 4.   If annotation already contains my identity, ok;
+				if existingAnnotation == myPeerName {
+					okToRemove = true
+				}
+			} else {
+				// 5.   If non-existent, write an annotation with key X and contents "my identity"
+				common.Log.Debugln("Noting I plan to remove ", peer.PeerName)
+				if err := cml.UpdateAnnotation(peer.PeerName, myPeerName); err == nil {
+					okToRemove = true
+				}
+			}
+			if okToRemove {
+				// 6.   If step 4 or 5 succeeded, rmpeer X
+				result, err := weave.RmPeer(peer.PeerName)
+				if err != nil {
+					return err
+				}
+				log.Println("rmpeer of", peer.PeerName, ":", result)
+				cml.LoopUpdate(func() error {
+					// 7aa.   Remove any annotations Z* that have contents X
+					if err := cml.RemoveAnnotationsWithValue(peer.PeerName); err != nil {
+						return err
+					}
+					// 7a.    Remove X from peerList
+					storedPeerList.remove(peer.PeerName)
+					if err := cml.UpdatePeerList(*storedPeerList); err != nil {
+						return err
+					}
+					// 7b.    Remove annotation with key X
+					if err := cml.RemoveAnnotation(peer.PeerName); err != nil {
+						return err
+					}
+					return nil
+				})
+				common.Log.Debugln("Finished removal of ", peer.PeerName)
+			}
+			// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
 
-	// Step 3-5 is to protect against two simultaneous rmpeers of X
-	// Step 4 is to pick up again after a restart between step 5 and step 7b
-	// If the peer doing the reclaim disappears between steps 5 and 7a, then someone will clean it up in step 7aa
-	// If peer doing the reclaim disappears forever between 7a and 7b then we get a dangling annotation
-	// This should be sufficiently rare that we don't care.
+			// Step 3-5 is to protect against two simultaneous rmpeers of X
+			// Step 4 is to pick up again after a restart between step 5 and step 7b
+			// If the peer doing the reclaim disappears between steps 5 and 7a, then someone will clean it up in step 7aa
+			// If peer doing the reclaim disappears forever between 7a and 7b then we get a dangling annotation
+			// This should be sufficiently rare that we don't care.
+		}
 
+		// 9. Go back to step 1 until there is no difference between the two sets
+	}
 	// Question: Should we narrow step 2 by checking against Weave Net IPAM?
 	// i.e. If peer X owns any address space and is marked unreachable, we want to rmpeer X
 	return nil
@@ -129,12 +183,14 @@ func main() {
 		log.Fatalf("Could not get peers: %v", err)
 	}
 	if justReclaim {
-		log.Println("Checking if any peers need to be reclaimed")
-		list, err := addMyselfToPeerList(c, peerName, nodeName)
+		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
+		common.Log.Infoln("Adding myself to peer list")
+		_, err := addMyselfToPeerList(cml, c, peerName, nodeName)
 		if err != nil {
 			log.Fatalf("Could not get peer list: %v", err)
 		}
-		err = reclaimRemovedPeers(list, peers)
+		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
+		err = reclaimRemovedPeers(weave, cml, peers, peerName)
 		if err != nil {
 			log.Fatalf("Error while reclaiming space: %v", err)
 		}
