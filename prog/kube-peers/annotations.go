@@ -35,7 +35,7 @@ type peerList struct {
 
 type peerInfo struct {
 	PeerName string // Weave internal unique ID
-	Name     string // Kubernetes node name
+	NodeName string // Kubernetes node name
 }
 
 func (pl peerList) contains(peerName string) bool {
@@ -48,7 +48,17 @@ func (pl peerList) contains(peerName string) bool {
 }
 
 func (pl *peerList) add(peerName string, name string) {
-	pl.Peers = append(pl.Peers, peerInfo{PeerName: peerName, Name: name})
+	pl.Peers = append(pl.Peers, peerInfo{PeerName: peerName, NodeName: name})
+}
+
+func (pl *peerList) remove(peerNameToRemove string) {
+	for i := 0; i < len(pl.Peers); {
+		if pl.Peers[i].PeerName == peerNameToRemove {
+			pl.Peers = append(pl.Peers[:i], pl.Peers[i+1:]...)
+		} else {
+			i++
+		}
+	}
 }
 
 const (
@@ -102,16 +112,55 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 }
 
 func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
-	if cml.cm == nil {
-		return errors.New("endpoint not initialized, call Init first")
-	}
 	recordBytes, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
+	return cml.UpdateAnnotation(KubePeersAnnotationKey, string(recordBytes))
+}
+
+func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
+	value, found := cml.cm.Annotations[key]
+	return value, found
+}
+
+func (cml *configMapAnnotations) UpdateAnnotation(key, value string) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
 	cm := cml.cm
-	cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
-	cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cm.Annotations[key] = value
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err == nil {
+		cml.cm = cm
+	}
+	return err
+}
+
+func (cml *configMapAnnotations) RemoveAnnotation(key string) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
+	cm := cml.cm
+	delete(cm.Annotations, key)
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err == nil {
+		cml.cm = cm
+	}
+	return err
+}
+
+func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
+	cm := cml.cm
+	for key, value := range cm.Annotations {
+		if value == valueToRemove {
+			delete(cm.Annotations, key)
+		}
+	}
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	if err == nil {
 		cml.cm = cm
 	}
