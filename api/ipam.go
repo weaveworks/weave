@@ -62,6 +62,12 @@ func (client *Client) ReleaseIPsFor(ID string) error {
 	return err
 }
 
+// release all IP space owned by a peer
+func (client *Client) RmPeer(peerName string) (string, error) {
+	result, err := client.httpVerb("DELETE", fmt.Sprintf("/peer/%s", peerName), nil)
+	return result, err
+}
+
 func (client *Client) DefaultSubnet() (*net.IPNet, error) {
 	cidr, err := client.httpVerb("GET", fmt.Sprintf("/ipinfo/defaultsubnet"), nil)
 	if err != nil {
