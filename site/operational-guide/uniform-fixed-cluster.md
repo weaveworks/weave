@@ -24,7 +24,7 @@ A uniform fixed cluster has the following characteristics:
 ### Bootstrapping
 
 On each initial peer, at boot, via
-[systemd](/site/installing-weave/systemd.md):
+[systemd](/site/install/systemd.md):
 
     weave launch --no-restart $PEERS
 
@@ -56,7 +56,7 @@ that](/site/troubleshooting.md) before moving on.
 ### Adding a Peer
 
 On the new peer, at boot, via
-[systemd](/site/installing-weave/systemd.md) run:
+[systemd](/site/install/systemd.md) run:
 
     weave launch --no-restart $PEERS
 

@@ -21,7 +21,7 @@ once and your system is configured to start Docker on boot, then Weave Net
 will start automatically on system restarts.
 
 If you are aiming for a non-interactive installation, use
-[systemd](/site/installing-weave/systemd.md) or a similar init system to
+[systemd](/site/install/systemd.md) or a similar init system to
 launch Weave using the `--no-restart` flag after Docker has been started.
 
 ## <a name="detect-reclaim-ipam"></a>Detecting and Reclaiming Lost IP Address Space
@@ -66,7 +66,7 @@ after which one of the remaining peers could decide unilaterally that
 it is safe to appropriate the space for itself, and so an
 administrative action is required to reclaim it.
 
-The [`weave rmpeer`](/site/ipam/stop-remove-peers-ipam.md)
+The [`weave rmpeer`](/site/tasks/ipam/stop-remove-peers-ipam.md)
 command is provided to perform this task, and must
 be executed on _one_ of the remaining peers. That peer will then take
 ownership of the freed address space.
@@ -115,6 +115,6 @@ you can issue the following command:
 
 **See Also**
 
- * [Allocating IP Addresses](/site/ipam.md)
- * [Troubleshooting the IP Allocator](/site/ipam/troubleshooting-ipam.md)
+ * [Allocating IP Addresses](/site/tasks/ipam/ipam.md)
+ * [Troubleshooting the IP Allocator](/site/tasks/ipam/troubleshooting-ipam.md)
 

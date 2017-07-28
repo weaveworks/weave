@@ -72,7 +72,7 @@ detail below.
 Peer discovery is a mechanism that allows peers to learn about new
 Weave Net hosts from existing peers without being explicitly told. Peer
 discovery is
-[enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
+[enabled by default](/site/tasks/manage/finding-adding-hosts-dynamically.md).
 
 ## <a name="network-partition"></a>Network Partition
 
@@ -85,7 +85,7 @@ partition, healing automatically once the partition is over.
 
 ## <a name="ip-address-manager"></a>IP Address Manager (IPAM)
 
-[IPAM](/site/ipam.md) is the subsystem responsible for dividing up a
+[IPAM](/site/tasks/ipam/ipam.md) is the subsystem responsible for dividing up a
 large contiguous block of IP addresses (known as the IP allocation
 range) amongst peers so that individual addresses may be uniquely
 assigned to containers anywhere on the overlay network.

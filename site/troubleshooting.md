@@ -79,7 +79,7 @@ $ weave status
 ```
 
 The terms used here are explained further at
-[How Weave Net Works](/site/how-it-works.md).
+[How Weave Net Works](/site/concepts/how-it-works.md).
 
  * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
 `CHECKPOINT_DISABLE` is not set), information about existence of a new version
@@ -95,11 +95,11 @@ can be overridden by using the `--nickname` argument at `weave
 launch`.
 
  * **Encryption** - indicates whether
-[encryption](/site/how-it-works/encryption.md) is in use for communication
+[encryption](/site/concepts/encryption.md) is in use for communication
 between peers.
 
  * **PeerDiscovery** - indicates whether
-[automatic peer discovery](/site/ipam/allocation-multi-ipam.md) is
+[automatic peer discovery](/site/tasks/ipam/allocation-multi-ipam.md) is
 enabled (which is the default).
 
  * **Targets** - are the number of hosts that the local Weave Router has been
@@ -286,7 +286,7 @@ on reboot. This can be disabled via:
 
 Note that the Weave Net router will create the `weave` network bridge
 if necessary when it restarts, and the [Weave Net Docker API
-Proxy](/site/weave-docker-api.md) will re-attach any application
+Proxy](/site/tasks/weave-docker-api/weave-docker-api.md) will re-attach any application
 containers that it originally attached to the Weave network when they
 restart.
 
@@ -307,5 +307,5 @@ and the container image versions as git hashes.
 
 **See Also**
 
- * [Troubleshooting IPAM](/site/ipam/troubleshooting-ipam.md)
- * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
+ * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
+ * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)
