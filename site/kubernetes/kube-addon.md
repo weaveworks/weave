@@ -160,8 +160,8 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
   Controller allows all multicast traffic. Since a single multicast
   address may be used by multiple pods, we cannot implement rules to
   isolate them individually.  You can turn this behaviour off (block
-  all multicast traffic) by adding `--allow-mcast` as an argument to
-  `weave-npc` in the YAML configuration.
+  all multicast traffic) by adding `--allow-mcast=false` as an
+  argument to `weave-npc` in the YAML configuration.
 
 ### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
