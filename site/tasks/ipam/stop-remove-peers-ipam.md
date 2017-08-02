@@ -37,22 +37,22 @@ name. Alternatively, you can supply a peer name as shown in `weave status`.
 
 ### <a name="caution-rmpeer"></a>Caution###
 
-You cannot call `weave rmpeer` on more than one host. The address
-space, which was owned by the stale peer cannot be left dangling, and
-as a result it gets reassigned. In this instance, the address is
-reassigned to the peer on which `weave rmpeer` was run. Therefore, if
-you run `weave forget` and then `weave rmpeer` on more than one host
-at a time, it results in duplicate IPs on more than one host.
+Do not invoke `weave rmpeer` for the same peer on more than one
+host.
 
-Once the peers detect the inconsistency, they log the error and drop
+The removed peer's address range cannot be left dangling and is
+therefore reassigned to the peer on which `weave rmpeer` was
+run. Consequently, if you run `weave rmpeer` for the same peer on more
+than one host, the removed peer's address range will be owned by
+multiple peers.
+
+Once the peers detect this inconsistency, they log the error and drop
 the connection that supplied the inconsistent data. The rest of the
 peers will carry on with their view of the world, but the network will
-not function correctly.
-
-Some peers may be able to communicate their claim to the others before
-they run `rmpeer` (i.e. it's a race), so what you can expect is a few
-cliques of peers that are still talking to each other, but repeatedly
-dropping attempted connections with peers in other cliques.
+not function correctly. Depending on the timing of the `rmpeer` and
+the communication between peers, several peer cliques may form -
+groups of peers that are talking to each other, but repeatedly drop
+attempted connections with peers in other cliques.
 
 **See Also**
 
