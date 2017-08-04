@@ -13,7 +13,8 @@
   "linux": {
     "capabilities": [
       "CAP_SYS_ADMIN",
-      "CAP_NET_ADMIN"
+      "CAP_NET_ADMIN",
+      "CAP_SYS_MODULE"
     ]
   },
   "mounts": [
@@ -38,6 +39,12 @@
     {
       "destination": "/host/etc/",
       "source": "/etc/",
+      "type": "bind",
+      "options": ["rbind"]
+    },
+    {
+      "destination": "/lib/modules/",
+      "source": "/lib/modules/",
       "type": "bind",
       "options": ["rbind"]
     }
