@@ -8,10 +8,6 @@ import (
 	weavenet "github.com/weaveworks/weave/net"
 )
 
-const (
-	WeaveDomain = "weave.local"
-)
-
 type watcher struct {
 	client *docker.Client
 	weave  *weaveapi.Client
