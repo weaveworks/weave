@@ -211,10 +211,6 @@ func main() {
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
 	proxyConfig := newProxyConfig(version, defaultDockerHost)
-	if bridgeConfig.AWSVPC {
-		proxyConfig.NoMulticastRoute = true
-		proxyConfig.KeepTXOn = true
-	}
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -229,6 +225,11 @@ func main() {
 	if justVersion {
 		fmt.Printf("weave %s\n", version)
 		os.Exit(0)
+	}
+
+	if bridgeConfig.AWSVPC {
+		proxyConfig.NoMulticastRoute = true
+		proxyConfig.KeepTXOn = true
 	}
 
 	peers = mflag.Args()
