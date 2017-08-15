@@ -39,8 +39,16 @@ func (w *watcher) ContainerStarted(id string) {
 		if network.isOurs {
 			if w.driver.dns {
 				fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
-				if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-					w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+				weaveDomain, _ := w.weave.DNSDomain()
+				// Container name is prefixed with '/' so we cut first character
+				name := fmt.Sprintf("%s.%s", info.Name[1:], weaveDomain)
+				aliases := append([]string(nil), fqdn, name)
+				aliases = append(aliases, net.Aliases...)
+				for _, alias := range aliases {
+					w.driver.debug("ContainerStarted", "going to register %s with weaveDNS", alias)
+					if err := w.weave.RegisterWithDNS(id, alias, net.IPAddress); err != nil {
+						w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+					}
 				}
 			}
 			netNSPath := weavenet.NSPathByPidWithProc(w.driver.procPath, info.State.Pid)
