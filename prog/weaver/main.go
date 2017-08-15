@@ -254,6 +254,9 @@ func main() {
 	var proxy *weaveproxy.Proxy
 	var err error
 	if proxyConfig.Enabled {
+		if noDNS {
+			proxyConfig.WithoutDNS = true
+		}
 		// Start Weave Proxy:
 		proxy, err = weaveproxy.NewProxy(*proxyConfig)
 		if err != nil {
