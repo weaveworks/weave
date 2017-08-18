@@ -443,10 +443,8 @@ EOF
 expose_ip() {
     ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
     for CIDR in $ALL_CIDRS ; do
-        if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
-            ip addr add dev $BRIDGE $CIDR
-            arp_update $BRIDGE $CIDR || true
-        fi
+        call_weave "POST" "/expose/$CIDR"
+
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
 }
@@ -1484,7 +1482,6 @@ case "$COMMAND" in
         fi
         create_bridge
         expose_ip
-        util_op expose-nat $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
     hide)

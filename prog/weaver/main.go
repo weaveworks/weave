@@ -322,7 +322,7 @@ func main() {
 	checkFatal(err)
 	defer db.Close()
 
-	router, err := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
+	router, err := weave.NewNetworkRouter(config, networkConfig, bridgeConfig, name, nickName, overlay, db)
 	checkFatal(err)
 	Log.Println("Our name is", router.Ourself)
 
@@ -469,17 +469,17 @@ func main() {
 		// Run this on its own goroutine because the allocator can block
 		// We remove the default route installed by the kernel,
 		// because awsvpc has installed it as well
-		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC, waitReady.Add())
+		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)
 }
 
-func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool, ready func()) {
+func exposeForAWSVPC(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, ready func()) {
 	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
 	checkFatal(err)
 	cidr := address.MakeCIDR(subnet, addr)
-	err = weavenet.AddBridgeAddr(bridgeName, cidr.IPNet(), removeDefaultRoute)
+	err = weavenet.Expose(bridgeName, cidr.IPNet(), true, false)
 	checkFatal(err)
 	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
 	ready()

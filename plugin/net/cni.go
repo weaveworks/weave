@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -100,12 +99,11 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 				return fmt.Errorf("unable to allocate IP address for bridge: %s", err)
 			}
 			bridgeCIDR := bridgeIPResult.IPs[0].Address
-			if err := assignBridgeIP(conf.BrName, bridgeCIDR); err != nil {
-				return fmt.Errorf("unable to assign IP address to bridge: %s", err)
+
+			if err := c.weave.Expose(&bridgeCIDR); err != nil {
+				return fmt.Errorf("unable to expose bridge %q: %s", conf.BrName, err)
 			}
-			if err := weavenet.ExposeNAT(bridgeCIDR); err != nil {
-				return fmt.Errorf("unable to create NAT rules: %s", err)
-			}
+
 			bridgeIP = bridgeCIDR.IP
 		} else if err != nil {
 			return err
@@ -163,22 +161,6 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 		if err != nil {
 			return fmt.Errorf("failed to add route '%v via %v dev %v': %v", r.Dst, gw, name, err)
 		}
-	}
-	return nil
-}
-
-func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
-	link, err := netlink.LinkByName(bridgeName)
-	if err != nil {
-		return err
-	}
-	if err := netlink.AddrAdd(link, &netlink.Addr{IPNet: &ipnet}); err != nil {
-		// Treat as non-error if this address is already there
-		// - maybe another copy of this program just added it
-		if err == syscall.Errno(syscall.EEXIST) {
-			return nil
-		}
-		return fmt.Errorf("failed to add IP address to %q: %v", bridgeName, err)
 	}
 	return nil
 }
