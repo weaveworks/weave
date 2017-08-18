@@ -254,6 +254,9 @@ func main() {
 	var proxy *weaveproxy.Proxy
 	var err error
 	if proxyConfig.Enabled {
+		if noDNS {
+			proxyConfig.WithoutDNS = true
+		}
 		// Start Weave Proxy:
 		proxy, err = weaveproxy.NewProxy(*proxyConfig)
 		if err != nil {
@@ -282,6 +285,7 @@ func main() {
 	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
 
 	bridgeConfig.Mac = name.String()
+	bridgeConfig.Port = config.Port
 	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
