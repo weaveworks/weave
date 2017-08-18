@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -296,37 +295,4 @@ func subnets(addrs []netlink.Addr) map[string]struct{} {
 		subnets[subnet(addr.IPNet)] = struct{}{}
 	}
 	return subnets
-}
-
-func addNatRule(ipt *iptables.IPTables, rulespec ...string) error {
-	// Loop until we get an exit code other than "temporarily unavailable"
-	for {
-		if err := ipt.AppendUnique("nat", "WEAVE", rulespec...); err != nil {
-			if ierr, ok := err.(*iptables.Error); ok {
-				if status, ok := ierr.ExitError.Sys().(syscall.WaitStatus); ok {
-					// (magic exit code 4 found in iptables source code; undocumented)
-					if status.ExitStatus() == 4 {
-						continue
-					}
-				}
-			}
-			return err
-		}
-		return nil
-	}
-}
-
-func ExposeNAT(ipnet net.IPNet) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return err
-	}
-	cidr := ipnet.String()
-	if err := addNatRule(ipt, "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
-		return err
-	}
-	if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
-		return err
-	}
-	return addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE")
 }

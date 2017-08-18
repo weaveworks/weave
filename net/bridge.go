@@ -8,7 +8,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
-	"github.com/j-keck/arping"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 
@@ -478,36 +477,4 @@ func linkSetUpByName(linkName string) error {
 		return errors.Wrapf(err, "setting link up on %q", linkName)
 	}
 	return netlink.LinkSetUp(link)
-}
-
-func AddBridgeAddr(bridgeName string, addr *net.IPNet, removeDefaultRoute bool) error {
-	link, err := netlink.LinkByName(bridgeName)
-	if err != nil {
-		return errors.Wrapf(err, "AddBridgeAddr finding bridge %q", bridgeName)
-	}
-	newAddresses, err := AddAddresses(link, []*net.IPNet{addr})
-	if err != nil {
-		return errors.Wrapf(err, "adding address %v to %q", addr, bridgeName)
-	}
-	for _, ipnet := range newAddresses {
-		arping.GratuitousArpOverIfaceByName(ipnet.IP, bridgeName)
-	}
-	if removeDefaultRoute {
-		routeFilter := &netlink.Route{
-			LinkIndex: link.Attrs().Index,
-			Dst:       &net.IPNet{IP: addr.IP.Mask(addr.Mask), Mask: addr.Mask},
-			Protocol:  2, // RTPROT_KERNEL
-		}
-		filterMask := netlink.RT_FILTER_OIF | netlink.RT_FILTER_DST | netlink.RT_FILTER_PROTOCOL
-		routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, routeFilter, filterMask)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get route list for bridge %q", bridgeName)
-		}
-		for _, r := range routes {
-			if err = netlink.RouteDel(&r); err != nil {
-				return errors.Wrapf(err, "failed to delete default route %+v", r)
-			}
-		}
-	}
-	return nil
 }

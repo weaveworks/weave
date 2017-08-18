@@ -33,13 +33,6 @@ check_container_connectivity() {
 
 start_suite "exposing weave network to host"
 
-# expose/hide with a CIDR work prior to launching weave
-run_on1   "! $PING $EXP"
-weave_on1 "expose  $EXP/24"
-run_on1   "  $PING $EXP"
-weave_on1 "hide    $EXP/24"
-run_on1   "! $PING $EXP"
-
 weave_on $HOST1 launch --ipalloc-range $UNIVERSE
 
 start_container $HOST1 $C1/24 --name=c1

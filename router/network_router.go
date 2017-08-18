@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/db"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 const (
@@ -47,11 +48,12 @@ type PacketLogging interface {
 type NetworkRouter struct {
 	*mesh.Router
 	NetworkConfig
+	weavenet.BridgeConfig
 	Macs *MacCache
 	db   db.DB
 }
 
-func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) (*NetworkRouter, error) {
+func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, bridgeConfig weavenet.BridgeConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) (*NetworkRouter, error) {
 	if overlay == nil {
 		overlay = NullNetworkOverlay{}
 	}
@@ -63,7 +65,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 	if err != nil {
 		return nil, err
 	}
-	router := &NetworkRouter{Router: meshRouter, NetworkConfig: networkConfig, db: db}
+	router := &NetworkRouter{Router: meshRouter, NetworkConfig: networkConfig, BridgeConfig: bridgeConfig, db: db}
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
