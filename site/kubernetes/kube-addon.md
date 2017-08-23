@@ -234,6 +234,10 @@ $ kubectl exec -n kube-system weave-net-1jkl6 -c weave -- /home/weave/weave --lo
 
 3\. Finally you could also use [Weave Cloud](https://cloud.weave.works/) and monitor all your pods, including Weave Net's ones, from there.
 
+![Weave Net status screen in Weave Cloud](weave-cloud-net-status.png)
+
+For more information see [What is Weave Cloud?](https://www.weave.works/faq/weave-cloud-faq/)
+
 ### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, the first thing to do is check the `weave-npc` container's logs.
