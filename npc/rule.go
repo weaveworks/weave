@@ -20,23 +20,25 @@ func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, ds
 	if proto != nil {
 		args = append(args, "-p", *proto)
 	}
+	srcComment := "anywhere"
 	if srcHost != nil {
 		args = append(args, "-m", "set", "--match-set", string(srcHost.ipsetName), "src")
+		if srcHost.nsName != "" {
+			srcComment = fmt.Sprintf("pods: namespace: %s, selector: %s", srcHost.nsName, srcHost.key)
+		} else {
+			srcComment = fmt.Sprintf("namespaces: selector: %s", srcHost.key)
+		}
 	}
+	dstComment := "anywhere"
 	if dstHost != nil {
 		args = append(args, "-m", "set", "--match-set", string(dstHost.ipsetName), "dst")
+		dstComment = fmt.Sprintf("pods: namespace: %s, selector: %s", dstHost.nsName, dstHost.key)
 	}
 	if dstPort != nil {
 		args = append(args, "--dport", *dstPort)
 	}
 	args = append(args, "-j", "ACCEPT")
-	srcComment := ""
-	if srcHost.nsName != "" {
-		srcComment = fmt.Sprintf("pods: namespace: %s, selector: %s", srcHost.nsName, srcHost.key)
-	} else {
-		srcComment = fmt.Sprintf("namespaces: selector: %s", srcHost.key)
-	}
-	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> namespace: %s, key: %s", srcComment, dstHost.nsName, dstHost.key))
+	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
 	key := strings.Join(args, " ")
 
 	return &ruleSpec{key, args}
