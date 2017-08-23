@@ -1,3 +1,32 @@
+## Release 2.0.3
+
+Bug fixes
+
+* Weave-npc would crash on a policy with no 'from' part - regression introduced in 2.0.2 #3095,#3096,#3097
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/61?closed=1).
+
+
+## Release 2.0.2
+
+Bug fixes and minor improvements
+
+* Fix race condition in weave-npc which would intermittently block all traffic for a namespace  #3057,#3059
+* Ensure Fast Datapath works on machines that need to mount the kernel module dynamically #3080
+* Regression: weave-npc would block everything if `kubelet --hostname-override` was used #3049,#3051
+* Fix netfilter rules to block containers from accessing the Weave Net control endpoint #3093
+* If DNS server is off then disable proxy DNS registration, to avoid spurious errors #3054,#3088
+* Add comments to each iptables rule and ipset, to help when troubleshooting #3064
+* Remove code that checked for an outdated fallback address for Kubernetes api-server #3071
+* Add a label to the weavedb image so it can be filtered out by tools #3066
+* Fix various build and continuous-integration failures #3061
+* Print 'help' text faster in the weave script #3056
+* Add an option to create continuous integration hosts in different ways  #3060
+* Remove remnants of the pre-2.0 proxy and plugin from build and test #3035,#3036
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/60?closed=1).
+
+
 ## Release 2.0.1
 
 Bug fixes and minor improvements
