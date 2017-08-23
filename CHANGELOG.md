@@ -1,3 +1,12 @@
+## Release 2.0.3
+
+Bug fixes
+
+* Weave-npc would crash on a policy with no 'from' part - regression introduced in 2.0.2 #3095,#3096,#3097
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/61?closed=1).
+
+
 ## Release 2.0.2
 
 Bug fixes and minor improvements
