@@ -30,13 +30,19 @@ func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, ds
 		args = append(args, "--dport", *dstPort)
 	}
 	args = append(args, "-j", "ACCEPT")
-	srcComment := ""
-	if srcHost.nsName != "" {
-		srcComment = fmt.Sprintf("pods: namespace: %s, selector: %s", srcHost.nsName, srcHost.key)
-	} else {
-		srcComment = fmt.Sprintf("namespaces: selector: %s", srcHost.key)
+	srcComment := "anywhere"
+	if srcHost != nil {
+		if srcHost.nsName != "" {
+			srcComment = fmt.Sprintf("pods: namespace: %s, selector: %s", srcHost.nsName, srcHost.key)
+		} else {
+			srcComment = fmt.Sprintf("namespaces: selector: %s", srcHost.key)
+		}
 	}
-	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> namespace: %s, key: %s", srcComment, dstHost.nsName, dstHost.key))
+	dstComment := "anywhere"
+	if dstHost != nil {
+		dstComment = fmt.Sprintf("pods: namespace: %s, selector: %s", dstHost.nsName, dstHost.key)
+	}
+	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
 	key := strings.Join(args, " ")
 
 	return &ruleSpec{key, args}
