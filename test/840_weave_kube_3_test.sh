@@ -94,6 +94,20 @@ spec:
       run: nettest
 EOF
 
+# Another policy, this time with no 'from' section, just to check that doesn't cause a crash
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+  name: test840f
+spec:
+  ingress:
+  - {}
+  podSelector:
+    matchLabels:
+      run: norealpods
+EOF
+
 check_ready() {
     run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
 }
@@ -134,6 +148,9 @@ assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # Check that a pod can contact the outside world
 assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
+
+# Check that our pods haven't crashed
+assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
 
 tear_down_kubeadm
 
