@@ -84,8 +84,8 @@ and so you will need to perform the procedure manually:
 * Apply the updated addon manifest `kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"`
 * Kill each Weave Net pod with `kubectl delete` and then wait for it to reboot before moving on to the next pod.
 
-**Note:** If you delete all Weave Net pods at the same time they will
-  lose track of IP address range ownership, possibly leading to
+**Note:** In versions prior to Weave Net 2.0, deleting all Weave Net pods at the same time
+  will result in them losing track of IP address range ownership, possibly leading to
   duplicate IP addresses if you then start a new copy of Weave Net.
 
 ## <a name="resources"></a>CPU and Memory Requirements
@@ -166,11 +166,9 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
 
 ## <a name="troubleshooting"></a><a name="troubleshooting"></a> Troubleshooting
 
-When using the Kubernetes addon, Weave Net's peers are managed via Kubernetes and very little effort should be required from your end to operate your network.
+The status of Weave Net can be checked by running its CLI commands. This can be done in various ways:
 
-However, should you need it, you can still run `weave` CLI commands to, for example, confirm Weave Net' status. This can be done in various ways:
-
-1. You could [install the `weave` script](/site/installing-weave.md) and run the same commands you would run without Kubernetes:
+1\. [Install the `weave` script](/site/installing-weave.md) and run:
 
 ```
 $ weave status
@@ -192,26 +190,29 @@ $ weave status
   DefaultSubnet: 10.32.0.0/12
 ```
 
-2. If you do not want to install anything else on your hosts, you can use the following `kubectl` commands, which will produce the exact same outcome as the previous example:
+2\. If you don't want to install additional software onto your hosts, run via `kubectl` commands, which produce the exact same outcome as the previous example:
 
 ```
 ### Identify the Weave Net pods:
 
-$ kubectl get pods --all-namespaces -o wide | grep weave
-kube-system  weave-net-1jkl6  2/2  Running  0  1d  10.128.0.4  host-0
-kube-system  weave-net-bskbv  2/2  Running  0  1d  10.128.0.5  host-1
-kube-system  weave-net-m4x1b  2/2  Running  0  1d  10.128.0.6  host-2
+$ kubectl get pods -n kube-system -l name=weave-net -o wide
+NAME              READY  STATUS   RESTARTS  AGE  IP           NODE
+weave-net-1jkl6   2/2    Running  0         1d   10.128.0.4   host-0
+weave-net-bskbv   2/2    Running  0         1d   10.128.0.5   host-1
+weave-net-m4x1b   2/2    Running  0         1d   10.128.0.6   host-2
+```
 
-### The above shows all Weave Net pods available in your cluster.
-### You can see Kubernetes has deployed one Weave Net pod per host, in order to interconnect all hosts.
+The above shows all Weave Net pods available in your cluster.
+You can see Kubernetes has deployed one Weave Net pod per host, in order to interconnect all hosts.
 
-### You then need to:
-### - choose which pod you want to run your command from (e.g.: here, pod weave-net-1jkl6, running on host-0), and
-### - make sure you pass --local to weave, in addition to your command:
+You then need to:
+ - choose which pod you want to run your command from (in most cases it doesn't matter
+   which one you pick so just pick the first one, e.g. pod `weave-net-1jkl6` here)
+ - use `kubectl exec` to run the `weave status` command
+ - specify the absolute path `/home/weave/weave` and add `--local` because it's running inside a container
 
-$ kubectl exec -n kube-system weave-net-1jkl6 -- /home/weave/weave --local status
-Defaulting container name to weave.
-Use 'kubectl describe pod/weave-net-1jkl6' to see all of the containers in this pod.
+```
+$ kubectl exec -n kube-system weave-net-1jkl6 -c weave -- /home/weave/weave --local status
 
         Version: 2.0.1 (up to date; next check at 2017/07/10 13:49:29)
 
@@ -231,7 +232,7 @@ Use 'kubectl describe pod/weave-net-1jkl6' to see all of the containers in this 
   DefaultSubnet: 10.32.0.0/12
 ```
 
-3. Finally you could also use [Weave Cloud](https://cloud.weave.works/) and monitor all your pods, including Weave Net's ones, from there.
+3\. Finally you could also use [Weave Cloud](https://cloud.weave.works/) and monitor all your pods, including Weave Net's ones, from there.
 
 ### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
