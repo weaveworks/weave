@@ -33,14 +33,33 @@ type Interface interface {
 type ipset struct {
 	refCount
 	*log.Logger
+	enableComments bool
 }
 
 func New(logger *log.Logger) Interface {
-	return &ipset{refCount: newRefCount(), Logger: logger}
+	ips := &ipset{refCount: newRefCount(), Logger: logger, enableComments: true}
+
+	// Check for comment support
+	testIpsetName := Name("weave-test-comment")
+	// Clear it out if it already exists
+	_ = ips.Destroy(testIpsetName)
+	// Test for comment support
+	if err := ips.Create(testIpsetName, HashIP); err != nil {
+		ips.Logger.Printf("failed to create %s; disabling comment support", testIpsetName)
+		ips.enableComments = false
+	}
+	// If it was created, destroy it
+	_ = ips.Destroy(testIpsetName)
+
+	return ips
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
-	return doExec("create", string(ipsetName), string(ipsetType), "comment")
+	args := []string{"create", string(ipsetName), string(ipsetType)}
+	if i.enableComments {
+		args = append(args, "comment")
+	}
+	return doExec(args...)
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
@@ -48,7 +67,11 @@ func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
 	if i.inc(ipsetName, entry) > 1 { // already in the set
 		return nil
 	}
-	return doExec("add", string(ipsetName), entry, "comment", comment)
+	args := []string{"add", string(ipsetName), entry}
+	if i.enableComments {
+		args = append(args, "comment", comment)
+	}
+	return doExec(args...)
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
