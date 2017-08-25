@@ -455,6 +455,15 @@ func configureIPTables(config *BridgeConfig) error {
 			return err
 		}
 	}
+
+	if !config.NPC {
+		// Create a chain for allowing ingress traffic when the bridge is exposed
+		_ = ipt.NewChain("filter", "WEAVE-EXPOSE")
+		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"); err != nil {
+			return err
+		}
+	}
+
 	// Forward from weave to the rest of the world
 	if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "!", "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
 		return err

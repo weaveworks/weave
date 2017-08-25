@@ -19,16 +19,31 @@ import (
 // * "removeDefaultRoute" - whether to remove a default route installed by the kernel (used only in the AWSVPC mode).
 // * "npc" - whether is Weave NPC running.
 func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return errors.Wrap(err, "iptables.New")
+	}
+	cidr := ipAddr.String()
+
 	if err := addBridgeIPAddr(bridgeName, ipAddr, removeDefaultRoute); err != nil {
 		return errors.Wrap(err, "addBridgeIPAddr")
 	}
 
-	if err := exposeNAT(ipAddr); err != nil {
+	if err := exposeNAT(ipt, cidr); err != nil {
 		return errors.Wrap(err, "exposeNAT")
 	}
 
 	if !npc {
-		// TODO comment why not in npc mode && add filter rules and docs
+		// Docker 1.13 has changed a default policy of FORWARD chain to DROP
+		// (https://github.com/moby/moby/pull/28257) which makes containers
+		// inaccessible from a remote host when the bridge is exposed.
+		//
+		// The change breaks e.g. the AWSVPC mode. To overcome this we install
+		// an explicit rule for accepting forwarded ingress traffic to an
+		// exposed subnet.
+		if err := ipt.AppendUnique("filter", "WEAVE-EXPOSE", "-d", cidr, "-j", "ACCEPT"); err != nil {
+			return errors.Wrap(err, "ipt.AppendUnique")
+		}
 	}
 
 	return nil
@@ -71,13 +86,7 @@ func addBridgeIPAddr(bridgeName string, addr *net.IPNet, removeDefaultRoute bool
 	return nil
 }
 
-func exposeNAT(ipnet *net.IPNet) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return err
-	}
-	cidr := ipnet.String()
-
+func exposeNAT(ipt *iptables.IPTables, cidr string) error {
 	if err := addNatRule(ipt, "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
 		return err
 	}
