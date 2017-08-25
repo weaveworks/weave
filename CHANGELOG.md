@@ -1,3 +1,12 @@
+## Release 2.0.4
+
+Bug fixes
+
+* weave-npc failed on Centos 7, due to older 'ipset' version in kernel #3099,#3100
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/62?closed=1).
+
+
 ## Release 2.0.3
 
 Bug fixes
