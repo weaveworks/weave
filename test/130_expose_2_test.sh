@@ -7,7 +7,9 @@ C2=10.2.1.37
 C3=10.2.2.34
 C4=10.2.2.37
 EXP=10.2.2.101
+EXP_CIDR=10.2.2.0/24
 UNIVERSE=10.2.3.0/24
+PORT=5555
 
 weave_on1() {
     assert_raises "weave_on $HOST1 $@"
@@ -15,6 +17,10 @@ weave_on1() {
 
 run_on1() {
     assert_raises "run_on   $HOST1 $@"
+}
+
+run_on2() {
+    assert_raises "run_on   $HOST2 $@"
 }
 
 exec_on1() {
@@ -70,5 +76,15 @@ run_on1   "  $PING $C5"
 weave_on1 "hide"
 weave_on1 "hide"
 run_on1   "! $PING $C5"
+
+# remote host connectivity after 'expose'
+docker_on $HOST1 exec -d c3 nc -l -p $PORT
+weave_on1 "expose $EXP/24"
+# Make c3 reachable from host2 w/o installing a route on host2 which does
+# not work on GCP.
+run_on1   "sudo iptables -t nat -A PREROUTING -p tcp --dport $PORT -j DNAT --to-destination $C3:$PORT"
+run_on2   "sh -c \"echo hello | nc -w1 $HOST1 $PORT\""
+weave_on1 "hide"
+run_on1   "sudo iptables -t nat -D PREROUTING -p tcp --dport $PORT -j DNAT --to-destination $C3:$PORT"
 
 end_suite
