@@ -8,12 +8,7 @@ IMAGE_VERSION=latest
 [ "$SCRIPT_VERSION" = "unreleased" ] || IMAGE_VERSION=$SCRIPT_VERSION
 IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
-# - The weavexec image embeds a Docker 1.10.3 client. Docker will give
-#   a "client is newer than server error" if the daemon has an older
-#   API version, which could be confusing if the user's Docker client
-#   is correctly matched with that older version.
-#
-# We therefore check that the user's Docker *client* is >= 1.10.3
+# Minimum tested version of Docker + Weave Net
 MIN_DOCKER_VERSION=1.10.0
 
 # These are needed for remote execs, hence we introduce them here
@@ -105,13 +100,6 @@ usage() {
     exit 1
 }
 
-handle_help_arg() {
-    if [ "$1" = "--help" ] ; then
-        usage_no_exit
-        exit 0
-    fi
-}
-
 docker_sock_options() {
     # Pass through DOCKER_HOST if it is a Unix socket;
     # a TCP socket may be secured by TLS, in which case we can't use it
@@ -123,7 +111,7 @@ docker_sock_options() {
 }
 
 docker_run_options() {
-    echo --privileged --net=host $(docker_sock_options)
+    echo --privileged --net host $(docker_sock_options)
 }
 
 exec_options() {
@@ -142,7 +130,7 @@ exec_options() {
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm \
         $(docker_run_options) \
-        --pid=host \
+        --pid host \
         $(exec_options "$@") \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
@@ -213,7 +201,7 @@ collect_cidr_args() {
 }
 
 kill_container() {
-    docker kill $1 >/dev/null 2>&1 || true
+    util_op kill-container $1 >/dev/null 2>&1 || true
 }
 
 ######################################################################
@@ -222,28 +210,40 @@ kill_container() {
 
 [ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
-# "--help|help" and "<command> --help" are special because we always want to
-# process them at the client end.
-handle_help_arg "$1"
-handle_help_arg "--$1"
-handle_help_arg "$2"
-
-if [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
-    # non-local "version" is special because we want to show the
-    # version of the script executed by the user rather than what is
-    # embedded in weaveexec.
-    echo "weave script $SCRIPT_VERSION"
-elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
-    # "env --restore" is special because we always want to process it
-    # at the client end.
-    if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
-        echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
-        exit 1
-    else
-        echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
+# Handle special case $1 commands that run locally at the client end
+case "$1" in
+    help|--help)
+        usage_no_exit
         exit 0
-    fi
-fi
+        ;;
+    version)
+        # non-local "version" is special because we want to show the
+        # version of the script executed by the user rather than what is
+        # embedded in weaveexec.
+        [ -z "$IS_LOCAL" ] && echo "weave script $SCRIPT_VERSION"
+        ;;
+    env)
+        if [ "$2" = "--restore" ] ; then
+            # "env --restore" is special because we always want to process it
+            # at the client end.
+            if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
+                echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
+                exit 1
+            else
+                echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
+                exit 0
+            fi
+        fi
+        ;;
+    setup)
+        for img in $IMAGE $EXEC_IMAGE $WEAVEDB_IMAGE ; do
+          docker pull $img
+        done
+        ;;
+    *)
+        [ "$2" = "--help" ] && usage_no_exit && exit 0
+        ;;
+esac
 
 if [ -z "$IS_LOCAL" ] ; then
     check_docker_version
@@ -256,7 +256,7 @@ fi
 ######################################################################
 
 # Default restart policy for router/proxy
-RESTART_POLICY="--restart=always"
+RESTART_POLICY="--restart always"
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
@@ -265,6 +265,7 @@ PLUGIN_NAME="$DOCKERHUB_USER/net-plugin"
 OLD_PLUGIN_CONTAINER_NAME=weaveplugin
 CNI_PLUGIN_NAME="weave-plugin-$IMAGE_VERSION"
 CNI_PLUGIN_DIR=${WEAVE_CNI_PLUGIN_DIR:-$HOST_ROOT/opt/cni/bin}
+VOLUMES_LABEL=weavevolumes
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
 VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
 # DB files should remain when you upgrade, so version number not included in name
@@ -367,7 +368,7 @@ util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
-        docker run --rm --pid=host $(docker_run_options) \
+        docker run --rm --pid host $(docker_run_options) \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
@@ -564,15 +565,6 @@ router_bridge_opts() {
     [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
 }
 
-ask_version() {
-    if check_running $1 2>/dev/null ; then
-        DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 )
-    elif ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
-        echo "Unable to find $2 image." >&2
-    fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
-}
-
 attach() {
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
@@ -585,41 +577,50 @@ attach() {
 # functions for interacting with containers
 ######################################################################
 
-# Check that a container for component $1 named $2 with image $3 is not running
+# Print an error to stderr and return with an indicative exit status
+# if the container $1 does not exist or isn't running.
+check_running() {
+    if ! STATE=$(util_op container-state $1 2> /dev/null) ; then
+        echo  "$1 container is not present. Have you launched it?" >&2
+        return 1
+    elif [ "$STATE" = "restarting" ] ; then
+        echo "$1 container is restarting." >&2
+        return 2
+    elif [ "$STATE" != "running" ] ; then
+        echo "$1 container is not running." >&2
+        return 2
+    fi
+}
+
+# Execute $@ only if the weave container is running
+when_weave_running() {
+    ! check_running $CONTAINER_NAME 2>/dev/null || "$@"
+}
+
+# Check that a container $1 with image $2 is not running
 check_not_running() {
-    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
-    case ${RUN_STATUS%:*} in
-        "true restarting $3")
-            echo "$2 is restarting; you can stop it with 'weave stop'." >&2
+    STATE=$(util_op container-state $1 $2 2> /dev/null) || true
+    case ${STATE} in
+        "running")
+            echo "$1 is already running; you can stop it with 'weave stop'." >&2
             return 3
             ;;
-        "true "*" $3")
-            echo "$2 is already running; you can stop it with 'weave stop'." >&2
+        "created" | "paused" | "restarting")
+            echo "$1 is created, paused, or restarting; you can stop it with 'weave stop'." >&2
             return 1
             ;;
-        "false "*" $3")
-            docker rm $2 >/dev/null
+        "exited" | "dead")
+            util_op remove-container $1 >/dev/null
             ;;
-        true*)
-            echo "Found another running container named '$2'. Aborting." >&2
+        "running image mismatch"*)
+            echo "Found another running container named '$1'. Aborting." >&2
             return 2
             ;;
-        false*)
-            echo "Found another container named '$2'. Aborting." >&2
+        "image mismatch"*)
+            echo "Found another container named '$1'. Aborting." >&2
             return 2
             ;;
     esac
-}
-
-# Given a container name or short ID in $1, ensure the specified
-# container exists and then print its full ID to stdout. If
-# it doesn't exist, print an error to stderr and
-# return with an indicative non-zero exit code.
-container_id() {
-    if ! docker inspect --format='{{.Id}}' $1 2>/dev/null ; then
-        echo "Error: No such container: $1" >&2
-        return 1
-    fi
 }
 
 http_call() {
@@ -825,32 +826,9 @@ dns_args() {
 }
 
 rewrite_etc_hosts() {
-    HOSTS_PATH_AND_FQDN=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER) || return 1
-    HOSTS=${HOSTS_PATH_AND_FQDN% *}
-    FQDN=${HOSTS_PATH_AND_FQDN#* }
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    util_op rewrite-etc-hosts "$HOSTS" "$FQDN" "$EXEC_IMAGE" "$ALL_CIDRS" "$@"
-}
-
-# Print an error to stderr and return with an indicative exit status
-# if the container $1 does not exist or isn't running.
-check_running() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Restarting}}' $1 2>/dev/null) ; then
-        echo  "$1 container is not present. Have you launched it?" >&2
-        return 1
-    elif [ "$STATUS" = "true true" ] ; then
-        echo "$1 container is restarting." >&2
-        return 2
-    elif [ "$STATUS" != "true false" ] ; then
-        echo "$1 container is not running." >&2
-        return 2
-    fi
-}
-
-# Execute $@ only if the weave container is running
-when_weave_running() {
-    ! check_running $CONTAINER_NAME 2>/dev/null || "$@"
+    util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" "$@" || return 1
 }
 
 # Iff the container in $1 has an FQDN, invoke $2 as a command passing
@@ -861,7 +839,7 @@ with_container_fqdn() {
     COMMAND_WCF="$2"
     shift 2
 
-    CONT_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONT 2>/dev/null) || return 0
+    CONT_FQDN=$(util_op container-fqdn $CONT 2>/dev/null) || return 0
     CONT_NAME=${CONT_FQDN%%.*}
     [ "$CONT_NAME" = "$CONT_FQDN" -o "$CONT_NAME." = "$CONT_FQDN" ] || $COMMAND_WCF "$CONT" "$CONT_FQDN" "$@"
 }
@@ -931,7 +909,7 @@ collect_dns_add_remove_args() {
     check_running $CONTAINER_NAME
     if [ -n "$C" ] ; then
         check_running $C
-        CONTAINER=$(container_id $C)
+        CONTAINER=$(util_op container-id $C)
         [ $IP_COUNT -gt 0 ] || IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
     fi
 }
@@ -1231,10 +1209,10 @@ launch() {
     fi
 
     # Create a data-only container for persistence data
-    if ! docker inspect -f ' ' $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
-       protect_against_docker_hang
-       docker create -v /weavedb --name=$DB_CONTAINER_NAME \
-           --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
+    if ! util_op container-state $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
+        protect_against_docker_hang
+        util_op create-volume-container $DB_CONTAINER_NAME $WEAVEDB_IMAGE $VOLUMES_LABEL \
+            /weavedb >/dev/null
     fi
 
     # Figure out the location of the actual resolv.conf file because
@@ -1254,19 +1232,19 @@ launch() {
     proxy_args "$@"
     mkdir -p /var/run/weave
     # Create a data-only container to mount the weavewait files from
-    if ! docker inspect -f ' ' $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
-       protect_against_docker_hang
-       docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
-           --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
+    if ! util_op container-state $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
+        protect_against_docker_hang
+        util_op create-volume-container $VOLUMES_CONTAINER_NAME $EXEC_IMAGE $VOLUMES_LABEL \
+            /w /w-noop /w-nomcast >/dev/null
     fi
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
-    WEAVE_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
+    WEAVE_CONTAINER=$(util_op run-container --name $CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
-        --pid=host \
+        --pid host \
         --volumes-from $DB_CONTAINER_NAME \
         --volumes-from $VOLUMES_CONTAINER_NAME \
         $PROXY_VOLUMES \
@@ -1299,10 +1277,10 @@ launch() {
 stop() {
     util_op remove-plugin-network weave || true
     warn_if_stopping_proxy_in_env
-    docker stop $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
+    util_op stop-container $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
     # In case user has upgraded from <v2.0 and left old containers running
-    docker stop $OLD_PLUGIN_CONTAINER_NAME >/dev/null 2>&1 || true
-    docker stop $OLD_PROXY_CONTAINER_NAME >/dev/null 2>&1 || true
+    util_op stop-container $OLD_PLUGIN_CONTAINER_NAME >/dev/null 2>&1 || true
+    util_op stop-container $OLD_PROXY_CONTAINER_NAME >/dev/null 2>&1 || true
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
 }
 
@@ -1346,18 +1324,13 @@ COMMAND=$1
 shift 1
 
 case "$COMMAND" in
-    setup)
-        for img in $IMAGE $EXEC_IMAGE $WEAVEDB_IMAGE ; do
-            docker pull $img
-        done
-        setup_cni
-        ;;
-    setup-cni)
+    setup|setup-cni)
         setup_cni
         ;;
     version)
         [ $# -eq 0 ] || usage
-        ask_version $CONTAINER_NAME $IMAGE || true
+        VERSION="weave $(call_weave GET /report --get --data-urlencode "format={{ .Version }}" 2> /dev/null)" || VERSION="$(/home/weave/weaver $COVERAGE_ARGS --version)"
+        echo $VERSION
         ;;
     attach-bridge)
         if detect_bridge_type ; then
@@ -1372,7 +1345,7 @@ case "$COMMAND" in
         detect_bridge_type && echo $BRIDGE_TYPE
         ;;
     launch)
-        check_not_running router $CONTAINER_NAME        $BASE_IMAGE
+        check_not_running $CONTAINER_NAME $BASE_IMAGE
         if http_call $HTTP_ADDR GET /status >/dev/null 2>&1 ; then
             echo "Weave Net is already running" >&2
             exit 1
@@ -1470,7 +1443,7 @@ case "$COMMAND" in
             shift
         done
         [ $# -eq 1 ] || usage
-        CONTAINER=$(container_id $1)
+        CONTAINER=$(util_op container-id $1)
         create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
@@ -1482,7 +1455,7 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         [ $# -eq 1 ] || usage
-        CONTAINER=$(container_id $1)
+        CONTAINER=$(util_op container-id $1)
         ipam_cidrs lookup $CONTAINER $CIDR_ARGS
         util_op detach-container $CONTAINER $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
@@ -1575,11 +1548,11 @@ case "$COMMAND" in
         esac
         stop
         for NAME in $CONTAINER_NAME $OLD_PROXY_CONTAINER_NAME $OLD_PLUGIN_CONTAINER_NAME ; do
-            docker rm -f $NAME >/dev/null 2>&1 || true
+            util_op remove-container -f $NAME >/dev/null 2>&1 || true
         done
         protect_against_docker_hang
-        VOLUME_CONTAINERS=$(docker ps -qa --filter label=weavevolumes)
-        [ -n "$VOLUME_CONTAINERS" ] && docker rm -v $VOLUME_CONTAINERS  >/dev/null 2>&1 || true
+        VOLUME_CONTAINERS=$(util_op list-containers $VOLUMES_LABEL)
+        [ -n "$VOLUME_CONTAINERS" ] && util_op remove-container -v $VOLUME_CONTAINERS  >/dev/null 2>&1 || true
         # weave-kube and v2-plugin put this file in different places; remove either
         rm -f $HOST_ROOT/var/lib/weave/weave-netdata.db >/dev/null 2>&1 || true
         rm -f $HOST_ROOT/var/lib/weave/weavedata.db     >/dev/null 2>&1 || true
