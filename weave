@@ -411,13 +411,9 @@ detect_bridge_type() {
 }
 
 try_create_bridge() {
-    # Running this from 'weave --local' when weaveexec is not on the
-    # path will run it as a Docker container that does not have access
-    # to /etc/machine-id, so will not give the full range of persistent IDs
-    if [ -z "$WEAVEDB_DIR_PATH" ]; then
-        WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
-    fi
-    MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
+    # Pass /dev/null because we do not have access to the weavedb files when this runs; BoltDB
+    # cannot open the file anyway if weaver is running, which is likely for attach|expose|hide.
+    MAC=$(util_op unique-id "/dev/null" "$HOST_ROOT")
     BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
     # Set some variables that are expected by code that comes later
     [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
