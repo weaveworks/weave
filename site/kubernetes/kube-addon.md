@@ -236,7 +236,7 @@ $ kubectl exec -n kube-system weave-net-1jkl6 -c weave -- /home/weave/weave --lo
 
 ![Weave Net status screen in Weave Cloud](weave-cloud-net-status.png)
 
-For more information see [What is Weave Cloud?](https://www.weave.works/faq/weave-cloud-faq/)
+For more information see [What is Weave Cloud?](https://www.weave.works/docs/cloud/latest/overview/)
 
 ### <a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
