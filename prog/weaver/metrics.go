@@ -82,6 +82,18 @@ var metrics = []metric{
 				ch <- intGauge(desc, metrics.Flows)
 			}
 		}},
+	{desc("weave_ipam_unreachable_count", "Number of unreachable peers."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			if s.IPAM != nil {
+				var count int64
+				for _, entry := range s.IPAM {
+					if !entry.IsKnownPeer {
+						count++
+					}
+				}
+				ch <- intGauge(desc, count)
+			}
+		}},
 	{desc("weave_ipam_pending_allocates", "Number of pending allocates."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.IPAM != nil {
