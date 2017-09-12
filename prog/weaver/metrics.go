@@ -85,8 +85,8 @@ var metrics = []metric{
 	{desc("weave_ipam_unreachable_count", "Number of unreachable peers."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.IPAM != nil {
-				var count int64
-				for _, entry := range s.IPAM {
+				var count int
+				for _, entry := range s.IPAM.Entries {
 					if !entry.IsKnownPeer {
 						count++
 					}
