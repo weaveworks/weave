@@ -7,7 +7,7 @@ type Stats struct {
 }
 
 func PeerStats(status *Status) Stats {
-	peerStats := make(map[string]*stats)
+	peerStats := make(map[string]*Stats)
 	for _, entry := range status.Entries {
 		s, found := peerStats[entry.Peer]
 		if !found {
