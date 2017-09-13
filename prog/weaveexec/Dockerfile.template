@@ -3,7 +3,6 @@ FROM DOCKERHUB_USER/weaveARCH_EXT
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
 
 ADD ./sigproxy ./symlink /home/weave/
-ADD ./docker /usr/bin/
 ADD ./weavewait /w/w
 ADD ./weavewait_noop /w-noop/w
 ADD ./weavewait_nomcast /w-nomcast/w
