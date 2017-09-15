@@ -237,7 +237,7 @@ case "$1" in
         ;;
     setup)
         for img in $IMAGE $EXEC_IMAGE $WEAVEDB_IMAGE ; do
-          docker pull $img
+          [ -z "$IS_LOCAL" ] &&  docker pull $img
         done
         ;;
     *)
