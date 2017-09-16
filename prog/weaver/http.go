@@ -34,8 +34,7 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	},
 	"printIPAMRanges": func(router weave.NetworkRouterStatus, status ipam.Status) string {
 		var buffer bytes.Buffer
-
-		peerStats := ipam.PeerStats(status)
+		peerStats := summariseIpamStats(&status)
 
 		printOwned := func(name string, nickName string, info string, ips uint32) {
 			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
@@ -48,17 +47,17 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		// print the local info first
 		if ourStats := peerStats[router.Name]; ourStats != nil {
 			activeStr := fmt.Sprintf("(%d active)", status.ActiveIPs)
-			printOwned(router.Name, ourStats.Nickname, activeStr, ourStats.IPs)
+			printOwned(router.Name, ourStats.nickname, activeStr, ourStats.ips)
 		}
 
 		// and then the rest
 		for peer, stats := range peerStats {
 			if peer != router.Name {
 				reachableStr := ""
-				if !stats.Reachable {
+				if !stats.reachable {
 					reachableStr = "- unreachable!"
 				}
-				printOwned(peer, stats.Nickname, reachableStr, stats.IPs)
+				printOwned(peer, stats.nickname, reachableStr, stats.ips)
 			}
 		}
 
@@ -100,6 +99,25 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	},
 	"trimSuffix": strings.TrimSuffix,
 })
+
+type ipamStats struct {
+	ips       uint32
+	nickname  string
+	reachable bool
+}
+
+func summariseIpamStats(status *ipam.Status) map[string]*ipamStats {
+	peerStats := make(map[string]*ipamStats)
+	for _, entry := range status.Entries {
+		s, found := peerStats[entry.Peer]
+		if !found {
+			s = &ipamStats{nickname: entry.Nickname, reachable: entry.IsKnownPeer}
+			peerStats[entry.Peer] = s
+		}
+		s.ips += entry.Size
+	}
+	return peerStats
+}
 
 func countDNSEntries(entries []nameserver.EntryStatus) int {
 	count := 0
