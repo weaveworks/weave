@@ -236,8 +236,9 @@ case "$1" in
         fi
         ;;
     setup)
+        # call 'docker pull' outside weaveexec so we don't need a docker binary inside
         for img in $IMAGE $EXEC_IMAGE $WEAVEDB_IMAGE ; do
-          docker pull $img
+          [ -z "$IS_LOCAL" ] &&  docker pull $img
         done
         ;;
     *)
