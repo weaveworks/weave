@@ -1098,18 +1098,13 @@ proxy_args() {
     fi
 }
 
-proxy_addrs() {
+proxy_addr() {
     if addr="$(call_weave GET /proxyaddrs)" ; then
       [ -n "$addr" ] || return 1
-      echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g" | tr '\n' ' '
+      echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g" | cut -d $'\n' -f1
     else
       return 1
     fi
-}
-
-proxy_addr() {
-    addr=$(proxy_addrs) || return 1
-    echo "$addr" | cut -d ' ' -f1
 }
 
 warn_if_stopping_proxy_in_env() {
