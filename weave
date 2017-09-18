@@ -186,20 +186,6 @@ check_docker_version() {
     fi
 }
 
-is_cidr() {
-    echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
-}
-
-collect_cidr_args() {
-    CIDR_ARGS=""
-    CIDR_ARG_COUNT=0
-    while [ "$1" = "net:default" ] || is_cidr "$1" || is_cidr "${1#ip:}" || is_cidr "${1#net:}" ; do
-        CIDR_ARGS="$CIDR_ARGS ${1#ip:}"
-        CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
-        shift 1
-    done
-}
-
 ######################################################################
 # main
 ######################################################################
@@ -900,6 +886,20 @@ collect_dns_add_remove_args() {
 ######################################################################
 # IP Allocation Management helpers
 ######################################################################
+
+is_cidr() {
+    echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
+}
+
+collect_cidr_args() {
+    CIDR_ARGS=""
+    CIDR_ARG_COUNT=0
+    while [ "$1" = "net:default" ] || is_cidr "$1" || is_cidr "${1#ip:}" || is_cidr "${1#net:}" ; do
+        CIDR_ARGS="$CIDR_ARGS ${1#ip:}"
+        CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
+        shift 1
+    done
+}
 
 check_overlap() {
     util_op netcheck $1 $BRIDGE
