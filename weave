@@ -561,14 +561,6 @@ router_bridge_opts() {
     [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
 }
 
-attach() {
-    ATTACH_ARGS=""
-    [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
-    # Relying on AWSVPC being set in 'ipam_cidrs allocate'
-    [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
-    util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
-}
-
 ######################################################################
 # functions for interacting with containers
 ######################################################################
@@ -1405,7 +1397,7 @@ case "$COMMAND" in
     attach)
         DNS_EXTRA_HOSTS=
         REWRITE_HOSTS=
-        NO_MULTICAST_ROUTE=
+        ATTACH_ARGS=
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         WITHOUT_DNS=
@@ -1425,7 +1417,7 @@ case "$COMMAND" in
                     DNS_EXTRA_HOSTS="${1#*=} $DNS_EXTRA_HOSTS"
                     ;;
                 --no-multicast-route)
-                    NO_MULTICAST_ROUTE=1
+                    ATTACH_ARGS="$1"
                     ;;
                 *)
                     break
@@ -1442,7 +1434,8 @@ case "$COMMAND" in
             # not modify it again) but leaving it with valid contents.
             util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" $DNS_EXTRA_HOSTS
         fi
-        attach $ALL_CIDRS >/dev/null
+        [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
+        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU $ALL_CIDRS >/dev/null
         [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
