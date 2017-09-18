@@ -822,12 +822,6 @@ dns_args() {
     fi
 }
 
-rewrite_etc_hosts() {
-    # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
-    # leaving it with valid contents...
-    util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" "$@" || return 1
-}
-
 # Iff the container in $1 has an FQDN, invoke $2 as a command passing
 # the container as the first argument, the FQDN as the second argument
 # and $3.. as additional arguments
@@ -1443,7 +1437,11 @@ case "$COMMAND" in
         CONTAINER=$(util_op container-id $1)
         create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
-        [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
+        if [ -n "$REWRITE_HOSTS" ] ; then
+            # rewrite /etc/hosts, unlinking the file (so Docker does
+            # not modify it again) but leaving it with valid contents.
+            util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" $DNS_EXTRA_HOSTS
+        fi
         attach $ALL_CIDRS >/dev/null
         [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
