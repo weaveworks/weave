@@ -1191,13 +1191,6 @@ launch() {
         fi
     fi
 
-    # Create a data-only container for persistence data
-    if ! util_op container-state $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
-        protect_against_docker_hang
-        util_op create-volume-container $DB_CONTAINER_NAME $WEAVEDB_IMAGE $VOLUMES_LABEL \
-            /weavedb >/dev/null
-    fi
-
     # Figure out the location of the actual resolv.conf file because
     # we want to bind mount its directory into the container.
     if [ -L ${HOST_ROOT:-/}/etc/resolv.conf ]; then # symlink
@@ -1213,7 +1206,15 @@ launch() {
 
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
+
     mkdir -p /var/run/weave
+
+    # Create a data-only container for persistence data
+    if ! util_op container-state $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
+        protect_against_docker_hang
+        util_op create-volume-container $DB_CONTAINER_NAME $WEAVEDB_IMAGE $VOLUMES_LABEL \
+            /weavedb >/dev/null
+    fi
     # Create a data-only container to mount the weavewait files from
     if ! util_op container-state $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
         protect_against_docker_hang
