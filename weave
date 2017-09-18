@@ -200,10 +200,6 @@ collect_cidr_args() {
     done
 }
 
-kill_container() {
-    util_op kill-container $1 >/dev/null 2>&1 || true
-}
-
 ######################################################################
 # main
 ######################################################################
@@ -576,6 +572,10 @@ attach() {
 ######################################################################
 # functions for interacting with containers
 ######################################################################
+
+kill_container() {
+    util_op kill-container $1 >/dev/null 2>&1 || true
+}
 
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
