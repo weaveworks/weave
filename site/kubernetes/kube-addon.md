@@ -14,6 +14,7 @@ The following topics are discussed:
 * [Network Policy Controller](#npc)
 * [Troubleshooting](#troubleshooting)
  * [Troubleshooting Blocked Connections](#blocked-connections)
+ * [Things to watch out for](#key-points)
 * [Changing Configuration Options](#configuration-options)
 
 
@@ -269,6 +270,15 @@ as per the below example:
 TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 ```
+
+### <a name="key-points"></a> Things to watch out for
+
+- Don't turn on `--masquerade-all` on kube-proxy: this will change the
+  source address of every pod-to-pod conversation which will make it
+  impossible to correctly enforce network policies that restrict which
+  pods can talk.
+- If you do set the `--cluster-cidr` option on kube-proxy, make sure
+  it matches the `IPALLOC_RANGE` given to Weave Net (see below)
 
 ## <a name="configuration-options"></a> Changing Configuration Options
 
