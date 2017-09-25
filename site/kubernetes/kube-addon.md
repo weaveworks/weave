@@ -164,7 +164,7 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
   all multicast traffic) by adding `--allow-mcast=false` as an
   argument to `weave-npc` in the YAML configuration.
 
-## <a name="troubleshooting"></a><a name="troubleshooting"></a> Troubleshooting
+## <a name="troubleshooting"></a> Troubleshooting
 
 The status of Weave Net can be checked by running its CLI commands. This can be done in various ways:
 
