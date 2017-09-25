@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/npc/ipset"
-	unversionedapi "k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	coreapi "k8s.io/client-go/pkg/api/v1"
 	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 )
 
 type mockSet struct {
@@ -109,7 +109,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	// https://github.com/weaveworks/weave/issues/3059
 
 	sourceNamespace := &coreapi.Namespace{
-		ObjectMeta: coreapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "source",
 			Labels: map[string]string{
 				"app": "source",
@@ -118,7 +118,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	}
 
 	destinationNamespace := &coreapi.Namespace{
-		ObjectMeta: coreapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "destination",
 		},
 	}
@@ -126,7 +126,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	port := intstr.FromInt(12345)
 
 	networkPolicy := &extnapi.NetworkPolicy{
-		ObjectMeta: coreapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "network-policy",
 			Namespace: "destination",
 		},
@@ -135,7 +135,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 				{
 					From: []extnapi.NetworkPolicyPeer{
 						{
-							NamespaceSelector: &unversionedapi.LabelSelector{
+							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"app": "source",
 								},

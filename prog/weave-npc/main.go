@@ -7,12 +7,12 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	coreapi "k8s.io/client-go/pkg/api/v1"
 	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -34,7 +34,7 @@ var (
 func handleError(err error) { common.CheckFatal(err) }
 
 func makeController(getter cache.Getter, resource string,
-	objType runtime.Object, handlers cache.ResourceEventHandlerFuncs) *cache.Controller {
+	objType runtime.Object, handlers cache.ResourceEventHandlerFuncs) cache.Controller {
 	listWatch := cache.NewListWatchFromClient(getter, resource, "", fields.Everything())
 	_, controller := cache.NewInformer(listWatch, objType, 0, handlers)
 	return controller

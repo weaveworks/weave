@@ -3,9 +3,9 @@ package npc
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api"
 	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/weaveworks/weave/npc/ipset"
 )

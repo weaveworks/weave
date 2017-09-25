@@ -5,8 +5,8 @@ import (
 	"log"
 	"net"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -19,7 +19,7 @@ func getKubePeers() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	nodeList, err := c.Nodes().List(api.ListOptions{})
+	nodeList, err := c.Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

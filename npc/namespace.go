@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	coreapi "k8s.io/client-go/pkg/api/v1"
 	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/uuid"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"
@@ -34,7 +34,7 @@ type ns struct {
 }
 
 func newNS(name, nodeName string, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
-	allPods, err := newSelectorSpec(&unversioned.LabelSelector{}, name, ipset.HashIP)
+	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/client-go/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/iptables"
