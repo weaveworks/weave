@@ -20,6 +20,7 @@ exposed:
 * `weave_max_ips` - Size of IP address space used by allocator.
 * `weave_dns_entries` - Number of DNS entries.
 * `weave_flows` - Number of FastDP flows.
+* `weave_ipam_unreachable_coun` - Number of unreachable peers.
 * `weave_ipam_pending_allocates` - Number of pending allocates.
 * `weave_ipam_pending_claims` - Number of pending claims.
 
