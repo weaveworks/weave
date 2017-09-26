@@ -92,6 +92,17 @@ var metrics = []metric{
 			}
 			ch <- intGauge(desc, count)
 		}},
+	{desc("weave_ipam_unreachable_percentage", "Percentage of IP addresses owned  by unreachable peers."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			var totalUnreachable uint32
+			for _, entry := range summariseIpamStats(s.IPAM) {
+				if !entry.reachable {
+					totalUnreachable += entry.ips
+				}
+			}
+			percentage := float64(totalUnreachable) * 100.0 / float64(s.IPAM.RangeNumIPs)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, percentage)
+		}},
 	{desc("weave_ipam_pending_allocates", "Number of pending allocates."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.IPAM != nil {

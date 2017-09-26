@@ -21,6 +21,7 @@ exposed:
 * `weave_dns_entries` - Number of DNS entries.
 * `weave_flows` - Number of FastDP flows.
 * `weave_ipam_unreachable_count` - Number of unreachable peers that own IPAM addresses.
+* `weave_ipam_unreachable_percentage` - Percentage of all IP addresses owned by unreachable peers.
 * `weave_ipam_pending_allocates` - Number of pending allocates.
 * `weave_ipam_pending_claims` - Number of pending claims.
 
