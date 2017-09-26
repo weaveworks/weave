@@ -17,15 +17,15 @@ QEMU_VERSION=v2.7.0
 
 # A list of all supported architectures here. Should be named as Go is naming platforms
 # All supported architectures must have an "ifeq" block below that customizes the parameters
-ALL_ARCHITECTURES=amd64 arm arm64
-ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64
+ALL_ARCHITECTURES=amd64 arm arm64 ppc64le
+ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le
 
 ifeq ($(ARCH),amd64)
 # The architecture to use when downloading the docker binary
 	WEAVEEXEC_DOCKER_ARCH?=x86_64
 
 # The name of the alpine baseimage to use as the base for weave images
-	ALPINE_BASEIMAGE?=alpine:3.4
+	ALPINE_BASEIMAGE?=alpine:3.6
 
 # The extension for the made images
 # Specifying none means for example weaveworks/weave:latest
@@ -42,7 +42,7 @@ ifeq ($(ARCH),arm)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=armhf/alpine:3.4
+	ALPINE_BASEIMAGE?=arm32v6/alpine:3.6
 
 # arm images have the -arm suffix, for instance weaveworks/weave-arm:latest
 	ARCH_EXT?=-arm
@@ -62,7 +62,7 @@ ifeq ($(ARCH),arm64)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=aarch64/alpine:3.5
+	ALPINE_BASEIMAGE?=arm64v8/alpine:3.6
 
 # arm64 images have the -arm64 suffix, for instance weaveworks/weave-arm64:latest
 	ARCH_EXT?=-arm64
@@ -74,6 +74,26 @@ ifeq ($(ARCH),arm64)
 	QEMUARCH=aarch64
 
 # In the weaveworks/build image; libpcap libraries for arm64 are placed here
+# Tell the gcc linker to search for libpcap here
+	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
+endif
+ifeq ($(ARCH),ppc64le)
+# The architecture to use when downloading the docker binary
+	WEAVEEXEC_DOCKER_ARCH?=ppc64le
+
+# Using the (semi-)official alpine image
+	ALPINE_BASEIMAGE?=ppc64le/alpine:3.6
+
+# ppc64le images have the -ppc64le suffix, for instance weaveworks/weave-ppc64le:latest
+	ARCH_EXT?=-ppc64le
+
+# The name of the gcc binary
+	CC=powerpc64le-linux-gnu-gcc
+
+# The architecture name to use when downloading a prebuilt QEMU binary
+	QEMUARCH=ppc64le
+
+# In the weaveworks/build image; libpcap libraries for ppc64le are placed here
 # Tell the gcc linker to search for libpcap here
 	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
 endif
@@ -244,7 +264,7 @@ ifeq ($(ARCH),amd64)
 	sed -i "/CROSS_BUILD_/d" $@
 else
 # When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+# Register /usr/bin/qemu-ARCH-static as the handler for ARM and ppc64le binaries in the kernel
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMU_VERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(shell dirname $@)
 	cd $(shell dirname $@) && sha256sum -c $(shell pwd)/build/shasums/qemu-$(QEMUARCH)-static.sha256sum
 	sed -i "s/CROSS_BUILD_//g" $@
@@ -334,7 +354,7 @@ publish-one-arch: $(PUBLISH)
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 # Tag :latest with the real version
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*$(ARCH_EXT) $(DOCKERHUB_USER)/$*$(ARCH_EXT):$(WEAVE_VERSION)
-# Push the image with the arch suffix for arm and arm64, and without suffix for amd64
+# Push the image with the arch suffix for arm, arm64 and ppc64le, and without suffix for amd64
 	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) push_$*$(ARCH_EXT)
 
 ifeq ($(ARCH),amd64)
