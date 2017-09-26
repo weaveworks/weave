@@ -285,11 +285,11 @@ on reboot. This can be disabled via:
 
     weave launch --no-restart
 
-Note that the Weave Net router will create the `weave` network bridge
-if necessary when it restarts, and the [Weave Net Docker API
-Proxy](/site/tasks/weave-docker-api/weave-docker-api.md) will re-attach any application
-containers that it originally attached to the Weave network when they
-restart.
+Note that the Weave Net router creates the `weave` network bridge if
+necessary when it restarts. The [Weave Net Docker API
+Proxy](/site/tasks/weave-docker-api/weave-docker-api.md) then
+re-attaches any application containers that it originally attached to
+the Weave network when they restart.
 
 ## <a name="v2plugin"></a>Troubleshooting the V2 plugin
 
