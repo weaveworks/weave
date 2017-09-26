@@ -14,6 +14,7 @@ search_type: Documentation
    - [List attached containers](#list-attached-containers)
  * [Stopping Weave](#stop)
  * [Reboots](#reboots)
+ * [Troubleshooting the V2 plugin](#v2plugin)
  * [Snapshot Releases](#snapshots)
 
 ## <a name="diagnostics"></a>Basic Diagnostics
@@ -289,6 +290,27 @@ if necessary when it restarts, and the [Weave Net Docker API
 Proxy](/site/tasks/weave-docker-api/weave-docker-api.md) will re-attach any application
 containers that it originally attached to the Weave network when they
 restart.
+
+## <a name="v2plugin"></a>Troubleshooting the V2 plugin
+
+If Weave Net is installed via `docker plugin install`, download the
+`weave` script to run `weave status`, `weave ps` or `weave report` as
+above.  Install Weave Net by following the [install
+instructions](/site/install/installing-weave.md).
+
+Docker "v2" plugins do run as containers, but at a lower level within
+the Docker environment.  Because of this, you cannot view them with
+`docker ps`, `docker inspect`, etc.
+
+Do not run `weave launch`, `weave stop` or similar commands when using
+this plugin; use the `docker plugin` commands instead.  You can run
+`weave reset`, but only after disabling the plugin via `docker plugin disable`.
+
+Diagnostic logs from the plugin go to the same place as the Docker
+daemon, which will depend on your Linux install. For example, if it
+uses `systemd`, then do this to view the Docker and plugin logs:
+
+    sudo journalctl -u docker
 
 ## <a name="snapshots"></a>Snapshot Releases
 
