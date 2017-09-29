@@ -13,10 +13,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	coreapi "k8s.io/client-go/pkg/api/v1"
 	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	networkingv1 "k8s.io/client-go/pkg/apis/networking/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -29,6 +31,7 @@ var (
 	logLevel    string
 	allowMcast  bool
 	nodeName    string
+	legacy      bool
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -46,11 +49,32 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.DefaultChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, npc.IngressIsolateChain); err != nil {
 		return err
 	}
 
-	return ipt.ClearChain(npc.TableFilter, npc.MainChain)
+	if err := ipt.ClearChain(npc.TableFilter, npc.IngressDropChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
+		return err
+	}
+
+	// The following are for removing obsolete (pre-networkingv1) chains and rules
+	// to ensure smooth upgrading of weave-npc
+	if err := ipt.ClearChain(npc.TableFilter, npc.DefaultChain); err != nil {
+		return err
+	}
+	if err := ipt.DeleteChain(npc.TableFilter, npc.DefaultChain); err != nil {
+		return err
+	}
+	// The rules might not exist, so ignore errors. Also, assume a default weave
+	// bridge name.
+	ipt.Delete("filter", "FORWARD", "-o", net.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86")
+	ipt.Delete("filter", "FORWARD", "-o", net.WeaveBridgeName, "-j", "DROP")
+
+	return nil
 }
 
 func resetIPSets(ips ipset.Interface) error {
@@ -91,20 +115,12 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
+	mcastTarget := "DROP"
 	if allowMcast {
-		if err := ipt.Append(npc.TableFilter, npc.MainChain,
-			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
-			return err
-		}
+		mcastTarget = "ACCEPT"
 	}
-
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
-		return err
-	}
-
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
+		"-d", "224.0.0.0/4", "-j", mcastTarget); err != nil {
 		return err
 	}
 
@@ -112,11 +128,31 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
 		return err
 	}
-	return ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT")
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "state", "--state", "NEW", "-j", string(npc.IngressIsolateChain)); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.IngressDropChain,
+		"-j", "NFLOG", "--nflog-group", "86"); err != nil {
+		return err
+	}
+	return ipt.Append(npc.TableFilter, npc.IngressDropChain,
+		"-j", "DROP")
 }
 
 func root(cmd *cobra.Command, args []string) {
+	var npController cache.Controller
+
 	common.SetLogLevel(logLevel)
 	if nodeName == "" {
 		// HOSTNAME is set by Kubernetes for pods in the host network namespace
@@ -135,6 +171,10 @@ func root(cmd *cobra.Command, args []string) {
 		common.Log.Fatalf("Failed to start ulogd: %v", err)
 	}
 
+	if legacy {
+		common.Log.Info("Running in legacy mode (k8s pre-1.7 network policy semantics)")
+	}
+
 	config, err := rest.InClusterConfig()
 	handleError(err)
 
@@ -150,7 +190,7 @@ func root(cmd *cobra.Command, args []string) {
 	handleError(resetIPSets(ips))
 	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(nodeName, ipt, ips)
+	npc := npc.New(nodeName, legacy, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -192,25 +232,29 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdatePod(old.(*coreapi.Pod), new.(*coreapi.Pod)))
 			}})
 
-	npController := makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{},
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				handleError(npc.AddNetworkPolicy(obj.(*extnapi.NetworkPolicy)))
-			},
-			DeleteFunc: func(obj interface{}) {
-				switch obj := obj.(type) {
-				case *extnapi.NetworkPolicy:
-					handleError(npc.DeleteNetworkPolicy(obj))
-				case cache.DeletedFinalStateUnknown:
-					// We know this object has gone away, but its final state is no longer
-					// available from the API server. Instead we use the last copy of it
-					// that we have, which is good enough for our cleanup.
-					handleError(npc.DeleteNetworkPolicy(obj.Obj.(*extnapi.NetworkPolicy)))
-				}
-			},
-			UpdateFunc: func(old, new interface{}) {
-				handleError(npc.UpdateNetworkPolicy(old.(*extnapi.NetworkPolicy), new.(*extnapi.NetworkPolicy)))
-			}})
+	npHandlers := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			handleError(npc.AddNetworkPolicy(obj))
+		},
+		DeleteFunc: func(obj interface{}) {
+			switch obj := obj.(type) {
+			case cache.DeletedFinalStateUnknown:
+				// We know this object has gone away, but its final state is no longer
+				// available from the API server. Instead we use the last copy of it
+				// that we have, which is good enough for our cleanup.
+				handleError(npc.DeleteNetworkPolicy(obj.Obj))
+			default:
+				handleError(npc.DeleteNetworkPolicy(obj))
+			}
+		},
+		UpdateFunc: func(old, new interface{}) {
+			handleError(npc.UpdateNetworkPolicy(old, new))
+		}}
+	if legacy {
+		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
+	} else {
+		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
+	}
 
 	go nsController.Run(wait.NeverStop)
 	go podController.Run(wait.NeverStop)
@@ -231,6 +275,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
+	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
 
 	handleError(rootCmd.Execute())
 }

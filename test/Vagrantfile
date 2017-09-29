@@ -25,7 +25,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.vm.define hostname do |host|
       host.vm.provider :virtualbox do |vb|
         vb.name = hostname
-        vb.memory = 384
+        vb.memory = 2048
         configure_nat_dns(vb)
       end
 

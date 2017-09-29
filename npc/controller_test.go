@@ -154,7 +154,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", &mockIPTables{}, &m)
+	controller := New("foo", true, &mockIPTables{}, &m)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -170,7 +170,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", &mockIPTables{}, &m)
+	controller = New("foo", true, &mockIPTables{}, &m)
 
 	controller.AddNetworkPolicy(networkPolicy)
 

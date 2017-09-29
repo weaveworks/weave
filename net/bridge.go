@@ -443,10 +443,7 @@ func configureIPTables(config *BridgeConfig) error {
 		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
 			return err
 		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"); err != nil {
-			return err
-		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "DROP"); err != nil {
+		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
 			return err
 		}
 	} else {

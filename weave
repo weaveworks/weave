@@ -507,7 +507,10 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
     run_iptables -F WEAVE-NPC >/dev/null 2>&1 || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-NPC 2>/dev/null || true
+    run_iptables -t filter -D FORWARD -o $BRIDGE -j ACCEPT 2>/dev/null || true
+    # TODO(mp) to remove in the future when no client is running < 2.1.0
     run_iptables -t filter -D FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86 2>/dev/null || true
+    # TODO(mp) to remove in the future when no client is running < 2.1.0
     run_iptables -t filter -D FORWARD -o $BRIDGE -j DROP 2>/dev/null || true
     run_iptables -X WEAVE-NPC >/dev/null 2>&1 || true
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
