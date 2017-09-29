@@ -32,7 +32,7 @@ You can of course also manually change the IP of any given container or subnet o
 ### IP Address Notation in Weave
 
 In the IP address `10.4.2.6/8`, the network prefix is the first 8 bits
-- `10`. Written out in full, that network is `10.0.0.0/8`.
+\- `10`. Written out in full, that network is `10.0.0.0/8`.
 
 The most common prefix lengths are 8, 16 and 24, but there is nothing
 stopping you using a /9 network or a /26. For example, `6.250.3.1/9` is on the
