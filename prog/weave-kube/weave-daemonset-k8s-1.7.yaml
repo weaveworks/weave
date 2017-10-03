@@ -99,7 +99,7 @@ items:
                 - name: xtables-lock
                   mountPath: /run/xtables.lock
                   readOnly: false
-          - name: weave-npc
+            - name: weave-npc
               env:
                 - name: HOSTNAME
                   valueFrom:
