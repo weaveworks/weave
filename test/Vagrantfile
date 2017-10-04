@@ -38,7 +38,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
       host.vm.provision :shell, :inline => <<END
 # Tests rely on hostnames, so we remove potentially incorrect entries (e.g. localhost), and add mappings of IP addresses to hostnames:
-sed -i '/#{hostname}/d' /etc/hosts
+sed -i.bak '/#{hostname}/d' /etc/hosts
 echo "#{ETC_HOSTS_ENTRIES}" >> /etc/hosts
 
 # Fix the resolution errors by using 8.8.8.8
