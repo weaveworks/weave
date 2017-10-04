@@ -383,11 +383,7 @@ func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
 		return errors.Wrap(err, "creating bridged fastdp veth pair")
 	}
 
-	if err := linkSetUpByName(bf.datapathName); err != nil {
-		return err
-	}
-
-	return nil
+	return linkSetUpByName(bf.datapathName)
 }
 
 func (b bridgeImpl) attach(veth *netlink.Veth) error {
@@ -473,11 +469,7 @@ func configureIPTables(config *BridgeConfig) error {
 	if err = ipt.ClearChain("nat", "WEAVE"); err != nil {
 		return errors.Wrap(err, "clearing WEAVE chain")
 	}
-	if err = ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
-		return err
-	}
-
-	return nil
+	return ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE")
 }
 
 func linkSetUpByName(linkName string) error {

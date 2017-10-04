@@ -218,11 +218,7 @@ func SetupIface(ifaceName, newIfName string) error {
 	if err := ConfigureARPCache("/proc", newIfName); err != nil {
 		return err
 	}
-	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
-		return err
-	}
-
-	return nil
+	return ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP")
 }
 
 // NB: This function can be used only by a process that terminates immediately
@@ -332,8 +328,5 @@ func ExposeNAT(ipnet net.IPNet) error {
 	if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
 		return err
 	}
-	if err := addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE"); err != nil {
-		return err
-	}
-	return nil
+	return addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE")
 }
