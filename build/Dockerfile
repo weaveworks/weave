@@ -6,17 +6,20 @@ ENV GOARM 7
 # The names of the architectures that we're fetching cross-compilers for from the Debian packages
 ENV DEB_CROSSPLATFORMS \
 	armhf \
-	arm64
+	arm64 \
+	ppc64el
 
 # The go platforms we are supporting to cross-compile
 ENV GO_CROSSPLATFORMS \
 	linux/arm \
-	linux/arm64
+	linux/arm64 \
+	linux/ppc64le
 
 # The names of the gcc cross-compilers we have installed
 ENV GCC_CROSSCOMPILERS \
 	arm-linux-gnueabihf \
-	aarch64-linux-gnu
+	aarch64-linux-gnu \
+	powerpc64le-linux-gnu
 
 # Temporarily add the Debian repositories, because we're going to install gcc cross-compilers from there
 # Install the build-essential and crossbuild-essential-ARCH packages
