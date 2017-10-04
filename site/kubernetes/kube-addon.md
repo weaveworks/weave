@@ -7,7 +7,7 @@ search_type: Documentation
 The following topics are discussed:
 
 * [Installation](#install)
- * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
+ * [Yaml files](#yamls)
  * [Upgrading the Daemon Sets](#daemon-sets)
  * [CPU and Memory Requirements](#resources)
  * [Pod Eviction](#eviction)
@@ -55,6 +55,19 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 
 Then relaunch Kubernetes and install the addon as described
 above.
+
+## <a name="yamls"></a> Kubernetes Yaml files supplied with Weave Net
+
+The Weave Cloud URL given at the top is designed to automatically
+supply a configuration suitable for your Kubernetes environment. For
+compatibility with previous releases we also supply a Yaml file which
+can be used to install Weave Net, in three variants:
+
+
+
+Three varia
+
+Kubernetes 1.7 
 
 ## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
 
