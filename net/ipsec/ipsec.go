@@ -421,10 +421,7 @@ func (ipsec *IPSec) installDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, in
 
 func (ipsec *IPSec) removeDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inSPI SPI) error {
 	rules := rulesDropNonEncrypted(srcIP, dstIP, udpPort, inSPI)
-	if err := ipsec.resetRules(rules, true); err != nil {
-		return err
-	}
-	return nil
+	return ipsec.resetRules(rules, true)
 }
 
 func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI) error {

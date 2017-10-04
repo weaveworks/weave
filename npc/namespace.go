@@ -65,10 +65,7 @@ func (ns *ns) empty() bool {
 }
 
 func (ns *ns) destroy() error {
-	if err := ns.podSelectors.deprovision(ns.uid, map[string]*selectorSpec{ns.allPods.key: ns.allPods}, nil); err != nil {
-		return err
-	}
-	return nil
+	return ns.podSelectors.deprovision(ns.uid, map[string]*selectorSpec{ns.allPods.key: ns.allPods}, nil)
 }
 
 func (ns *ns) onNewPodSelector(selector *selector) error {
@@ -180,11 +177,7 @@ func (ns *ns) addNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	if err := ns.podSelectors.provision(obj.ObjectMeta.UID, nil, podSelectors); err != nil {
 		return err
 	}
-	if err := ns.rules.provision(obj.ObjectMeta.UID, nil, rules); err != nil {
-		return err
-	}
-
-	return nil
+	return ns.rules.provision(obj.ObjectMeta.UID, nil, rules)
 }
 
 func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
@@ -217,11 +210,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
 	if err := ns.podSelectors.provision(oldObj.ObjectMeta.UID, oldPodSelectors, newPodSelectors); err != nil {
 		return err
 	}
-	if err := ns.rules.provision(oldObj.ObjectMeta.UID, oldRules, newRules); err != nil {
-		return err
-	}
-
-	return nil
+	return ns.rules.provision(oldObj.ObjectMeta.UID, oldRules, newRules)
 }
 
 func (ns *ns) deleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
@@ -240,11 +229,7 @@ func (ns *ns) deleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	if err := ns.nsSelectors.deprovision(obj.ObjectMeta.UID, nsSelectors, nil); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.deprovision(obj.ObjectMeta.UID, podSelectors, nil); err != nil {
-		return err
-	}
-
-	return nil
+	return ns.podSelectors.deprovision(obj.ObjectMeta.UID, podSelectors, nil)
 }
 
 func bypassRule(nsIpsetName ipset.Name, namespace string) []string {
