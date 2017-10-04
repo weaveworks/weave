@@ -88,9 +88,9 @@ build() {
 
     ## Inject the version numbers and build the distributables
     ## (library versions?)
-    sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
-    sed -i -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
-    sed -i -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.6.yaml
+    sed -i.bak "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
+    sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
+    sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.6.yaml
     make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER
 
     if make tests; then

@@ -175,7 +175,7 @@ function use_or_create_image() {
 function update_local_etc_hosts() {
     echo "> Updating local /etc/hosts..."
     # Remove old entries (if present):
-    for host in $1; do sudo sed -i "/$host/d" /etc/hosts; done
+    for host in $1; do sudo sed -i.bak "/$host/d" /etc/hosts; done
     # Add new entries:
     sudo sh -c "echo \"$2\" >> /etc/hosts"
 }
@@ -183,7 +183,7 @@ function update_local_etc_hosts() {
 function upload_etc_hosts() {
     # Remove old entries (if present):
     # shellcheck disable=SC2016,SC2086
-    $SSH $3 'for host in '$1'; do sudo sed -i "/$host/d" /etc/hosts; done'
+    $SSH $3 'for host in '$1'; do sudo sed -i.bak "/$host/d" /etc/hosts; done'
     # Add new entries:
     echo "$2" | $SSH "$3" "sudo -- sh -c \"cat >> /etc/hosts\""
 }
