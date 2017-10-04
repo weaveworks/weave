@@ -17,10 +17,7 @@ func ConfigureARPCache(procPath, name string) error {
 	if err := sysctl(procPath, fmt.Sprintf("net/ipv4/neigh/%s/delay_first_probe_time", name), "2"); err != nil {
 		return err
 	}
-	if err := sysctl(procPath, fmt.Sprintf("net/ipv4/neigh/%s/ucast_solicit", name), "1"); err != nil {
-		return err
-	}
-	return nil
+	return sysctl(procPath, fmt.Sprintf("net/ipv4/neigh/%s/ucast_solicit", name), "1")
 }
 
 func sysctl(procPath, variable, value string) error {

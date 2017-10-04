@@ -330,11 +330,7 @@ func copyOwnerAndPermissions(from, to string) error {
 		return nil
 	}
 
-	if err = os.Chown(to, int(moreStat.Uid), int(moreStat.Gid)); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Chown(to, int(moreStat.Uid), int(moreStat.Gid))
 }
 
 func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
