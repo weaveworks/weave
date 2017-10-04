@@ -510,7 +510,10 @@ func (proxy *Proxy) attach(containerID string) error {
 		if container.HostConfig != nil {
 			extraHosts = container.HostConfig.ExtraHosts
 		}
-		proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts)
+		if err := proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts); err != nil {
+			Log.Errorf("Error from rewriting container's /etc/hosts: %s", err)
+			// carry on since the original /etc/hosts is good enough in most cases
+		}
 	}
 
 	pid := container.State.Pid
@@ -684,6 +687,7 @@ func (proxy *Proxy) runTransientContainer(entrypoint, cmd, binds []string) (err 
 		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
 	}
 
+	Log.Debugf("Running image %q; entrypoint=%q; cmd=%q; binds=%q", proxy.Image, entrypoint, fmt.Sprintf("%.72s", cmd), binds)
 	var container *docker.Container
 	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
