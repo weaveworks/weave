@@ -50,11 +50,7 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
-		return err
-	}
-
-	return nil
+	return ipt.ClearChain(npc.TableFilter, npc.MainChain)
 }
 
 func resetIPSets(ips ipset.Interface) error {
@@ -116,12 +112,8 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
 		return err
 	}
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
-	return nil
+	return ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT")
 }
 
 func root(cmd *cobra.Command, args []string) {
