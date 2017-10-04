@@ -241,13 +241,13 @@ $(BUILD_UPTODATE): build/*
 	sed -e "s|DOCKERHUB_USER|$(DOCKERHUB_USER)|g;s|ARCH_EXT|$(ARCH_EXT)|g;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|g;s|QEMUARCH|$(QEMUARCH)|g" $^ > $@
 ifeq ($(ARCH),amd64)
 # When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	sed -i "/CROSS_BUILD_/d" $@
+	sed -i.bak "/CROSS_BUILD_/d" $@
 else
 # When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 # Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMU_VERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(shell dirname $@)
 	cd $(shell dirname $@) && sha256sum -c $(shell pwd)/build/shasums/qemu-$(QEMUARCH)-static.sha256sum
-	sed -i "s/CROSS_BUILD_//g" $@
+	sed -i.bak "s/CROSS_BUILD_//g" $@
 endif
 
 # The targets below builds the weave images
