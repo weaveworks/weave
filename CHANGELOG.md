@@ -1,3 +1,21 @@
+## Release 2.0.5
+
+Bug fixes
+
+* Fix /etc/hosts inside containers so the container's name resolves to
+  its Weave Net address #3136,#3138
+* New weave-kube config for Kubernetes 1.7 and 1.8 which resolves an
+  intermittent conflict with kube-proxy that could break Weave Net
+  until reboot #2998,#3134
+* Remove persistence file in `weave reset` when using Docker plugin V2 #3103,#3114
+
+Build and test
+
+* Some trivial changes to placate go-lint #3137
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/63?closed=1).
+
+
 ## Release 2.0.4
 
 Bug fixes
