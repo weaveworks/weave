@@ -33,7 +33,7 @@ func createVolumeContainer(args []string) error {
 	labels := map[string]string{label: ""}
 	config := docker.Config{Image: image, Volumes: volumes, Labels: labels, Entrypoint: []string{"data-only"}}
 	hostConfig := docker.HostConfig{}
-	container, err = c.CreateContainer(docker.CreateContainerOptions{Name: containerName, Config: &config, HostConfig: &hostConfig})
+	_, err = c.CreateContainer(docker.CreateContainerOptions{Name: containerName, Config: &config, HostConfig: &hostConfig})
 	if err != nil {
 		return fmt.Errorf("unable to create container: %s", err)
 	}
