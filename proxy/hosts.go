@@ -20,8 +20,7 @@ func (proxy *Proxy) RewriteEtcHosts(hostsPath, fqdn string, ips []*net.IPNet, ex
 	contents := buf.String()
 	cmdLine := fmt.Sprintf("echo '%s' > %s && rm -f %s && echo '%s' > %s", contents, mntHosts, mntHosts, contents, mntHosts)
 	mounts := []string{hostsPathDir + ":" + mnt}
-	proxy.runTransientContainer([]string{"sh"}, []string{"-c", cmdLine}, mounts)
-	return nil
+	return proxy.runTransientContainer([]string{"sh"}, []string{"-c", cmdLine}, mounts)
 }
 
 // we assume (for compatibility with the weave script) that fqdn has a dot
