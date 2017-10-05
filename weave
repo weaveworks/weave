@@ -1278,6 +1278,7 @@ launch() {
         -e WEAVE_DEBUG \
         -e WEAVE_HTTP_ADDR \
         -e WEAVE_PASSWORD \
+        -e EXEC_IMAGE=$EXEC_IMAGE \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS \
         $IMAGE \
