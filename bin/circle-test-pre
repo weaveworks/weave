@@ -24,6 +24,6 @@ wait_for 900 "$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
 
 # Upload built binaries to testing VMs:
 cd "$SRCDIR/test" # Ensures we generate Terraform state files in the right folder, for later use by integration tests.
-./run-integration-tests.sh setup >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+./run-integration-tests.sh setup
 echo "OK" >"$TEST_VMS_READY_LOCK_FILE"
-echo "Test VMs now ready. $(date)." >>"$TEST_VMS_SETUP_OUTPUT_FILE"
+echo "Test VMs now ready. $(date)."

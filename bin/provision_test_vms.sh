@@ -27,14 +27,14 @@ function install_ansible() {
 
 source "$SRCDIR/bin/circle-env"
 
-install_terraform >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
-install_ansible >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+install_terraform
+install_ansible
 
 # Only attempt to create GCP image in first container, wait for it to be created otherwise:
 [ "$CIRCLE_NODE_INDEX" != "0" ] && export CREATE_IMAGE=0
 
 # Provision and configure testing VMs:
 cd "$SRCDIR/test" # Ensures we generate Terraform state files in the right folder, for later use by integration tests.
-./run-integration-tests.sh configure >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+./run-integration-tests.sh configure
 echo "OK" >"$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
-echo "Test VMs now provisioned and configured. $(date)." >>"$TEST_VMS_SETUP_OUTPUT_FILE"
+echo "Test VMs now provisioned and configured. $(date)."
