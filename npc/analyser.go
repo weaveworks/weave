@@ -3,9 +3,9 @@ package npc
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
-	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
+	apiv1 "k8s.io/api/core/v1"
+	extnapi "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/weaveworks/weave/npc/ipset"
 )
@@ -92,7 +92,7 @@ func (ns *ns) analysePolicy(policy *extnapi.NetworkPolicy) (
 func withNormalisedProtoAndPort(npps []extnapi.NetworkPolicyPort, f func(proto, port string)) {
 	for _, npp := range npps {
 		// If no proto is specified, default to TCP
-		proto := string(api.ProtocolTCP)
+		proto := string(apiv1.ProtocolTCP)
 		if npp.Protocol != nil {
 			proto = string(*npp.Protocol)
 		}

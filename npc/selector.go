@@ -1,9 +1,9 @@
 package npc
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"
@@ -18,8 +18,8 @@ type selectorSpec struct {
 	nsName    string     // Namespace name
 }
 
-func newSelectorSpec(json *unversioned.LabelSelector, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
-	selector, err := unversioned.LabelSelectorAsSelector(json)
+func newSelectorSpec(json *metav1.LabelSelector, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
+	selector, err := metav1.LabelSelectorAsSelector(json)
 	if err != nil {
 		return nil, err
 	}
