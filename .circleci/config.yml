@@ -33,12 +33,12 @@ jobs:
       - run:
           command: bin/circle-test-smoke
           no_output_timeout: 360s
-      # Generate code coverage reports
-      - run: bin/circle-test-teardown
       # Destroy testing VMs:
       - run:
           command: bin/circle-destroy-vms
           background: true
+      - deploy:
+          command: cd $SRCDIR/test; ./gen_coverage_reports.sh
       # run goveralls; copy coverage reports to artifacts dir
       - deploy:
           command: $SRCDIR/bin/circle-teardown-pre

@@ -1,6 +1,0 @@
-#!/bin/bash
-
-set -e
-
-cd $SRCDIR/test
-test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh)
