@@ -18,13 +18,14 @@ function install_ansible() {
     sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev \
         && pip install --user -U setuptools cffi \
         && pip install --user ansible
-    export PATH="$PATH:$HOME/.local/bin"
 }
 
 [ -n "$SECRET_KEY" ] || {
     echo "Cannot run smoke tests: no secret key"
     exit 1
 }
+
+source "$SRCDIR/bin/circle-env"
 
 install_terraform >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
 install_ansible >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1

@@ -9,6 +9,8 @@ source "$(dirname "$0")/wait_for.sh"
     exit 1
 }
 
+source "$SRCDIR/bin/circle-env"
+
 # Provisioning from image typically take 90 seconds, 
 # but if we are creating a GCP image, it can take more than 10 minutes:
 wait_for 900 "$TEST_VMS_READY_LOCK_FILE"
