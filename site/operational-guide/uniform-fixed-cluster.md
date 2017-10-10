@@ -42,7 +42,7 @@ Then on _any_ peer run the following to force consensus:
 
     weave prime
 
->>**Note:** You can run this safely on more than one or
+>**Note:** You can run this safely on more than one or
 even all peers, but it's only strictly necessary to run it on one of
 them. 
 
