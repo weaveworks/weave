@@ -99,7 +99,7 @@ To minimize downtime while the new script is pulling the new container images:
 * Start the new Weave Net with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
->>**Note:** Always check the Release Notes for specific versions in case
+>**Note:** Always check the Release Notes for specific versions in case
 there are any special caveats or deviations from the standard
 procedure.
 
