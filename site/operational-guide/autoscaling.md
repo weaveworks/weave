@@ -39,7 +39,7 @@ You do not have to keep track of and specify the addresses
 of other dynamic peers in `$PEERS` - they will discover and connect to
 each other via the fixed cluster.
 
->>**Note:** The use of `--ipalloc-init=observer` prevents dynamic peers from
+>**Note:** The use of `--ipalloc-init=observer` prevents dynamic peers from
 coming to a consensus on their own - this is important to stop a
 clique forming amongst a group of dynamically added peers if they
 become partitioned from the fixed cluster after having learned about
