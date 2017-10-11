@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	coreapi "k8s.io/client-go/pkg/api/v1"
-	extnapi "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	coreapi "k8s.io/api/core/v1"
+	extnapi "k8s.io/api/extensions/v1beta1"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"

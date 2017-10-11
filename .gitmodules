@@ -133,3 +133,48 @@
 [submodule "vendor/golang.org/x/net"]
 	path = vendor/golang.org/x/net
 	url = https://github.com/golang/net
+[submodule "vendor/k8s.io/api"]
+	path = vendor/k8s.io/api
+	url = https://github.com/kubernetes/api
+[submodule "vendor/k8s.io/apimachinery"]
+	path = vendor/k8s.io/apimachinery
+	url = https://github.com/kubernetes/apimachinery
+[submodule "vendor/github.com/PuerkitoBio/purell"]
+	path = vendor/github.com/PuerkitoBio/purell
+	url = https://github.com/PuerkitoBio/purell
+[submodule "vendor/github.com/PuerkitoBio/urlesc"]
+	path = vendor/github.com/PuerkitoBio/urlesc
+	url = https://github.com/PuerkitoBio/urlesc
+[submodule "vendor/github.com/emicklei/go-restful"]
+	path = vendor/github.com/emicklei/go-restful
+	url = https://github.com/emicklei/go-restful
+[submodule "vendor/github.com/go-openapi/jsonpointer"]
+	path = vendor/github.com/go-openapi/jsonpointer
+	url = https://github.com/go-openapi/jsonpointer
+[submodule "vendor/github.com/go-openapi/jsonreference"]
+	path = vendor/github.com/go-openapi/jsonreference
+	url = https://github.com/go-openapi/jsonreference
+[submodule "vendor/github.com/go-openapi/spec"]
+	path = vendor/github.com/go-openapi/spec
+	url = https://github.com/go-openapi/spec
+[submodule "vendor/github.com/go-openapi/swag"]
+	path = vendor/github.com/go-openapi/swag
+	url = https://github.com/go-openapi/swag
+[submodule "vendor/github.com/golang/glog"]
+	path = vendor/github.com/golang/glog
+	url = https://github.com/golang/glog
+[submodule "vendor/github.com/google/gofuzz"]
+	path = vendor/github.com/google/gofuzz
+	url = https://github.com/google/gofuzz
+[submodule "vendor/github.com/mailru/easyjson"]
+	path = vendor/github.com/mailru/easyjson
+	url = https://github.com/mailru/easyjson
+[submodule "vendor/k8s.io/kube-openapi"]
+	path = vendor/k8s.io/kube-openapi
+	url = https://github.com/kubernetes/kube-openapi
+[submodule "vendor/golang.org/x/text"]
+	path = vendor/golang.org/x/text
+	url = https://go.googlesource.com/text
+[submodule "vendor/gopkg.in/yaml.v2"]
+	path = vendor/gopkg.in/yaml.v2
+	url = https://gopkg.in/yaml.v2
