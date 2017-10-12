@@ -147,11 +147,46 @@ check_all_pods_communicate() {
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
+# Start pod which should not have access to nettest
+$SSH $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
+podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
+assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- wget --spider -T1 http://nettest.default.svc.cluster.local:8080/status" 1
+
 # Check that a pod can contact the outside world
 assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
 # Check that our pods haven't crashed
 assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
+
+# Restart weave-net with disabled legacy netpol
+$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
+    -e "s%env:%$COVERAGE_ARGS%" \
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+
+assert_raises 'wait_for_x check_all_pods_communicate pods'
+
+# nettest-deny should still not be able to reach nettest pods
+assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- wget --spider -T1 http://nettest.default.svc.cluster.local:8080/status" 1
+
+# allow access for all
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nettest-misc
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - access: deny
+  podSelector:
+    matchLabels:
+      run: nettest
+EOF
+
+assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- wget --spider -T1 http://nettest.default.svc.cluster.local:8080/status"
 
 tear_down_kubeadm
 
