@@ -116,6 +116,7 @@ items:
                       fieldPath: spec.nodeName
               image: 'weaveworks/weave-npc:latest'
               imagePullPolicy: Always
+#npc-args
               resources:
                 requests:
                   cpu: 10m
