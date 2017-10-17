@@ -207,7 +207,9 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 	} else {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
 	}
-	logOnStderr(fmt.Errorf("unable to release IP address: %s", err))
+	if err != nil {
+		logOnStderr(fmt.Errorf("unable to release IP address: %s", err))
+	}
 	return nil
 }
 
