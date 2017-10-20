@@ -92,3 +92,59 @@ When a new version of Docker is released, you willneed to update the GCE test im
 To do this, change the Docker version in `run-integration-tests.sh` and push the change.
 Next build in CircleCI will detect that there is no template for this version of Docker and will first create the template before running tests.
 Subsequent builds will then simply re-use the template.
+
+## Running the tests on a cloud provider
+
+Running the tests against a remote provider instead of local vagrant VMs is a little more involved, and reproduces the environment used for CI. It is recommended that you use the build VM to coordinate the build phase.
+
+1. Create the build VM in the repository root and log in
+    
+    ```
+    ➤ vagrant up
+    # ...
+    ➤ vagrant ssh
+    ```
+
+2. Once in the build vm, install the `gcloud` tools as [per the documentation](https://cloud.google.com/sdk/downloads). You need to do this manually as the circleCI VMs are already provisioned with `gcloud`.
+
+    ```
+    vagrant@vagrant:~$ curl https://sdk.cloud.google.com | bash
+    # ...
+    vagrant@vagrant:~$ exec -l $SHELL
+    ```
+
+    You don't need to initialise the `gcloud` tools by running `gcloud init`.
+
+3. Export the secret key needed to decrypt the cloud credentials - This assumes you're using the build tools 
+
+    ```
+    vagrant@vagrant:~$ export SECRET_KEY="XXXXXXXXXX"
+    ```
+
+4. Navigate to the test directory and provision the VMs
+
+    ```
+    vagrant@vagrant:~$ cd weave/test
+    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh up
+    #...
+    ```
+5. Run the tests you need
+
+    ```
+    vagrant@vagrant:~/weave/test$ export TESTS="./090_docker_restart_policy_2_test.sh" 
+    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh test
+    ```
+
+6. Don't forget to close down your remote VMs when you're done
+
+    ```
+    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh destroy
+    ```
+
+7. And switch off your build VM
+
+    ```
+    vagrant@vagrant:~/weave/test$ exit
+    ➤ vagrant destroy -f 
+    # or "vagrant suspend" if you want to preserve the machine state
+    ```
