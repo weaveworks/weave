@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	coreapi "k8s.io/api/core/v1"
 	extnapi "k8s.io/api/extensions/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,6 +30,7 @@ var (
 	logLevel    string
 	allowMcast  bool
 	nodeName    string
+	legacy      bool
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -117,6 +119,8 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 }
 
 func root(cmd *cobra.Command, args []string) {
+	var npController cache.Controller
+
 	common.SetLogLevel(logLevel)
 	if nodeName == "" {
 		// HOSTNAME is set by Kubernetes for pods in the host network namespace
@@ -126,6 +130,10 @@ func root(cmd *cobra.Command, args []string) {
 		common.Log.Fatalf("Must set node name via --node-name or $HOSTNAME")
 	}
 	common.Log.Infof("Starting Weaveworks NPC %s; node name %q", version, nodeName)
+
+	if legacy {
+		common.Log.Info("Running in legacy mode (k8s pre-1.7 network policy semantics)")
+	}
 
 	if err := metrics.Start(metricsAddr); err != nil {
 		common.Log.Fatalf("Failed to start metrics: %v", err)
@@ -150,7 +158,7 @@ func root(cmd *cobra.Command, args []string) {
 	handleError(resetIPSets(ips))
 	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(nodeName, ipt, ips)
+	npc := npc.New(nodeName, legacy, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -192,25 +200,30 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdatePod(old.(*coreapi.Pod), new.(*coreapi.Pod)))
 			}})
 
-	npController := makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{},
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				handleError(npc.AddNetworkPolicy(obj.(*extnapi.NetworkPolicy)))
-			},
-			DeleteFunc: func(obj interface{}) {
-				switch obj := obj.(type) {
-				case *extnapi.NetworkPolicy:
-					handleError(npc.DeleteNetworkPolicy(obj))
-				case cache.DeletedFinalStateUnknown:
-					// We know this object has gone away, but its final state is no longer
-					// available from the API server. Instead we use the last copy of it
-					// that we have, which is good enough for our cleanup.
-					handleError(npc.DeleteNetworkPolicy(obj.Obj.(*extnapi.NetworkPolicy)))
-				}
-			},
-			UpdateFunc: func(old, new interface{}) {
-				handleError(npc.UpdateNetworkPolicy(old.(*extnapi.NetworkPolicy), new.(*extnapi.NetworkPolicy)))
-			}})
+	npHandlers := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			handleError(npc.AddNetworkPolicy(obj))
+		},
+		DeleteFunc: func(obj interface{}) {
+			switch obj := obj.(type) {
+			case cache.DeletedFinalStateUnknown:
+				// We know this object has gone away, but its final state is no longer
+				// available from the API server. Instead we use the last copy of it
+				// that we have, which is good enough for our cleanup.
+				handleError(npc.DeleteNetworkPolicy(obj.Obj))
+			default:
+				handleError(npc.DeleteNetworkPolicy(obj))
+			}
+		},
+		UpdateFunc: func(old, new interface{}) {
+			handleError(npc.UpdateNetworkPolicy(old, new))
+		},
+	}
+	if legacy {
+		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
+	} else {
+		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
+	}
 
 	go nsController.Run(wait.NeverStop)
 	go podController.Run(wait.NeverStop)
@@ -231,6 +244,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
+	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
 
 	handleError(rootCmd.Execute())
 }
