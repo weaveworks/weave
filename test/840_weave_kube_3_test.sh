@@ -19,6 +19,7 @@ SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
 KUBE_PORT=6443
 IMAGE=weaveworks/network-tester:latest
+DOMAIN=nettest.default.svc.cluster.local.
 
 tear_down_kubeadm
 
@@ -47,6 +48,7 @@ fi
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
@@ -115,7 +117,7 @@ check_ready() {
 assert_raises 'wait_for_x check_ready "hosts to be ready"'
 
 # See if we can get some pods running that connect to the network
-run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=nettest.default.svc.cluster.local."
+run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=$DOMAIN"
 # Create a headless service so they can be found in Kubernetes DNS
 run_on $HOST1 "$KUBECTL create -f -" <<EOF
 apiVersion: v1
@@ -151,6 +153,42 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
 # Check that our pods haven't crashed
 assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
+
+# Start pod which should not have access to nettest
+run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
+denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# Restart weave-net with npc in non-legacy mode
+$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
+    -e "s%env:%$COVERAGE_ARGS%" \
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+
+assert_raises 'wait_for_x check_all_pods_communicate pods'
+
+# nettest-deny should still not be able to reach nettest pods
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# allow access for all
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nettest-misc
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: nettest
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              access: deny
+EOF
+
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 tear_down_kubeadm
 
