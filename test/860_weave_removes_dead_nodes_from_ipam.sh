@@ -79,23 +79,40 @@ function teardown_kubernetes_cluster {
 
 }
 
+function check_no_lost_ip_addresses {
+    for host in $HOSTS; do
+        unreachable_count=$(run_on $host "sudo weave status ipam" | grep "unreachable" | wc -l)
+        if [ "$unreachable_count" -gt "0" ]; then
+            return 1 # fail
+        fi
+    done
+}
+
+function force_drop_node {
+    run_on $HOST2 "sudo kubeadm reset"
+}
+
 function cleanup {
 teardown_kubernetes_cluster
 }
 trap cleanup EXIT
 
 function main {
-    start_suite "Test weave-net deallocates IPAM on node failure";
+    WEAVE_IPAM_RECOVERY_DELAY=5
+
+    start_suite "Test weave-net deallocates from IPAM on node failure";
     
     setup_kubernetes_cluster;
 
     sleep 5;
 
-    # check_no_lost_ip_addresses;
+    check_no_lost_ip_addresses;
 
-    # force_drop_node;
+    force_drop_node;
 
-    # check_no_lost_ip_addresses;
+    sleep ${WEAVE_IPAM_RECOVERY_DELAY};
+
+    check_no_lost_ip_addresses;
 
     teardown_kubernetes_cluster;
     
