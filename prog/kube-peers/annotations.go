@@ -10,23 +10,22 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	wait "k8s.io/apimachinery/pkg/util/wait"
+	kubernetes "k8s.io/client-go/kubernetes"
 )
 
 type configMapAnnotations struct {
 	Name      string
 	Namespace string
-	Client    corev1client.ConfigMapsGetter
+	Clientset *kubernetes.Clientset
 	cm        *v1.ConfigMap
 }
 
-func newConfigMapAnnotations(ns string, name string, client *kubernetes.Clientset) *configMapAnnotations {
+func newConfigMapAnnotations(ns string, name string, clientset *kubernetes.Clientset) *configMapAnnotations {
 	return &configMapAnnotations{
 		Namespace: ns,
 		Name:      name,
-		Client:    client,
+		Clientset: clientset,
 	}
 }
 
@@ -72,12 +71,12 @@ const (
 func (cml *configMapAnnotations) Init() error {
 	for { // Loop only if we call Create() and it's already there
 		var err error
-		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Get(cml.Name)
+		cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Get(cml.Name, api.GetOptions{})
 		if err != nil {
 			if !kubeErrors.IsNotFound(err) {
 				return errors.Wrapf(err, "Unable to fetch ConfigMap %s/%s", cml.Namespace, cml.Name)
 			}
-			cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Create(&api.ConfigMap{
+			cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Create(&v1.ConfigMap{
 				ObjectMeta: api.ObjectMeta{
 					Name:      cml.Name,
 					Namespace: cml.Namespace,
@@ -130,7 +129,7 @@ func (cml *configMapAnnotations) UpdateAnnotation(key, value string) error {
 	}
 	cm := cml.cm
 	cm.Annotations[key] = value
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cm, err := cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Update(cml.cm)
 	if err == nil {
 		cml.cm = cm
 	}
@@ -143,7 +142,7 @@ func (cml *configMapAnnotations) RemoveAnnotation(key string) error {
 	}
 	cm := cml.cm
 	delete(cm.Annotations, key)
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cm, err := cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Update(cml.cm)
 	if err == nil {
 		cml.cm = cm
 	}
@@ -160,7 +159,7 @@ func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string
 			delete(cm.Annotations, key)
 		}
 	}
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cm, err := cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Update(cml.cm)
 	if err == nil {
 		cml.cm = cm
 	}

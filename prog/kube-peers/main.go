@@ -22,7 +22,7 @@ type nodeInfo struct {
 
 // return the IP addresses of all nodes in the cluster
 func getKubePeers(c *kubernetes.Clientset) ([]nodeInfo, error) {
-	nodeList, err := c.Nodes().List(api.ListOptions{})
+	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
