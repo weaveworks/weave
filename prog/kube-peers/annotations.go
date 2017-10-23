@@ -7,18 +7,19 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
+	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
+	api "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	kubeErrors "k8s.io/client-go/pkg/api/errors"
-	api "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/wait"
 )
 
 type configMapAnnotations struct {
 	Name      string
 	Namespace string
 	Client    corev1client.ConfigMapsGetter
-	cm        *api.ConfigMap
+	cm        *v1.ConfigMap
 }
 
 func newConfigMapAnnotations(ns string, name string, client *kubernetes.Clientset) *configMapAnnotations {
