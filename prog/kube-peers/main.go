@@ -136,10 +136,8 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 						return err
 					}
 					// 7b.    Remove annotation with key X
-					if err := cml.RemoveAnnotation(peer.PeerName); err != nil {
-						return err
-					}
-					return nil
+					return cml.RemoveAnnotation(peer.PeerName)
+
 				})
 				common.Log.Debugln("Finished removal of ", peer.PeerName)
 			}

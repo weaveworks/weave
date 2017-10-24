@@ -65,6 +65,7 @@ const (
 	retryPeriod  = time.Second * 2
 	jitterFactor = 1.0
 
+	// KubePeersAnnotationKey is the default annotation key
 	KubePeersAnnotationKey = "kube-peers.weave.works/peers"
 )
 
