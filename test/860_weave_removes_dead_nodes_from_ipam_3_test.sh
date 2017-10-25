@@ -2,7 +2,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-howmany() { echo $#; }
+function howmany { echo $#; }
 
 #
 # Test vars
@@ -24,20 +24,10 @@ fi
 #
 # Utility functions
 #
-tear_down_kubeadm() {
+function tear_down_kubeadm {
     for host in $HOSTS; do
         run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
     done
-}
-
-
-
-check_connections() {
-    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
-}
-
-check_ready() {
-    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
 }
 
 #
@@ -74,8 +64,8 @@ function teardown_kubernetes_cluster {
     greyly echo "Tearing down kubernetes cluster"
     tear_down_kubeadm; 
 
-    # Destroy our test ipset, and implicitly check it is still there
-    assert_raises "docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset"
+    # Destroy our test ipset
+    docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset
 
 }
 
