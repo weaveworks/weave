@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"log"
+	"time"
 
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -50,6 +53,9 @@ func (pl *peerList) add(peerName string, name string) {
 }
 
 const (
+	retryPeriod  = time.Second * 2
+	jitterFactor = 1.0
+
 	// KubePeersAnnotationKey is the default annotation key
 	KubePeersAnnotationKey = "kube-peers.weave.works/peers"
 )
@@ -99,7 +105,6 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 	return &record, nil
 }
 
-// Update will update and existing annotation on a given resource.
 func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
@@ -108,7 +113,32 @@ func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
 	if err != nil {
 		return err
 	}
-	cml.cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cm := cml.cm
+	cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
+	cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err == nil {
+		cml.cm = cm
+	}
+	return err
+}
+
+// Loop with jitter, fetching the cml data and calling f() until it
+// doesn't get an optimistic locking conflict.
+// If it succeeds or gets any other kind of error, stop the loop.
+func (cml *configMapAnnotations) LoopUpdate(f func() error) error {
+	stop := make(chan struct{})
+	var err error
+	wait.JitterUntil(func() {
+		if err = cml.Init(); err != nil {
+			close(stop)
+			return
+		}
+		err = f()
+		if err != nil && kubeErrors.IsConflict(err) {
+			log.Printf("Optimistic locking conflict: trying again: %s", err)
+			return
+		}
+		close(stop)
+	}, retryPeriod, jitterFactor, true, stop)
 	return err
 }
