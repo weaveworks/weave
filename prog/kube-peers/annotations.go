@@ -129,11 +129,6 @@ func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
 	return cml.UpdateAnnotation(KubePeersAnnotationKey, string(recordBytes))
 }
 
-func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
-	value, found := cml.cm.Annotations[key]
-	return value, found
-}
-
 func (cml *configMapAnnotations) UpdateAnnotation(key, value string) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
