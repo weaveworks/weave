@@ -1,4 +1,3 @@
-// Much of this copied from k8s.io/kubernetes/pkg/client/leaderelection/resourcelock/configmaplock.go
 package main
 
 import (
@@ -9,16 +8,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	kubeErrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
 	api "k8s.io/client-go/pkg/api/v1"
 )
-
-type LeaderElectionRecord struct {
-	HolderIdentity       string           `json:"holderIdentity"`
-	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
-	AcquireTime          unversioned.Time `json:"acquireTime"`
-	RenewTime            unversioned.Time `json:"renewTime"`
-}
 
 type configMapAnnotations struct {
 	Name      string
