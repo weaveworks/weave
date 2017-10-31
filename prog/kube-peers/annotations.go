@@ -1,3 +1,10 @@
+/*
+In order to keep track of active weave peers, we use annotations on the Kubernetes cluster.
+
+Kubernetes uses etcd to distribute and synchronise these annotations so we don't have to.
+
+This module deals with operations on the peerlist backed by Kubernetes' annotation mechanism.
+*/
 package main
 
 import (
