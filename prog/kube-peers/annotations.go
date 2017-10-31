@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 
 	"github.com/pkg/errors"
 
@@ -96,14 +97,27 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 
 // Update will update and existing annotation on a given resource.
 func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
-	if cml.cm == nil {
-		return errors.New("endpoint not initialized, call Init first")
-	}
 	recordBytes, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
-	cml.cm.Annotations[KubePeersAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	return cml.Update(KubePeersAnnotationKey, recordBytes)
+}
+
+func (cml *configMapAnnotations) Update(key string, recordBytes []byte) error {
+	if cml.cm == nil {
+		return errors.New("endpoint not initialized, call Init first")
+	}
+	var err error
+	for {
+		cml.cm.Annotations[key] = string(recordBytes)
+		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+		if err != nil && kubeErrors.IsConflict(err) {
+			log.Printf("Optimistic locking conflict: trying again: %s", err)
+			err = cml.Init()
+			continue
+		}
+		break
+	}
 	return err
 }
