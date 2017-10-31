@@ -77,7 +77,10 @@ const (
 )
 
 func (cml *configMapAnnotations) Init() error {
-	for { // Loop only if we call Create() and it's already there
+	for {
+		// Since it's potentially racy to GET, then CREATE if not found, we wrap in a check loop
+		// so that if the configmap is created after our GET but before or CREATE, we'll gracefully
+		// re-try to get the configmap.
 		var err error
 		cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Get(cml.ConfigMapName, api.GetOptions{})
 		if err != nil {
