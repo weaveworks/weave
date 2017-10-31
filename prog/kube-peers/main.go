@@ -59,6 +59,7 @@ const (
 
 // update the list of all peers that have gone through this code path
 func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
+	common.Log.Infoln("Adding myself to peer list")
 	var list *peerList
 	err := cml.LoopUpdate(func() error {
 		var err error
@@ -181,11 +182,12 @@ func main() {
 	}
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
-		common.Log.Infoln("Adding myself to peer list")
+
 		_, err := addMyselfToPeerList(cml, c, peerName, nodeName)
 		if err != nil {
 			log.Fatalf("Could not get peer list: %v", err)
 		}
+
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 		err = reclaimRemovedPeers(weave, cml, peers, peerName)
 		if err != nil {
