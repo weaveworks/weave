@@ -50,10 +50,10 @@ items:
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: Role
     metadata:
-      name: weave-net
+      name: weave-net-kube-peer
       namespace: kube-system
       labels:
-        name: weave-net
+        name: weave-net-kube-peer
     rules:
       - apiGroups:
           - ''
@@ -73,13 +73,13 @@ items:
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: RoleBinding
     metadata:
-      name: weave-net
+      name: weave-net-kube-peer
       namespace: kube-system
       labels:
-        name: weave-net
+        name: weave-net-kube-peer
     roleRef:
       kind: Role
-      name: weave-net
+      name: weave-net-kube-peer
       apiGroup: rbac.authorization.k8s.io
     subjects:
       - kind: ServiceAccount
