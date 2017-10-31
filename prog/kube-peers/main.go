@@ -1,3 +1,8 @@
+/*
+Package main deals with weave-net peers on the cluster.
+
+This involves peer management, such as getting the latest peers or removing defunct peers from the cluster
+*/
 package main
 
 import (
