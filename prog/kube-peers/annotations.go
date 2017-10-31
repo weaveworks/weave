@@ -22,17 +22,17 @@ import (
 )
 
 type configMapAnnotations struct {
-	Name      string
-	Namespace string
-	Clientset *kubernetes.Clientset
-	cm        *v1.ConfigMap
+	ConfigMapName string
+	Namespace     string
+	Clientset     *kubernetes.Clientset
+	cm            *v1.ConfigMap
 }
 
-func newConfigMapAnnotations(ns string, name string, clientset *kubernetes.Clientset) *configMapAnnotations {
+func newConfigMapAnnotations(ns string, configMapName string, clientset *kubernetes.Clientset) *configMapAnnotations {
 	return &configMapAnnotations{
-		Namespace: ns,
-		Name:      name,
-		Clientset: clientset,
+		Namespace:     ns,
+		ConfigMapName: configMapName,
+		Clientset:     clientset,
 	}
 }
 
@@ -79,14 +79,14 @@ const (
 func (cml *configMapAnnotations) Init() error {
 	for { // Loop only if we call Create() and it's already there
 		var err error
-		cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Get(cml.Name, api.GetOptions{})
+		cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Get(cml.ConfigMapName, api.GetOptions{})
 		if err != nil {
 			if !kubeErrors.IsNotFound(err) {
-				return errors.Wrapf(err, "Unable to fetch ConfigMap %s/%s", cml.Namespace, cml.Name)
+				return errors.Wrapf(err, "Unable to fetch ConfigMap %s/%s", cml.Namespace, cml.ConfigMapName)
 			}
 			cml.cm, err = cml.Clientset.CoreV1().ConfigMaps(cml.Namespace).Create(&v1.ConfigMap{
 				ObjectMeta: api.ObjectMeta{
-					Name:      cml.Name,
+					Name:      cml.ConfigMapName,
 					Namespace: cml.Namespace,
 				},
 			})
@@ -94,7 +94,7 @@ func (cml *configMapAnnotations) Init() error {
 				if kubeErrors.IsAlreadyExists(err) {
 					continue
 				}
-				return errors.Wrapf(err, "Unable to create ConfigMap %s/%s", cml.Namespace, cml.Name)
+				return errors.Wrapf(err, "Unable to create ConfigMap %s/%s", cml.Namespace, cml.ConfigMapName)
 			}
 		}
 		break
