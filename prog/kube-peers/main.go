@@ -137,9 +137,11 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 					}
 					// 7a.    Remove X from peerList
 					storedPeerList.remove(peer.PeerName)
+					common.Log.Infoln("Removing peer ", peer.PeerName, ". Expecting to remove linked annotation next.")
 					if err := cml.UpdatePeerList(*storedPeerList); err != nil {
 						return err
 					}
+					common.Log.Infoln("Removing annotation ", peer.PeerName)
 					// 7b.    Remove annotation with key X
 					return cml.RemoveAnnotation(peer.PeerName)
 
