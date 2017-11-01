@@ -24,23 +24,11 @@ fi
 #
 # Utility functions
 #
-function tear_down_kubeadm {
-    for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
-    done
-}
-
-#
-# Test functions
-#
 
 function setup_kubernetes_cluster {
-    greyly echo "Setting up kubernetes cluster"
-    tear_down_kubeadm;
+    teardown_kubernetes_cluster;
 
-    # Make an ipset, so we can check it doesn't get wiped out by Weave Net
-    docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
-    docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
+    greyly echo "Setting up kubernetes cluster"
 
     # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
     k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
@@ -62,51 +50,57 @@ function setup_kubernetes_cluster {
 
 function teardown_kubernetes_cluster {
     greyly echo "Tearing down kubernetes cluster"
-    tear_down_kubeadm; 
-
-    # Destroy our test ipset
-    docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset
-
+    for host in $HOSTS; do
+        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+    done 
 }
+
+function force_drop_node {
+    run_on $1 "sudo kubeadm reset"
+}
+
+#
+# Test functions
+#
 
 function check_no_lost_ip_addresses {
     for host in $HOSTS; do
         unreachable_count=$(run_on $host "sudo weave status ipam" | grep "unreachable" | wc -l)
-        if [ "$unreachable_count" -gt "0" ]; then
+        if [ "$unreachable_count" != "0" ]; then
             return 1 # fail
         fi
     done
 }
 
-function force_drop_node {
-    run_on $HOST2 "sudo kubeadm reset"
-}
-
-function cleanup {
-teardown_kubernetes_cluster
-}
-trap cleanup EXIT
-
 function main {
     WEAVE_IPAM_RECOVERY_DELAY=5
-
     start_suite "Test weave-net deallocates from IPAM on node failure";
+
+    # ensure that we stop testing on first failure, but don't exit 
+    # the script since we still have cleaning up to do
+    set +e; ( set -e;
+
+        setup_kubernetes_cluster;
+
+        sleep 5;
+
+        check_no_lost_ip_addresses;
+
+        force_drop_node $HOST2;
+
+        sleep ${WEAVE_IPAM_RECOVERY_DELAY};
+
+        check_no_lost_ip_addresses;
+
+    # Save exit status of subshell and resume terminating the script on a bad exit status
+    ); status=$?; set -e
     
-    setup_kubernetes_cluster;
-
-    sleep 5;
-
-    check_no_lost_ip_addresses;
-
-    force_drop_node;
-
-    sleep ${WEAVE_IPAM_RECOVERY_DELAY};
-
-    check_no_lost_ip_addresses;
-
     teardown_kubernetes_cluster;
-    
+
     end_suite;
+
+    # Exit script with caught failure
+    return $status;
 }
 
 main
