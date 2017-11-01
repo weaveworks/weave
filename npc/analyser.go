@@ -54,32 +54,43 @@ func (ns *ns) analysePolicy(policy *extnapi.NetworkPolicy) (
 			// From is present and contains at least on item, this rule allows traffic only if the
 			// traffic matches at least one item in the from list.
 			for _, peer := range ingressRule.From {
-				var srcSelector *selectorSpec
+				var srcSelectors []*selectorSpec
 				if peer.PodSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.PodSelector, ns.name, ipset.HashIP)
+					srcPodSelector, err := newSelectorSpec(peer.PodSelector, ns.name, ipset.HashIP)
 					if err != nil {
 						return nil, nil, nil, err
 					}
-					podSelectors[srcSelector.key] = srcSelector
+					podSelectors[srcPodSelector.key] = srcPodSelector
+					srcSelectors = append(srcSelectors, srcPodSelector)
 				}
 				if peer.NamespaceSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, "", ipset.ListSet)
+					srcNSSelector, err := newSelectorSpec(peer.NamespaceSelector, "", ipset.ListSet)
 					if err != nil {
 						return nil, nil, nil, err
 					}
-					nsSelectors[srcSelector.key] = srcSelector
+					nsSelectors[srcNSSelector.key] = srcNSSelector
+					srcSelectors = append(srcSelectors, srcNSSelector)
 				}
 
+				if len(srcSelectors) == 0 {
+					var nilSelector *selectorSpec
+					srcSelectors = append(srcSelectors, nilSelector)
+				}
 				if ingressRule.Ports == nil {
 					// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-					rule := newRuleSpec(nil, srcSelector, dstSelector, nil)
-					rules[rule.key] = rule
+					for _, srcSelector := range srcSelectors {
+						rule := newRuleSpec(nil, srcSelector, dstSelector, nil)
+						rules[rule.key] = rule
+					}
+
 				} else {
 					// Ports is present and contains at least one item, then this rule allows traffic
 					// only if the traffic matches at least one port in the ports list.
 					withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(&proto, srcSelector, dstSelector, &port)
-						rules[rule.key] = rule
+						for _, srcSelector := range srcSelectors {
+							rule := newRuleSpec(&proto, srcSelector, dstSelector, &port)
+							rules[rule.key] = rule
+						}
 					})
 				}
 			}
