@@ -24,6 +24,12 @@ fi
 #
 # Utility functions
 #
+function teardown_kubernetes_cluster {
+    greyly echo "Tearing down kubernetes cluster"
+    for host in $HOSTS; do
+        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+    done 
+}
 
 function setup_kubernetes_cluster {
     teardown_kubernetes_cluster;
@@ -45,17 +51,11 @@ function setup_kubernetes_cluster {
     # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
     sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
         -e "s%env:%$COVERAGE_ARGS%" \
-        "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.6.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
-}
-
-function teardown_kubernetes_cluster {
-    greyly echo "Tearing down kubernetes cluster"
-    for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
-    done 
+        "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 }
 
 function force_drop_node {
+    greyly echo "Resetting node $1 with 'sudo kubeadm reset'" 
     run_on $1 "sudo kubeadm reset"
 }
 
@@ -64,12 +64,11 @@ function force_drop_node {
 #
 
 function check_no_lost_ip_addresses {
-    for host in $HOSTS; do
-        unreachable_count=$(run_on $host "sudo weave status ipam" | grep "unreachable" | wc -l)
-        if [ "$unreachable_count" != "0" ]; then
-            return 1 # fail
-        fi
-    done
+    host=$1
+    unreachable_count=$(run_on $host "sudo weave status ipam" | grep "unreachable" | wc -l)
+    if [ "$unreachable_count" != "0" ]; then
+        return 1 # fail
+    fi
 }
 
 function main {
@@ -84,9 +83,14 @@ function main {
 
         sleep 5;
 
-        check_no_lost_ip_addresses;
+        check_no_lost_ip_addresses $HOST1;
+        check_no_lost_ip_addresses $HOST2;
+        check_no_lost_ip_addresses $HOST3;
 
         force_drop_node $HOST2;
+
+        check_no_lost_ip_addresses $HOST1;
+        check_no_lost_ip_addresses $HOST3;
 
         sleep ${WEAVE_IPAM_RECOVERY_DELAY};
 
