@@ -10,7 +10,7 @@ function tear_down_kubeadm {
 
 function howmany { echo $#; }
 
-start_suite "Test weave-kube image with Kubernetes"
+
 
 TOKEN=112233.4455667788990000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
@@ -28,7 +28,6 @@ fi
 
 function setup_kubernetes_cluster {
     greyly echo "Setting up kubernetes cluster"
-    tear_down_kubeadm
 
     # Make an ipset, so we can check it doesn't get wiped out by Weave Net
     docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
@@ -53,15 +52,10 @@ function setup_kubernetes_cluster {
         -e "s%env:%$COVERAGE_ARGS%" \
         "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 }
-setup_kubernetes_cluster;
-
-sleep 5
 
 function check_connections {
     run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
 }
-
-assert_raises 'wait_for_x check_connections "connections to establish"'
 
 function check_can_ping_between_weave_bridge_IPs {
     HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
@@ -71,15 +65,13 @@ function check_can_ping_between_weave_bridge_IPs {
     assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
     assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
 }
-check_can_ping_between_weave_bridge_IPs;
-
 
 function check_weave_does_not_generate_defunct_processes {
     assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
     assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
     assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 }
-check_weave_does_not_generate_defunct_processes;
+
 
 
 function check_ready {
@@ -147,9 +139,6 @@ spec:
     run: nettest
 EOF
 }
-setup_pod_networking;
-
-podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
 function check_all_pods_communicate {
     if [ -n podIP ] ; then
@@ -160,6 +149,24 @@ function check_all_pods_communicate {
     fi
     return 1
 }
+
+start_suite "Test weave-kube image with Kubernetes"
+
+tear_down_kubeadm;
+
+setup_kubernetes_cluster;
+
+sleep 5;
+
+assert_raises 'wait_for_x check_connections "connections to establish"'
+
+check_can_ping_between_weave_bridge_IPs;
+
+check_weave_does_not_generate_defunct_processes;
+
+setup_pod_networking;
+
+podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
