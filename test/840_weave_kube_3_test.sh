@@ -116,13 +116,12 @@ spec:
     matchLabels:
       run: norealpods
 EOF
+}
 
-
-
-    assert_raises 'wait_for_x check_ready "hosts to be ready"'
-
+function setup_nettest_on_pods {
     # See if we can get some pods running that connect to the network
     run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=nettest.default.svc.cluster.local."
+    
     # Create a headless service so they can be found in Kubernetes DNS
     run_on $HOST1 "$KUBECTL create -f -" <<EOF
 apiVersion: v1
@@ -160,6 +159,10 @@ check_can_ping_between_weave_bridge_IPs;
 check_weave_does_not_generate_defunct_processes;
 
 setup_pod_networking;
+
+assert_raises 'wait_for_x check_ready "hosts to be ready"'
+
+setup_nettest_on_pods;
 
 podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
