@@ -2,13 +2,13 @@
 
 . "$(dirname "$0")/config.sh"
 
-tear_down_kubeadm() {
+function tear_down_kubeadm {
     for host in $HOSTS; do
         run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
     done
 }
 
-howmany() { echo $#; }
+function howmany { echo $#; }
 
 start_suite "Test weave-kube image with Kubernetes"
 
@@ -57,7 +57,7 @@ setup_kubernetes_cluster;
 
 sleep 5
 
-check_connections() {
+function check_connections {
     run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
 }
 
@@ -151,7 +151,7 @@ setup_pod_networking;
 
 podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
-check_all_pods_communicate() {
+function check_all_pods_communicate {
     if [ -n podIP ] ; then
         status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
         if [ $status = "pass" ] ; then
