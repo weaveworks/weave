@@ -142,10 +142,7 @@ EOF
 
 function check_all_pods_communicate {
     status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
-    if [ $status = "pass" ] ; then
-        return 0
-    fi
-    return 1
+    test "$status" = "pass" && return 0 || return 1
 }
 
 start_suite "Test weave-kube image with Kubernetes"
