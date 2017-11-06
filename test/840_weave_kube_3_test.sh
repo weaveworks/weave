@@ -2,15 +2,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-function tear_down_kubeadm {
-    for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
-    done
-}
-
 function howmany { echo $#; }
-
-
 
 TOKEN=112233.4455667788990000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
@@ -26,6 +18,9 @@ else
     COVERAGE_ARGS="env:"
 fi
 
+#
+# Setup functions
+#
 function setup_kubernetes_cluster {
     greyly echo "Setting up kubernetes cluster"
 
@@ -51,31 +46,6 @@ function setup_kubernetes_cluster {
     sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
         -e "s%env:%$COVERAGE_ARGS%" \
         "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
-}
-
-function check_connections {
-    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
-}
-
-function check_can_ping_between_weave_bridge_IPs {
-    HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
-    HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
-    HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
-    assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
-    assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
-    assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
-}
-
-function check_weave_does_not_generate_defunct_processes {
-    assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
-    assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
-    assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
-}
-
-
-
-function check_ready {
-    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
 }
 
 function setup_pod_networking {
@@ -139,11 +109,49 @@ spec:
 EOF
 }
 
+#
+# Teardown functions
+#
+function tear_down_kubeadm {
+    for host in $HOSTS; do
+        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+    done
+}
+
+#
+# Test functions
+#
 function check_all_pods_communicate {
     status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
     test "$status" = "pass" && return 0 || return 1
 }
 
+function check_connections {
+    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
+}
+
+function check_can_ping_between_weave_bridge_IPs {
+    HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
+    HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
+    HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
+    assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
+    assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
+    assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
+}
+
+function check_weave_does_not_generate_defunct_processes {
+    assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
+    assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
+    assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
+}
+
+function check_ready {
+    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
+}
+
+#
+# Test suite
+#
 function main {
     start_suite "Test weave-kube image with Kubernetes"
 
