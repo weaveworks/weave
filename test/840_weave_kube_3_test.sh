@@ -119,15 +119,22 @@ function tear_down_kubeadm {
 }
 
 #
+# Utility functions
+#
+function master_node_registers_all_connections {
+    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
+}
+
+function k8s_nodes_ready {
+    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
+}
+
+#
 # Test functions
 #
 function check_all_pods_communicate {
     status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
     test "$status" = "pass" && return 0 || return 1
-}
-
-function check_connections {
-    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
 }
 
 function check_can_ping_between_weave_bridge_IPs {
@@ -145,9 +152,7 @@ function check_weave_does_not_generate_defunct_processes {
     assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 }
 
-function check_ready {
-    run_on $HOST1 "$KUBECTL get nodes | grep -c -w Ready | grep $NUM_HOSTS"
-}
+
 
 #
 # Test suite
@@ -161,7 +166,7 @@ function main {
 
     sleep 5;
 
-    assert_raises 'wait_for_x check_connections "connections to establish"'
+    assert_raises 'wait_for_x master_node_registers_all_connections "connections to establish"'
 
     check_can_ping_between_weave_bridge_IPs;
 
@@ -169,7 +174,7 @@ function main {
 
     setup_pod_networking;
 
-    assert_raises 'wait_for_x check_ready "hosts to be ready"'
+    assert_raises 'wait_for_x k8s_nodes_ready "hosts to be ready"'
 
     setup_nettest_on_pods;
 
