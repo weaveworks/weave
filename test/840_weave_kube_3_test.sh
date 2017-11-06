@@ -144,39 +144,43 @@ function check_all_pods_communicate {
     test "$status" = "pass" && return 0 || return 1
 }
 
-start_suite "Test weave-kube image with Kubernetes"
+function main {
+    start_suite "Test weave-kube image with Kubernetes"
 
-tear_down_kubeadm;
+    tear_down_kubeadm;
 
-setup_kubernetes_cluster;
+    setup_kubernetes_cluster;
 
-sleep 5;
+    sleep 5;
 
-assert_raises 'wait_for_x check_connections "connections to establish"'
+    assert_raises 'wait_for_x check_connections "connections to establish"'
 
-check_can_ping_between_weave_bridge_IPs;
+    check_can_ping_between_weave_bridge_IPs;
 
-check_weave_does_not_generate_defunct_processes;
+    check_weave_does_not_generate_defunct_processes;
 
-setup_pod_networking;
+    setup_pod_networking;
 
-assert_raises 'wait_for_x check_ready "hosts to be ready"'
+    assert_raises 'wait_for_x check_ready "hosts to be ready"'
 
-setup_nettest_on_pods;
+    setup_nettest_on_pods;
 
-podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
+    podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
-assert_raises 'wait_for_x check_all_pods_communicate pods'
+    assert_raises 'wait_for_x check_all_pods_communicate pods'
 
-# Check that a pod can contact the outside world
-assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
+    # Check that a pod can contact the outside world
+    assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
-# Check that our pods haven't crashed
-assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
+    # Check that our pods haven't crashed
+    assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
 
-tear_down_kubeadm
+    tear_down_kubeadm
 
-# Destroy our test ipset, and implicitly check it is still there
-assert_raises "docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset"
+    # Destroy our test ipset, and implicitly check it is still there
+    assert_raises "docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset"
 
-end_suite
+    end_suite
+}
+
+main;
