@@ -141,11 +141,9 @@ EOF
 }
 
 function check_all_pods_communicate {
-    if [ -n podIP ] ; then
-        status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
-        if [ $status = "pass" ] ; then
-            return 0
-        fi
+    status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
+    if [ $status = "pass" ] ; then
+        return 0
     fi
     return 1
 }
