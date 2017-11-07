@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/npc/ipset"
 	coreapi "k8s.io/api/core/v1"
-	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -151,15 +150,15 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	port := intstr.FromInt(12345)
 
-	networkPolicy := &extnapi.NetworkPolicy{
+	networkPolicy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "network-policy",
 			Namespace: "destination",
 		},
-		Spec: extnapi.NetworkPolicySpec{
-			Ingress: []extnapi.NetworkPolicyIngressRule{
+		Spec: networkingv1.NetworkPolicySpec{
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					From: []extnapi.NetworkPolicyPeer{
+					From: []networkingv1.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -168,7 +167,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 							},
 						},
 					},
-					Ports: []extnapi.NetworkPolicyPort{
+					Ports: []networkingv1.NetworkPolicyPort{
 						{
 							Port: &port,
 						},
@@ -180,7 +179,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", true, &mockIPTables{}, &m)
+	controller := New("foo", false, &mockIPTables{}, &m)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -196,7 +195,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", true, &mockIPTables{}, &m)
+	controller = New("foo", false, &mockIPTables{}, &m)
 
 	controller.AddNetworkPolicy(networkPolicy)
 

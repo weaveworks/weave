@@ -11,6 +11,10 @@ import (
 	"github.com/weaveworks/weave/npc/ipset"
 )
 
+// analysePolicyLegacy is used to analyse extensions/v1beta1/NetworkPolicy (legacy) and
+// implements pre-1.7 k8s netpol semantics, whilst analysePolicy - networking.k8s.io/v1/NetworkPolicy
+// and 1.7 semantics.
+
 func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 	rules map[string]*ruleSpec,
 	nsSelectors, podSelectors map[string]*selectorSpec,
