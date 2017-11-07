@@ -33,6 +33,14 @@ items:
           - get
           - list
           - watch
+      - apiGroups:
+          - 'networking.k8s.io'
+        resources:
+          - networkpolicies
+        verbs:
+          - get
+          - list
+          - watch
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRoleBinding
     metadata:
@@ -108,6 +116,7 @@ items:
                       fieldPath: spec.nodeName
               image: 'weaveworks/weave-npc:latest'
               imagePullPolicy: Always
+#npc-args
               resources:
                 requests:
                   cpu: 10m

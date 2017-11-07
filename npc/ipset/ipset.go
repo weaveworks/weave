@@ -20,7 +20,10 @@ const (
 type Interface interface {
 	Create(ipsetName Name, ipsetType Type) error
 	AddEntry(ipsetName Name, entry string, comment string) error
+	AddEntryIfNotExist(ipsetName Name, entry string, comment string) error
 	DelEntry(ipsetName Name, entry string) error
+	DelEntryIfExists(ipsetName Name, entry string) error
+	Exist(ipsetName Name, entry string) bool
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
 
@@ -74,12 +77,34 @@ func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
 	return doExec(args...)
 }
 
+// AddEntryIfNotExist does the same as AddEntry but bypasses the ref counting.
+// Should be used only with "default-allow" ipsets.
+func (i *ipset) AddEntryIfNotExist(ipsetName Name, entry string, comment string) error {
+	if i.count(ipsetName, entry) == 1 {
+		return nil
+	}
+	return i.AddEntry(ipsetName, entry, comment)
+}
+
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
 	i.Logger.Printf("deleting entry %s from %s", entry, ipsetName)
 	if i.dec(ipsetName, entry) > 0 { // still needed
 		return nil
 	}
 	return doExec("del", string(ipsetName), entry)
+}
+
+// DelEntryIfExists does the same as DelEntry but bypasses the ref counting.
+// Should be used only with "default-allow" ipsets.
+func (i *ipset) DelEntryIfExists(ipsetName Name, entry string) error {
+	if i.count(ipsetName, entry) == 0 {
+		return nil
+	}
+	return i.DelEntry(ipsetName, entry)
+}
+
+func (i *ipset) Exist(ipsetName Name, entry string) bool {
+	return i.count(ipsetName, entry) > 0
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
@@ -152,6 +177,10 @@ func (rc *refCount) dec(ipsetName Name, entry string) int {
 	k := key{ipsetName, entry}
 	rc.ref[k]--
 	return rc.ref[k]
+}
+
+func (rc *refCount) count(ipsetName Name, entry string) int {
+	return rc.ref[key{ipsetName, entry}]
 }
 
 func (rc *refCount) removeSet(ipsetName Name) {
