@@ -59,6 +59,10 @@ function force_drop_node {
     run_on $1 "sudo kubeadm reset"
 }
 
+function weave_connected {
+    run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
+}
+
 #
 # Test functions
 #
@@ -72,7 +76,8 @@ function check_no_lost_ip_addresses {
 }
 
 function main {
-    WEAVE_IPAM_RECOVERY_DELAY=5
+    WEAVE_IPAM_RECOVERY_DELAY_SECONDS=30
+
     start_suite "Test weave-net deallocates from IPAM on node failure";
 
     # ensure that we stop testing on first failure, but don't exit 
@@ -81,20 +86,20 @@ function main {
 
         setup_kubernetes_cluster;
 
-        sleep 5;
+        # Need to wait until all pods have come up
+        assert_raises "wait_for_x weave_connected 'pods to be running weave net' $POD_SETUP_TIMEOUT_SECONDS"
 
         check_no_lost_ip_addresses $HOST1;
         check_no_lost_ip_addresses $HOST2;
         check_no_lost_ip_addresses $HOST3;
 
+       
         force_drop_node $HOST2;
 
+        sleep $WEAVE_IPAM_RECOVERY_DELAY_SECONDS;
+        
         check_no_lost_ip_addresses $HOST1;
         check_no_lost_ip_addresses $HOST3;
-
-        sleep ${WEAVE_IPAM_RECOVERY_DELAY};
-
-        check_no_lost_ip_addresses;
 
     # Save exit status of subshell and resume terminating the script on a bad exit status
     ); status=$?; set -e
