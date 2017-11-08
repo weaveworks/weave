@@ -108,7 +108,7 @@ post_start_actions() {
     export HOST_ROOT
     /home/weave/weave --local setup-cni
 
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$(cat /sys/class/net/weave/address)"
+    /home/weave/kube-peers -reclaim -log-level=debug -node-name="$HOSTNAME" -peer-name="$(cat /sys/class/net/weave/address)"
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
