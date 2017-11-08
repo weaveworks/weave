@@ -8,7 +8,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 
@@ -64,7 +63,6 @@ const (
 
 // update the list of all peers that have gone through this code path
 func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
-	common.Log.Infoln("Adding myself to peer list")
 	var list *peerList
 	err := cml.LoopUpdate(func() error {
 		var err error
@@ -72,10 +70,8 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 		if err != nil {
 			return err
 		}
-		log.Println("Fetched existing peer list", list)
 		if !list.contains(peerName) {
 			list.add(peerName, name)
-			log.Println("Storing new peer list", list)
 			err = cml.UpdatePeerList(*list)
 			if err != nil {
 				return err
@@ -83,6 +79,7 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 		}
 		return nil
 	})
+	common.Log.Infoln("Added myself to peer list", list)
 	return list, err
 }
 
@@ -102,7 +99,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		for _, node := range nodes {
 			delete(peerMap, node.name)
 		}
-		log.Println("Nodes that have disappeared:", peerMap)
+		common.Log.Debugln("Nodes that have disappeared:", peerMap)
 		if len(peerMap) == 0 {
 			break
 		}
@@ -127,10 +124,10 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 			if okToRemove {
 				// 6.   If step 4 or 5 succeeded, rmpeer X
 				result, err := weave.RmPeer(peer.PeerName)
+				common.Log.Infoln("rmpeer of", peer.PeerName, ":", result)
 				if err != nil {
 					return err
 				}
-				log.Println("rmpeer of", peer.PeerName, ":", result)
 				cml.LoopUpdate(func() error {
 					// 7aa.   Remove any annotations Z* that have contents X
 					if err := cml.RemoveAnnotationsWithValue(peer.PeerName); err != nil {
@@ -170,36 +167,39 @@ func main() {
 		justReclaim bool
 		peerName    string
 		nodeName    string
+		logLevel    string
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
+	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.Parse()
 
+	common.SetLogLevel(logLevel)
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatalf("Could not get cluster config: %v", err)
+		common.Log.Fatalf("Could not get cluster config: %v", err)
 	}
 	c, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatalf("Could not make Kubernetes connection: %v", err)
+		common.Log.Fatalf("Could not make Kubernetes connection: %v", err)
 	}
 	peers, err := getKubePeers(c)
 	if err != nil {
-		log.Fatalf("Could not get peers: %v", err)
+		common.Log.Fatalf("Could not get peers: %v", err)
 	}
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
 
 		_, err := addMyselfToPeerList(cml, c, peerName, nodeName)
 		if err != nil {
-			log.Fatalf("Could not get peer list: %v", err)
+			common.Log.Fatalf("Could not update peer list: %v", err)
 		}
 
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 		err = reclaimRemovedPeers(weave, cml, peers, peerName)
 		if err != nil {
-			log.Fatalf("Error while reclaiming space: %v", err)
+			common.Log.Fatalf("Error while reclaiming space: %v", err)
 		}
 		return
 	}
