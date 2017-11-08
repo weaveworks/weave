@@ -98,7 +98,7 @@ fi
 # If this peer name is not stored in the list, either we are a
 # brand-new peer or we were removed by another peer while temporarily
 # absent. In order to avoid a CRDT clash for the latter case, clean up
-if ! /home/weave/kube-peers -check-peer-exists -peer-name="$PEERNAME" ; then
+if ! /home/weave/kube-peers -check-peer-exists -peer-name="$PEERNAME" -log-level=debug ; then
     if [ -f ${DB_PREFIX}data.db ]; then
         echo "Peer not in list; removing persisted data" >&2
         rm -f ${DB_PREFIX}data.db
@@ -126,7 +126,7 @@ post_start_actions() {
     export HOST_ROOT
     /home/weave/weave --local setup-cni
 
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME"
+    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
