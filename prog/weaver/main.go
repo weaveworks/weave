@@ -131,6 +131,7 @@ func main() {
 
 	var (
 		justVersion        bool
+		justPeerName       bool
 		config             mesh.Config
 		bridgeConfig       weavenet.BridgeConfig
 		networkConfig      weave.NetworkConfig
@@ -163,6 +164,7 @@ func main() {
 	)
 
 	mflag.BoolVar(&justVersion, []string{"-version"}, false, "print version and exit")
+	mflag.BoolVar(&justPeerName, []string{"-print-peer-name"}, false, "print peer name and exit")
 	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
 	mflag.IntVar(&config.Port, []string{"-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
@@ -230,6 +232,11 @@ func main() {
 		fmt.Printf("weave %s\n", version)
 		os.Exit(0)
 	}
+	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
+	if justPeerName {
+		fmt.Printf("%s\n", name)
+		os.Exit(0)
+	}
 
 	peers = mflag.Args()
 	if resume && len(peers) > 0 {
@@ -281,8 +288,6 @@ func main() {
 			Log.Warningf("Setting %s MAC (mitigate https://github.com/docker/docker/issues/14908)", bridgeConfig.DockerBridgeName)
 		}
 	}
-
-	name := peerName(routerName, bridgeConfig.WeaveBridgeName, dbPrefix, hostRoot)
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
