@@ -83,6 +83,18 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 	return list, err
 }
 
+func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName string) (bool, error) {
+	if err := cml.Init(); err != nil {
+		return false, err
+	}
+	list, err := cml.GetPeerList()
+	if err != nil {
+		return false, err
+	}
+	common.Log.Debugf("[kube-peers] Checking peer %q against list %v", peerName, list)
+	return list.contains(peerName), nil
+}
+
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
 func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName string) error {
@@ -164,11 +176,13 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 func main() {
 	var (
 		justReclaim bool
+		justCheck   bool
 		peerName    string
 		nodeName    string
 		logLevel    string
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
+	flag.BoolVar(&justCheck, "check-peer-exists", false, "return success if peer name is stored in annotation")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
@@ -182,6 +196,18 @@ func main() {
 	c, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		common.Log.Fatalf("[kube-peers] Could not make Kubernetes connection: %v", err)
+	}
+	if justCheck {
+		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
+		exists, err := checkIamInPeerList(cml, c, peerName)
+		if err != nil {
+			common.Log.Fatalf("[kube-peers] Could not check peer list: %v", err)
+		}
+		if exists {
+			os.Exit(0)
+		} else {
+			os.Exit(9)
+		}
 	}
 	peers, err := getKubePeers(c)
 	if err != nil {
