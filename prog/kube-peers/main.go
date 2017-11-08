@@ -79,7 +79,7 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 		}
 		return nil
 	})
-	common.Log.Infoln("Added myself to peer list", list)
+	common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 	return list, err
 }
 
@@ -99,24 +99,24 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		for _, node := range nodes {
 			delete(peerMap, node.name)
 		}
-		common.Log.Debugln("Nodes that have disappeared:", peerMap)
+		common.Log.Debugln("[kube-peers] Nodes that have disappeared:", peerMap)
 		if len(peerMap) == 0 {
 			break
 		}
 		// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
 		for _, peer := range peerMap {
-			common.Log.Debugln("Preparing to remove disappeared peer", peer)
+			common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peer)
 			okToRemove := false
 			// 3. Check if there is an existing annotation with key X
 			if existingAnnotation, found := cml.cm.Annotations[peer.PeerName]; found {
-				common.Log.Debugln("Existing annotation", existingAnnotation)
+				common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation)
 				// 4.   If annotation already contains my identity, ok;
 				if existingAnnotation == myPeerName {
 					okToRemove = true
 				}
 			} else {
 				// 5.   If non-existent, write an annotation with key X and contents "my identity"
-				common.Log.Debugln("Noting I plan to remove ", peer.PeerName)
+				common.Log.Debugln("[kube-peers] Noting I plan to remove ", peer.PeerName)
 				if err := cml.UpdateAnnotation(peer.PeerName, myPeerName); err == nil {
 					okToRemove = true
 				}
@@ -124,7 +124,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 			if okToRemove {
 				// 6.   If step 4 or 5 succeeded, rmpeer X
 				result, err := weave.RmPeer(peer.PeerName)
-				common.Log.Infoln("rmpeer of", peer.PeerName, ":", result)
+				common.Log.Infoln("[kube-peers] rmpeer of", peer.PeerName, ":", result)
 				if err != nil {
 					return err
 				}
@@ -135,16 +135,16 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 					}
 					// 7a.    Remove X from peerList
 					storedPeerList.remove(peer.PeerName)
-					common.Log.Infoln("Removing peer ", peer.PeerName, ". Expecting to remove linked annotation next.")
+					common.Log.Infoln("[kube-peers] Removing peer ", peer.PeerName, ". Expecting to remove linked annotation next.")
 					if err := cml.UpdatePeerList(*storedPeerList); err != nil {
 						return err
 					}
-					common.Log.Infoln("Removing annotation ", peer.PeerName)
+					common.Log.Infoln("[kube-peers] Removing annotation ", peer.PeerName)
 					// 7b.    Remove annotation with key X
 					return cml.RemoveAnnotation(peer.PeerName)
 
 				})
-				common.Log.Debugln("Finished removal of ", peer.PeerName)
+				common.Log.Debugln("[kube-peers] Finished removal of ", peer.PeerName)
 			}
 			// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
 
@@ -178,28 +178,28 @@ func main() {
 	common.SetLogLevel(logLevel)
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		common.Log.Fatalf("Could not get cluster config: %v", err)
+		common.Log.Fatalf("[kube-peers] Could not get cluster config: %v", err)
 	}
 	c, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		common.Log.Fatalf("Could not make Kubernetes connection: %v", err)
+		common.Log.Fatalf("[kube-peers] Could not make Kubernetes connection: %v", err)
 	}
 	peers, err := getKubePeers(c)
 	if err != nil {
-		common.Log.Fatalf("Could not get peers: %v", err)
+		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
 	}
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
 
 		_, err := addMyselfToPeerList(cml, c, peerName, nodeName)
 		if err != nil {
-			common.Log.Fatalf("Could not update peer list: %v", err)
+			common.Log.Fatalf("[kube-peers] Could not update peer list: %v", err)
 		}
 
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 		err = reclaimRemovedPeers(weave, cml, peers, peerName)
 		if err != nil {
-			common.Log.Fatalf("Error while reclaiming space: %v", err)
+			common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 		}
 		return
 	}
