@@ -69,10 +69,13 @@ function weave_connected {
 
 function check_no_lost_ip_addresses {
     host=$1
-    unreachable_count=$(run_on $host "sudo weave status ipam" | grep "unreachable" | wc -l)
+    ipam_status=$(run_on $host "sudo weave status ipam")
+    echo $ipam_status
+    unreachable_count=$(echo $ipam_status | grep "unreachable" | wc -l)
     if [ "$unreachable_count" != "0" ]; then
-        return 1 # fail
+        return 1
     fi
+    return 0
 }
 
 function main {
