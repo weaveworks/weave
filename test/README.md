@@ -11,6 +11,7 @@ The `Vagrantfile` in this directory constructs three such VMs.
 If you are [building Weave Net using Vagrant](https://www.weave.works/docs/net/latest/building/),
 it is recommended to run the tests from the build VM and not the host.
 
+> **NOTE WELL** The number of hosts required by a test must be specified in the test name. For example, `000_some_test.sh` will use one host, while `001_some_other_3_test.sh` will use three hosts. The number of hosts must be the last part of the test name before the `_test.sh` prefix. See `/tools/runner/runner.go` for details
 
 ## Running tests
 
