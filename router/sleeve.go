@@ -493,7 +493,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bo
 		// non-broadcast frames can be broadcast, if the
 		// destination MAC was not in our MAC cache.
 		if broadcast {
-			log.Print(fwd.logPrefix(), "dropping too big DF broadcast frame (", dec.IP.SrcIP, " -> ", dec.IP.DstIP, "): MTU=", mtu)
+			log.Print(fwd.logPrefix(), "dropping too big DF broadcast frame: len ", len(frame), " (", dec.IP.SrcIP, " -> ", dec.IP.DstIP, "): MTU=", mtu)
 			return
 		}
 
