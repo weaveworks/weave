@@ -170,12 +170,12 @@ assert_raises 'wait_for_x check_all_pods_communicate pods'
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-# allow access for all
+# allow access for nettest-deny
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: nettest-misc
+  name: allow-nettest-deny
   namespace: default
 spec:
   podSelector:
@@ -186,6 +186,27 @@ spec:
         - podSelector:
             matchLabels:
               access: deny
+EOF
+
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# remove the access for nettest-deny
+run_on $HOST1 "$KUBECTL delete netpol allow-nettest-deny"
+
+# nettest-deny should still not be able to reach nettest pods
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# allow access for all
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nettest-deny
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+    - {}
 EOF
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
