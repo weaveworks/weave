@@ -60,7 +60,6 @@ type Config struct {
 	NoDefaultIPAM       bool
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
-	Version             string
 	WithoutDNS          bool
 	NoMulticastRoute    bool
 	KeepTXOn            bool

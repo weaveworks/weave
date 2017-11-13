@@ -210,11 +210,7 @@ func main() {
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
-	proxyConfig := configureProxy(version, defaultDockerHost)
-	if bridgeConfig.AWSVPC {
-		proxyConfig.NoMulticastRoute = true
-		proxyConfig.KeepTXOn = true
-	}
+	proxyConfig := newProxyConfig()
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -229,6 +225,12 @@ func main() {
 	if justVersion {
 		fmt.Printf("weave %s\n", version)
 		os.Exit(0)
+	}
+
+	proxyConfig.DockerHost = dockerAPI
+	if bridgeConfig.AWSVPC {
+		proxyConfig.NoMulticastRoute = true
+		proxyConfig.KeepTXOn = true
 	}
 
 	peers = mflag.Args()
@@ -525,12 +527,10 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func configureProxy(version string, defaultDockerHost string) *weaveproxy.Config {
+func newProxyConfig() *weaveproxy.Config {
 	proxyConfig := weaveproxy.Config{
-		Version:      version,
 		Image:        getenvOrDefault("EXEC_IMAGE", "weaveworks/weaveexec"),
 		DockerBridge: getenvOrDefault("DOCKER_BRIDGE", "docker0"),
-		DockerHost:   defaultDockerHost,
 	}
 	mflag.BoolVar(&proxyConfig.Enabled, []string{"-proxy"}, false, "instruct Weave Net to start its Docker proxy")
 	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen for Docker proxy")
