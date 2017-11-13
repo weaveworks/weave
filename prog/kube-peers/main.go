@@ -77,12 +77,41 @@ func addMyselfToPeerList(c *kubernetes.Clientset, peerName, name string) (*peerL
 	return list, err
 }
 
+// For each of those peers that is no longer listed as a node by
+// Kubernetes, remove it from Weave IPAM
+func reclaimRemovedPeers(apl *peerList, nodes []nodeInfo) error {
+	// TODO
+	// Outline of function:
+	// 1. Compare peers stored in the peerList against all peers reported by k8s now.
+	// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
+	// 3. Check if there is an existing annotation with key X
+	// 4.   If annotation already contains my identity, ok;
+	// 5.   If non-existent, write an annotation with key X and contents "my identity"
+	// 6.   If step 4 or 5 succeeded, rmpeer X
+	// 7aa.   Remove any annotations Z* that have contents X
+	// 7a.    Remove X from peerList
+	// 7b.    Remove annotation with key X
+	// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
+	// 9. Go back to step 1 until there is no difference between the two sets
+
+	// Step 3-5 is to protect against two simultaneous rmpeers of X
+	// Step 4 is to pick up again after a restart between step 5 and step 7b
+	// If the peer doing the reclaim disappears between steps 5 and 7a, then someone will clean it up in step 7aa
+	// If peer doing the reclaim disappears forever between 7a and 7b then we get a dangling annotation
+	// This should be sufficiently rare that we don't care.
+
+	// Question: Should we narrow step 2 by checking against Weave Net IPAM?
+	// i.e. If peer X owns any address space and is marked unreachable, we want to rmpeer X
+	return nil
+}
+
 func main() {
 	var (
 		justReclaim bool
 		peerName    string
 		nodeName    string
 	)
+	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.Parse()
@@ -104,6 +133,10 @@ func main() {
 		_, err := addMyselfToPeerList(c, peerName, nodeName)
 		if err != nil {
 			log.Fatalf("Could not get peer list: %v", err)
+		}
+		err = reclaimRemovedPeers(list, peers)
+		if err != nil {
+			log.Fatalf("Error while reclaiming space: %v", err)
 		}
 		return
 	}
