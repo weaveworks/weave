@@ -305,6 +305,6 @@ func TestDefaultAllow(t *testing.T) {
 	require.True(t, m.Exist(defaultAllowIPSetName, fooPodIP))
 
 	controller.DeletePod(podFoo)
-	// Should remove foo pod to default-allow
+	// Should remove foo pod from default-allow
 	require.False(t, m.Exist(defaultAllowIPSetName, fooPodIP))
 }
