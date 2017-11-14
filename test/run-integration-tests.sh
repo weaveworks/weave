@@ -354,6 +354,13 @@ function main() {
             exit $status
             ;;
 
+        up) # Setup a test environment without actually doing any testing.
+            provision on "$PROVIDER"
+            configure "$ssh_user" "$ssh_hosts" "${ssh_port:-22}" "$ssh_id_file"
+            "$DIR/setup.sh"
+            echo_export_hosts
+            ;;
+
         provision)
             provision on "$PROVIDER"
             echo_export_hosts

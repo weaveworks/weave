@@ -30,6 +30,7 @@ HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
 HOST_ROOT=${HOST_ROOT:-/host}
 CONN_LIMIT=${CONN_LIMIT:-30}
+DB_PREFIX=${DB_PREFIX:-/weavedb/weave-net}
 
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
@@ -87,6 +88,23 @@ if [ -z "$IPALLOC_INIT" ]; then
     IPALLOC_INIT="consensus=$(peer_count $KUBE_PEERS)"
 fi
 
+# Find out what peer name we will be using
+PEERNAME=$(/home/weave/weaver $EXTRA_ARGS --print-peer-name --host-root=$HOST_ROOT --db-prefix="$DB_PREFIX")
+if [ -z "$PEERNAME" ]; then
+    echo "Unable to get peer name" >&2
+    exit 2
+fi
+
+# If this peer name is not stored in the list, either we are a
+# brand-new peer or we were removed by another peer while temporarily
+# absent. In order to avoid a CRDT clash for the latter case, clean up
+if ! /home/weave/kube-peers -check-peer-exists -peer-name="$PEERNAME" -log-level=debug ; then
+    if [ -f ${DB_PREFIX}data.db ]; then
+        echo "Peer not in list; removing persisted data" >&2
+        rm -f ${DB_PREFIX}data.db
+    fi
+fi
+
 post_start_actions() {
     # Wait for weave process to become responsive
     while true ; do
@@ -108,6 +126,8 @@ post_start_actions() {
     export HOST_ROOT
     /home/weave/weave --local setup-cni
 
+    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug
+
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
 }
@@ -115,9 +135,10 @@ post_start_actions() {
 post_start_actions &
 
 /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
+     --name="$PEERNAME" \
      --host-root=$HOST_ROOT \
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
-     --db-prefix="/weavedb/weave-net" \
+     --db-prefix="$DB_PREFIX" \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \

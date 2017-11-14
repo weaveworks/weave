@@ -104,6 +104,13 @@ run_on() {
     remote $host $SSH $host "$@"
 }
 
+get_command_output_on() {
+    host=$1
+    shift 1
+    [ -z "$DEBUG" ] || greyly echo "Running on $host: $@" >&2
+    $SSH $host "$@"
+}
+
 docker_on() {
     host=$1
     shift 1
