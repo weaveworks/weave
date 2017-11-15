@@ -27,7 +27,7 @@ func getDBFlag(args []string) error {
 		return err
 	}
 	if !nameFound {
-		return fmt.Errorf("Flag %q not found", flagName)
+		return fmt.Errorf("")
 	}
 	fmt.Print(value)
 	return nil

@@ -85,7 +85,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err := cmd(os.Args[2:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if err.Error() != "" {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }
