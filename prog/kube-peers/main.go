@@ -182,7 +182,7 @@ func main() {
 		logLevel    string
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
-	flag.BoolVar(&justCheck, "check-peer-exists", false, "return success if peer name is stored in annotation")
+	flag.BoolVar(&justCheck, "check-peer-new", false, "return success if peer name is not stored in annotation")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
@@ -204,9 +204,9 @@ func main() {
 			common.Log.Fatalf("[kube-peers] Could not check peer list: %v", err)
 		}
 		if exists {
-			os.Exit(0)
-		} else {
 			os.Exit(9)
+		} else {
+			os.Exit(0)
 		}
 	}
 	peers, err := getKubePeers(c)

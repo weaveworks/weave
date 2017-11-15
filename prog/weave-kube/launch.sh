@@ -98,7 +98,7 @@ fi
 # If this peer name is not stored in the list, either we are a
 # brand-new peer or we were removed by another peer while temporarily
 # absent. In order to avoid a CRDT clash for the latter case, clean up
-if ! /home/weave/kube-peers -check-peer-exists -peer-name="$PEERNAME" -log-level=debug ; then
+if /home/weave/kube-peers -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
     if [ -f ${DB_PREFIX}data.db ]; then
         echo "Peer not in list; removing persisted data" >&2
         rm -f ${DB_PREFIX}data.db
