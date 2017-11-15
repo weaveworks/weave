@@ -50,6 +50,8 @@ func init() {
 		"swarm-manager-peers":      swarmManagerPeers,
 		"is-docker-plugin-enabled": isDockerPluginEnabled,
 		"rewrite-etc-hosts":        rewriteEtcHosts,
+		"get-db-flag":              getDBFlag,
+		"set-db-flag":              setDBFlag,
 	}
 }
 
@@ -83,7 +85,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err := cmd(os.Args[2:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if err.Error() != "" {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }
