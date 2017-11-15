@@ -50,6 +50,8 @@ func init() {
 		"swarm-manager-peers":      swarmManagerPeers,
 		"is-docker-plugin-enabled": isDockerPluginEnabled,
 		"rewrite-etc-hosts":        rewriteEtcHosts,
+		"get-db-flag":              getDBFlag,
+		"set-db-flag":              setDBFlag,
 	}
 }
 
