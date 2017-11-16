@@ -79,7 +79,6 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 		}
 		return nil
 	})
-	common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 	return list, err
 }
 
@@ -216,10 +215,11 @@ func main() {
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
 
-		_, err := addMyselfToPeerList(cml, c, peerName, nodeName)
+		list, err := addMyselfToPeerList(cml, c, peerName, nodeName)
 		if err != nil {
 			common.Log.Fatalf("[kube-peers] Could not update peer list: %v", err)
 		}
+		common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 		err = reclaimRemovedPeers(weave, cml, peers, peerName)
