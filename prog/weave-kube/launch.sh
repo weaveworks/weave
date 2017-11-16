@@ -95,13 +95,12 @@ if [ -z "$PEERNAME" ]; then
     exit 2
 fi
 
-# Check if peer reclaim is in use - we don't want to delete persisted data on an upgrade
-if /usr/bin/weaveutil get-db-flag "$DB_PREFIX" peer-reclaim >/dev/null ; then
-    # If this peer name is not stored in the list, either we are a
-    # brand-new peer or we were removed by another peer while temporarily
-    # absent. In order to avoid a CRDT clash for the latter case, clean up
-    if /home/weave/kube-peers -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
-        if [ -f ${DB_PREFIX}data.db ]; then
+# If we have persisted data and peer reclaim is in use
+if [ -f ${DB_PREFIX}data.db ]; then
+    if /usr/bin/weaveutil get-db-flag "$DB_PREFIX" peer-reclaim >/dev/null ; then
+        # If this peer name is not stored in the list then we were removed by another peer.
+        if /home/weave/kube-peers -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
+            # In order to avoid a CRDT clash, clean up
             echo "Peer not in list; removing persisted data" >&2
             rm -f ${DB_PREFIX}data.db
         fi
@@ -133,7 +132,8 @@ post_start_actions() {
     export HOST_ROOT
     /home/weave/weave --local setup-cni
 
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug
+    # Attempt to run the reclaim process, but don't halt the script if it fails
+    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
