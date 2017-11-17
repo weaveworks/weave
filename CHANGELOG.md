@@ -35,7 +35,7 @@ addresses when many nodes are added and deleted over a long period.
 * Images are now also built for the ppc64le platform #3129
 * Tweak build scripts to run on OSX as well as Linux #3135
 
-##External Contributers
+##External Contributors
 
 Thanks to the following contributors:
 @caarlos0
