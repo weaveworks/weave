@@ -15,7 +15,7 @@ MIN_DOCKER_VERSION=1.10.0
 DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
-WEAVEDB_IMAGE=$DOCKERHUB_USER/weavedb
+WEAVEDB_IMAGE=$DOCKERHUB_USER/weavedb:latest
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
@@ -217,6 +217,15 @@ case "$1" in
                 echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
                 exit 0
             fi
+        fi
+        ;;
+    launch)
+        # this is necessary because 'util_op run-container' doesn't do
+        # an implied pull like 'docker run' does
+        if [ -z "$IS_LOCAL" ] ; then
+            for img in $IMAGE $WEAVEDB_IMAGE ; do
+                docker inspect -f "_" $img >/dev/null 2>&1 || docker pull $img
+            done
         fi
         ;;
     setup)
