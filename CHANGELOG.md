@@ -1,3 +1,7 @@
+## Release 2.1.1
+
+As 2.1.0, but fixing a couple of installation glitches. #3175,#3176
+
 ## Release 2.1.0
 
 ##New Features
