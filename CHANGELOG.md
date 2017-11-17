@@ -1,3 +1,49 @@
+## Release 2.1.0
+
+##New Features
+
+Improved Kubernetes Network Policy - Weave Net now supports the
+'v1' policies introduced in Kubernetes 1.7 as well as the 'beta'
+policies supported previously. See [Kubernetes 1.7 changelog](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.7.md#network)
+for differences. To use old policies, `--use-legacy-netpol` argument
+should be passed to `weave-npc`. #3105,#3141,#3151,#3169
+
+Weave Net now reclaims IP addresses owned by Kubernetes nodes which
+have been deleted from the cluster - this avoids running out of IP
+addresses when many nodes are added and deleted over a long period.
+#2797,#3149,#3170,#3172
+
+##Other improvements
+
+* Export a Prometheus-style metric giving count of unreachable peers #3119
+* Update 'gopacket' library to reduce memory use by approx 15MB #3160
+* Replace bundling the 'docker' binary with our own code to avoid
+  security vulnerability alerts and save space #2957,#3110
+
+##Bug fixes
+
+* When `weave expose` is used, allow traffic into the Weave network -
+  up till version 1.12 Docker would do this for us, but in 1.13 they
+  stopped so now we do it. This change makes `weave expose` require
+  Weave Net to be running. #2758,#3122
+* Arm64 build now works on non-kubernetes installs #2832,#3110
+* TX offload was being disabled in 'awsvpc' mode, which slows down packet sending #3089
+* Removed spurious 'nil' in logs from CNI DEL operation #3143
+
+##Build and test
+
+* Images are now also built for the ppc64le platform #3129
+* Tweak build scripts to run on OSX as well as Linux #3135
+
+##External Contributers
+
+Thanks to the following contributors:
+@caarlos0
+@dtshepherd
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/59?closed=1)
+
+
 ## Release 2.0.5
 
 Bug fixes
