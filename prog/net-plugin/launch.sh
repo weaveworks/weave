@@ -6,6 +6,7 @@ set -e
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
+LOG_LEVEL=${WEAVE_LOG_LEVEL:-debug}
 HOST_ROOT=${HOST_ROOT:-/host}
 WEAVE_DIR="/host/var/lib/weave"
 
@@ -44,7 +45,7 @@ exec /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
     --no-dns \
     --ipalloc-range=$IPALLOC_RANGE \
     --nickname "$(hostname)" \
-    --log-level=debug \
+    --log-level=$LOG_LEVEL \
     --db-prefix="$WEAVE_DIR/weave" \
     --plugin-v2 \
     $(multicast_opt) \
