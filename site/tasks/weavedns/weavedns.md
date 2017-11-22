@@ -43,6 +43,10 @@ To disable an application container's use of weaveDNS, add the
 `--without-dns` option to `weave launch`. To
 disable weaveDNS itself, launch weave with the `--no-dns` option.
 
+> **Note** WeaveDNS is not part of the Weave Net Kubernetes add-on.
+    Kubernetes has its own DNS service, integrated with Kubernetes
+    Services, and WeaveDNS does not duplicate that functionality.
+
 **See Also**
 
  * [Integrating Docker via the API Proxy](/site/tasks/weave-docker-api/weave-docker-api.md)
