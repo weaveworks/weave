@@ -89,6 +89,14 @@
           "value"
       ],
       "value": ""
+    },
+    {
+      "description": "Logging level of the Weave Net process",
+      "name": "WEAVE_LOG_LEVEL",
+      "settable": [
+          "value"
+      ],
+      "value": ""
     }
   ],
   "network": {
