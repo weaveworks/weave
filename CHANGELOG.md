@@ -1,3 +1,18 @@
+## Release 2.1.2
+
+This release fixes a couple of bugs discovered since the release of Weave Net 2.1.0
+
+##Bug fixes
+
+* Fix crash seen when starting 10-15 nodes simultaneously #3184,#3186
+* Fix NetworkPolicy blocking traffic if updates come out of order from Kubernetes #3177,#3181
+
+Thanks to the following contributors:
+@zignig
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/66?closed=1)
+
+
 ## Release 2.1.1
 
 As 2.1.0, but fixing a couple of installation glitches. #3175,#3176
