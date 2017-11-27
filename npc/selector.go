@@ -46,12 +46,12 @@ func (s *selector) matches(labelMap map[string]string) bool {
 	return s.spec.selector.Matches(labels.Set(labelMap))
 }
 
-func (s *selector) addEntry(entry string, comment string) error {
-	return s.ips.AddEntry(s.spec.ipsetName, entry, comment)
+func (s *selector) addEntry(user types.UID, entry string, comment string) error {
+	return s.ips.AddEntry(user, s.spec.ipsetName, entry, comment)
 }
 
-func (s *selector) delEntry(entry string) error {
-	return s.ips.DelEntry(s.spec.ipsetName, entry)
+func (s *selector) delEntry(user types.UID, entry string) error {
+	return s.ips.DelEntry(user, s.spec.ipsetName, entry)
 }
 
 type selectorFn func(selector *selector) error
@@ -85,14 +85,14 @@ func newSelectorSet(ips ipset.Interface, onNewSelector, onNewDstSelector selecto
 		dstSelectorsCount:    make(map[string]int)}
 }
 
-func (ss *selectorSet) addToMatching(labelMap map[string]string, entry string, comment string) (bool, error) {
+func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string, entry string, comment string) (bool, error) {
 	found := false
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
 			if ss.dstSelectorExist(s) {
 				found = true
 			}
-			if err := s.addEntry(entry, comment); err != nil {
+			if err := s.addEntry(user, entry, comment); err != nil {
 				return found, err
 			}
 		}
@@ -100,10 +100,10 @@ func (ss *selectorSet) addToMatching(labelMap map[string]string, entry string, c
 	return found, nil
 }
 
-func (ss *selectorSet) delFromMatching(labelMap map[string]string, entry string) error {
+func (ss *selectorSet) delFromMatching(user types.UID, labelMap map[string]string, entry string) error {
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
-			if err := s.delEntry(entry); err != nil {
+			if err := s.delEntry(user, entry); err != nil {
 				return err
 			}
 		}

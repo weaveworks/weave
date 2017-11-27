@@ -10,13 +10,14 @@ import (
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type mockSet struct {
 	name    ipset.Name
 	setType ipset.Type
-	subSets map[string]bool
+	subSets map[string]map[types.UID]bool
 }
 
 type mockIPSet struct {
@@ -24,70 +25,57 @@ type mockIPSet struct {
 }
 
 func newMockIPSet() mockIPSet {
-	i := mockIPSet{
-		sets: make(map[string]mockSet),
-	}
-
-	return i
+	return mockIPSet{sets: make(map[string]mockSet)}
 }
 
 func (i *mockIPSet) Create(ipsetName ipset.Name, ipsetType ipset.Type) error {
 	if _, ok := i.sets[string(ipsetName)]; ok {
 		return errors.Errorf("ipset %s already exists", ipsetName)
 	}
-	i.sets[string(ipsetName)] = mockSet{name: ipsetName, setType: ipsetType, subSets: make(map[string]bool)}
+	i.sets[string(ipsetName)] = mockSet{name: ipsetName, setType: ipsetType, subSets: make(map[string]map[types.UID]bool)}
 	return nil
 }
 
-func (i *mockIPSet) AddEntry(ipsetName ipset.Name, entry string, comment string) error {
-	return i.addEntry(ipsetName, entry, comment, true)
-}
-
-func (i *mockIPSet) AddEntryIfNotExist(ipsetName ipset.Name, entry string, comment string) error {
-	return i.addEntry(ipsetName, entry, comment, false)
-}
-
-func (i *mockIPSet) addEntry(ipsetName ipset.Name, entry string, comment string, checkIfExists bool) error {
-	log.Printf("adding entry %s to %s", entry, ipsetName)
+func (i *mockIPSet) AddEntry(user types.UID, ipsetName ipset.Name, entry string, comment string) error {
+	log.Printf("adding entry %s to %s for %s", entry, ipsetName, user)
 	if _, ok := i.sets[string(ipsetName)]; !ok {
-		return errors.Errorf("ipset %s does not exist", entry)
+		return errors.Errorf("%s does not exist", entry)
 	}
-	if checkIfExists {
-		if _, ok := i.sets[string(ipsetName)].subSets[entry]; ok {
-			return errors.Errorf("ipset %s is already a member of %s", entry, ipsetName)
-		}
+	if i.sets[string(ipsetName)].subSets[entry] == nil {
+		i.sets[string(ipsetName)].subSets[entry] = make(map[types.UID]bool)
 	}
-	i.sets[string(ipsetName)].subSets[entry] = true
+	if _, ok := i.sets[string(ipsetName)].subSets[entry][user]; ok {
+		return errors.Errorf("user %s already owns entry %s", user, entry)
+	}
+	i.sets[string(ipsetName)].subSets[entry][user] = true
 
 	return nil
 }
 
-func (i *mockIPSet) DelEntry(ipsetName ipset.Name, entry string) error {
-	return i.delEntry(ipsetName, entry, true)
-}
-
-func (i *mockIPSet) DelEntryIfExists(ipsetName ipset.Name, entry string) error {
-	return i.delEntry(ipsetName, entry, false)
-}
-
-func (i *mockIPSet) delEntry(ipsetName ipset.Name, entry string, checkIfExists bool) error {
-	log.Printf("deleting entry %s from %s", entry, ipsetName)
+func (i *mockIPSet) DelEntry(user types.UID, ipsetName ipset.Name, entry string) error {
+	log.Printf("deleting entry %s from %s for %s", entry, ipsetName, user)
 	if _, ok := i.sets[string(ipsetName)]; !ok {
 		return errors.Errorf("ipset %s does not exist", ipsetName)
 	}
-	if checkIfExists {
-		if _, ok := i.sets[string(ipsetName)].subSets[entry]; !ok {
-			return errors.Errorf("ipset %s is not a member of %s", entry, ipsetName)
-		}
+	if _, ok := i.sets[string(ipsetName)].subSets[entry][user]; !ok {
+		return errors.Errorf("user %s does not own entry %s", user, entry)
 	}
-	delete(i.sets[string(ipsetName)].subSets, entry)
+	delete(i.sets[string(ipsetName)].subSets[entry], user)
+
+	if len(i.sets[string(ipsetName)].subSets[entry]) == 0 {
+		delete(i.sets[string(ipsetName)].subSets, entry)
+	}
 
 	return nil
 }
 
-func (i *mockIPSet) Exist(ipsetName ipset.Name, entry string) bool {
-	_, found := i.sets[string(ipsetName)].subSets[entry]
-	return found
+func (i *mockIPSet) Exist(user types.UID, ipsetName ipset.Name, entry string) bool {
+	_, ok := i.sets[string(ipsetName)].subSets[entry][user]
+	return ok
+}
+
+func (i *mockIPSet) entryExists(ipsetName ipset.Name, entry string) bool {
+	return len(i.sets[string(ipsetName)].subSets[entry]) > 0
 }
 
 func (i *mockIPSet) Flush(ipsetName ipset.Name) error {
@@ -191,7 +179,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	controller.AddNetworkPolicy(networkPolicy)
 
-	require.Equal(t, true, m.sets[selectorIPSetName].subSets[sourceIPSetName])
+	require.Equal(t, true, len(m.sets[selectorIPSetName].subSets[sourceIPSetName]) > 0)
 
 	// NetworkPolicy first
 	m = newMockIPSet()
@@ -202,8 +190,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	controller.AddNamespace(sourceNamespace)
 	controller.AddNamespace(destinationNamespace)
 
-	require.Equal(t, true, m.sets[selectorIPSetName].subSets[sourceIPSetName])
-
+	require.Equal(t, true, len(m.sets[selectorIPSetName].subSets[sourceIPSetName]) > 0)
 }
 
 // Tests default-allow ipset behavior when running in non-legacy mode.
@@ -238,7 +225,7 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddPod(podFoo)
 
 	// Should add the foo pod to default-allow
-	require.True(t, m.Exist(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -252,7 +239,7 @@ func TestDefaultAllow(t *testing.T) {
 	controller.UpdatePod(podBarNoIP, podBar)
 
 	// Should add the bar pod to default-allow
-	require.True(t, m.Exist(defaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
 
 	// Allow access from the bar pod to the foo pod
 	netpol := &networkingv1.NetworkPolicy{
@@ -274,37 +261,118 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddNetworkPolicy(netpol)
 
 	// Should remove the foo pod from default-allow as the netpol selects it
-	require.False(t, m.Exist(defaultAllowIPSetName, fooPodIP))
-	require.True(t, m.Exist(defaultAllowIPSetName, barPodIP))
+	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
 
 	podBarWithNewIP := *podBar
 	podBarWithNewIP.Status.PodIP = barPodNewIP
 	controller.UpdatePod(podBar, &podBarWithNewIP)
 
 	// Should update IP addr of the bar pod in default-allow
-	require.False(t, m.Exist(defaultAllowIPSetName, barPodIP))
-	require.True(t, m.Exist(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(defaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
 
 	controller.UpdatePod(&podBarWithNewIP, podBarNoIP)
 	// Should remove the bar pod from default-allow as it does not have any IP addr
-	require.False(t, m.Exist(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
 
 	podFooWithNewLabel := *podFoo
 	podFooWithNewLabel.ObjectMeta.Labels = map[string]string{"run": "new-foo"}
 	controller.UpdatePod(podFoo, &podFooWithNewLabel)
 
 	// Should bring back the foo pod to default-allow as it does not match dst of any netpol
-	require.True(t, m.Exist(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
 
 	controller.UpdatePod(&podFooWithNewLabel, podFoo)
 	// Should remove from default-allow as it matches the netpol after the update
-	require.False(t, m.Exist(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNetworkPolicy(netpol)
 	// Should bring back the foo pod to default-allow as no netpol selects it
-	require.True(t, m.Exist(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
 
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
-	require.False(t, m.Exist(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+}
+
+func TestOutOfOrderPodEvents(t *testing.T) {
+	const (
+		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
+		runBarIPSetName       = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
+		podIP                 = "10.32.0.10"
+	)
+
+	m := newMockIPSet()
+	controller := New("qux", false, &mockIPTables{}, &m)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	controller.AddNamespace(defaultNamespace)
+
+	podFoo := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "foo",
+			Namespace: "default",
+			Name:      "foo",
+			Labels:    map[string]string{"run": "foo"}},
+		Status: coreapi.PodStatus{PodIP: podIP}}
+	controller.AddPod(podFoo)
+
+	// Should be in default-allow as no netpol selects podFoo
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	netpol := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "allow-from-bar-to-foo",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"run": "bar"},
+					},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpol)
+
+	// Shouldn't be in default-allow as netpol above selects podFoo
+	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	podBar := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "bar",
+			Namespace: "default",
+			Name:      "bar",
+			Labels:    map[string]string{"run": "bar"}},
+		Status: coreapi.PodStatus{PodIP: podIP}}
+	controller.AddPod(podBar)
+
+	// Should be in default-allow as no netpol selects podBar
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.Exist(podBar.ObjectMeta.UID, defaultAllowIPSetName, podIP))
+	// Should be in run=bar ipset
+	require.True(t, m.entryExists(runBarIPSetName, podIP))
+
+	controller.DeletePod(podFoo)
+	// Multiple duplicate events should not affect npc state
+	controller.DeletePod(podFoo)
+	controller.DeletePod(podFoo)
+
+	// Should be in default-allow as no netpol selects podBar and podFoo removal
+	// should not affect podBar in default-allow
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	controller.DeletePod(podBar)
+
+	// Should remove from default-allow and run=bar ipsets
+	require.Equal(t, 0, len(m.sets[defaultAllowIPSetName].subSets))
+	require.False(t, m.entryExists(runBarIPSetName, podIP))
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type Name string
@@ -19,11 +20,9 @@ const (
 
 type Interface interface {
 	Create(ipsetName Name, ipsetType Type) error
-	AddEntry(ipsetName Name, entry string, comment string) error
-	AddEntryIfNotExist(ipsetName Name, entry string, comment string) error
-	DelEntry(ipsetName Name, entry string) error
-	DelEntryIfExists(ipsetName Name, entry string) error
-	Exist(ipsetName Name, entry string) bool
+	AddEntry(user types.UID, ipsetName Name, entry string, comment string) error
+	DelEntry(user types.UID, ipsetName Name, entry string) error
+	Exist(user types.UID, ipsetName Name, entry string) bool
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
 
@@ -33,14 +32,27 @@ type Interface interface {
 	DestroyAll() error
 }
 
+type entryKey struct {
+	ipsetName Name
+	entry     string
+}
+
 type ipset struct {
-	refCount
 	*log.Logger
 	enableComments bool
+	// List of users per ipset entry. User is either a namespace or a pod.
+	// There might be multiple users for the same ipset & entry pair because
+	// events from k8s API server might be out of order causing duplicate IPs:
+	// https://github.com/weaveworks/weave/issues/2792.
+	users map[entryKey]map[types.UID]struct{}
 }
 
 func New(logger *log.Logger) Interface {
-	ips := &ipset{refCount: newRefCount(), Logger: logger, enableComments: true}
+	ips := &ipset{
+		Logger:         logger,
+		enableComments: true,
+		users:          make(map[entryKey]map[types.UID]struct{}),
+	}
 
 	// Check for comment support
 	testIpsetName := Name("weave-test-comment")
@@ -65,11 +77,15 @@ func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 	return doExec(args...)
 }
 
-func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
-	i.Logger.Printf("adding entry %s to %s", entry, ipsetName)
-	if i.inc(ipsetName, entry) > 1 { // already in the set
+func (i *ipset) AddEntry(user types.UID, ipsetName Name, entry string, comment string) error {
+	i.Logger.Printf("adding entry %s to %s of %s", entry, ipsetName, user)
+
+	if !i.addUser(user, ipsetName, entry) { // already in the set
 		return nil
 	}
+
+	i.Logger.Printf("added entry %s to %s of %s", entry, ipsetName, user)
+
 	args := []string{"add", string(ipsetName), entry}
 	if i.enableComments {
 		args = append(args, "comment", comment)
@@ -77,53 +93,39 @@ func (i *ipset) AddEntry(ipsetName Name, entry string, comment string) error {
 	return doExec(args...)
 }
 
-// AddEntryIfNotExist does the same as AddEntry but bypasses the ref counting.
-// Should be used only with "default-allow" ipsets.
-func (i *ipset) AddEntryIfNotExist(ipsetName Name, entry string, comment string) error {
-	if i.count(ipsetName, entry) == 1 {
-		return nil
-	}
-	return i.AddEntry(ipsetName, entry, comment)
-}
+func (i *ipset) DelEntry(user types.UID, ipsetName Name, entry string) error {
+	i.Logger.Printf("deleting entry %s from %s of %s", entry, ipsetName, user)
 
-func (i *ipset) DelEntry(ipsetName Name, entry string) error {
-	i.Logger.Printf("deleting entry %s from %s", entry, ipsetName)
-	if i.dec(ipsetName, entry) > 0 { // still needed
+	if !i.delUser(user, ipsetName, entry) { // still needed
 		return nil
 	}
+
+	i.Logger.Printf("deleted entry %s from %s of %s", entry, ipsetName, user)
+
 	return doExec("del", string(ipsetName), entry)
 }
 
-// DelEntryIfExists does the same as DelEntry but bypasses the ref counting.
-// Should be used only with "default-allow" ipsets.
-func (i *ipset) DelEntryIfExists(ipsetName Name, entry string) error {
-	if i.count(ipsetName, entry) == 0 {
-		return nil
-	}
-	return i.DelEntry(ipsetName, entry)
-}
-
-func (i *ipset) Exist(ipsetName Name, entry string) bool {
-	return i.count(ipsetName, entry) > 0
+func (i *ipset) Exist(user types.UID, ipsetName Name, entry string) bool {
+	return i.existUser(user, ipsetName, entry)
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
-	i.removeSet(ipsetName)
+	i.removeSetFromUsers(ipsetName)
 	return doExec("flush", string(ipsetName))
 }
 
 func (i *ipset) FlushAll() error {
-	i.refCount = newRefCount()
+	i.users = make(map[entryKey]map[types.UID]struct{})
 	return doExec("flush")
 }
 
 func (i *ipset) Destroy(ipsetName Name) error {
-	i.removeSet(ipsetName)
+	i.removeSetFromUsers(ipsetName)
 	return doExec("destroy", string(ipsetName))
 }
 
 func (i *ipset) DestroyAll() error {
-	i.refCount = newRefCount()
+	i.users = make(map[entryKey]map[types.UID]struct{})
 	return doExec("destroy")
 }
 
@@ -145,48 +147,52 @@ func (i *ipset) List(prefix string) ([]Name, error) {
 	return selected, err
 }
 
+// Returns true if entry does not exist in ipset (entry has to be inserted into ipset).
+func (i *ipset) addUser(user types.UID, ipsetName Name, entry string) bool {
+	k := entryKey{ipsetName, entry}
+	add := false
+
+	if i.users[k] == nil {
+		i.users[k] = make(map[types.UID]struct{})
+	}
+	if len(i.users[k]) == 0 {
+		add = true
+	}
+	i.users[k][user] = struct{}{}
+
+	return add
+}
+
+// Returns true if user is the last owner of entry (entry has to be removed from ipset).
+func (i *ipset) delUser(user types.UID, ipsetName Name, entry string) bool {
+	k := entryKey{ipsetName, entry}
+
+	oneLeft := len(i.users[k]) == 1
+	delete(i.users[k], user)
+
+	if len(i.users[k]) == 0 {
+		delete(i.users, k)
+	}
+
+	return oneLeft && (len(i.users[k]) == 0)
+}
+
+func (i *ipset) existUser(user types.UID, ipsetName Name, entry string) bool {
+	_, ok := i.users[entryKey{ipsetName, entry}][user]
+	return ok
+}
+
+func (i *ipset) removeSetFromUsers(ipsetName Name) {
+	for k := range i.users {
+		if k.ipsetName == ipsetName {
+			delete(i.users, k)
+		}
+	}
+}
+
 func doExec(args ...string) error {
 	if output, err := exec.Command("ipset", args...).CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "ipset %v failed: %s", args, output)
 	}
 	return nil
-}
-
-// Reference-counting
-type key struct {
-	ipsetName Name
-	entry     string
-}
-
-// note no locking is required as all operations are serialised in the controller
-type refCount struct {
-	ref map[key]int
-}
-
-func newRefCount() refCount {
-	return refCount{ref: make(map[key]int)}
-}
-
-func (rc *refCount) inc(ipsetName Name, entry string) int {
-	k := key{ipsetName, entry}
-	rc.ref[k]++
-	return rc.ref[k]
-}
-
-func (rc *refCount) dec(ipsetName Name, entry string) int {
-	k := key{ipsetName, entry}
-	rc.ref[k]--
-	return rc.ref[k]
-}
-
-func (rc *refCount) count(ipsetName Name, entry string) int {
-	return rc.ref[key{ipsetName, entry}]
-}
-
-func (rc *refCount) removeSet(ipsetName Name) {
-	for k := range rc.ref {
-		if k.ipsetName == ipsetName {
-			delete(rc.ref, k)
-		}
-	}
 }
