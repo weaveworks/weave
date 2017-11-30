@@ -122,7 +122,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 			common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peer)
 			okToRemove := false
 			// 3. Check if there is an existing annotation with key X
-			if existingAnnotation, found := cml.cm.Annotations[peer.PeerName]; found {
+			if existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peer.PeerName); found {
 				common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation)
 				// 4.   If annotation already contains my identity, ok;
 				if existingAnnotation == myPeerName {
@@ -131,7 +131,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 			} else {
 				// 5.   If non-existent, write an annotation with key X and contents "my identity"
 				common.Log.Debugln("[kube-peers] Noting I plan to remove ", peer.PeerName)
-				if err := cml.UpdateAnnotation(peer.PeerName, myPeerName); err == nil {
+				if err := cml.UpdateAnnotation(KubePeersPrefix+peer.PeerName, myPeerName); err == nil {
 					okToRemove = true
 				}
 			}
@@ -155,7 +155,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 					}
 					common.Log.Infoln("[kube-peers] Removing annotation ", peer.PeerName)
 					// 7b.    Remove annotation with key X
-					return cml.RemoveAnnotation(peer.PeerName)
+					return cml.RemoveAnnotation(KubePeersPrefix + peer.PeerName)
 				})
 				common.Log.Debugln("[kube-peers] Finished removal of ", peer.PeerName)
 			}
