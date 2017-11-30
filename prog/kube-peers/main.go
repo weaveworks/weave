@@ -98,6 +98,9 @@ func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peer
 // Kubernetes, remove it from Weave IPAM
 func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName string) error {
 	for {
+		if err := cml.Init(); err != nil {
+			return err
+		}
 		// 1. Compare peers stored in the peerList against all peers reported by k8s now.
 		storedPeerList, err := cml.GetPeerList()
 		if err != nil {
