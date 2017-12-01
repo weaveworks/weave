@@ -133,12 +133,14 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 				common.Log.Debugln("[kube-peers] Noting I plan to remove ", peer.PeerName)
 				if err := cml.UpdateAnnotation(KubePeersPrefix+peer.PeerName, myPeerName); err == nil {
 					okToRemove = true
+				} else {
+					common.Log.Debugln("[kube-peers] error from UpdateAnnotation: ", err)
 				}
 			}
 			if okToRemove {
 				// 6.   If step 4 or 5 succeeded, rmpeer X
 				result, err := weave.RmPeer(peer.PeerName)
-				common.Log.Infoln("[kube-peers] rmpeer of", peer.PeerName, ":", result)
+				common.Log.Infof("[kube-peers] rmpeer of %s: %s", peer.PeerName, result)
 				if err != nil {
 					return err
 				}
@@ -149,15 +151,12 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 					}
 					// 7a.    Remove X from peerList
 					storedPeerList.remove(peer.PeerName)
-					common.Log.Infoln("[kube-peers] Removing peer ", peer.PeerName, ". Expecting to remove linked annotation next.")
 					if err := cml.UpdatePeerList(*storedPeerList); err != nil {
 						return err
 					}
-					common.Log.Infoln("[kube-peers] Removing annotation ", peer.PeerName)
 					// 7b.    Remove annotation with key X
 					return cml.RemoveAnnotation(KubePeersPrefix + peer.PeerName)
 				})
-				common.Log.Debugln("[kube-peers] Finished removal of ", peer.PeerName)
 			}
 			// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
 
