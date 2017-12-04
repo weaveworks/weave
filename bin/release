@@ -196,7 +196,7 @@ publish() {
 
     if [ "$RELEASE_TYPE" = 'PRERELEASE' ] ; then
         echo "== Building and pushing plugin"
-        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
+        make UPDATE_LATEST=false SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
         echo "** Plugin built and pushed"
 
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
@@ -232,7 +232,7 @@ publish() {
         echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
         echo "== Building and pushing plugin"
-        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
+        make UPDATE_LATEST=true SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER plugin_publish
         echo "** Plugin built and pushed"
 
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
