@@ -1,3 +1,9 @@
+## Release 2.1.3
+
+This release fixes a race-condition in the IP reclaim code for weave-kube
+where two nodes could end up fighting over the same space and break
+connectivity #3190, #3192
+
 ## Release 2.1.2
 
 This release fixes a couple of bugs discovered since the release of Weave Net 2.1.0
