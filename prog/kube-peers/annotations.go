@@ -73,8 +73,10 @@ const (
 	retryPeriod  = time.Second * 2
 	jitterFactor = 1.0
 
+	// Prefix all our annotation keys with this string so they don't clash with anyone else's
+	KubePeersPrefix = "kube-peers.weave.works/"
 	// KubePeersAnnotationKey is the default annotation key
-	KubePeersAnnotationKey = "kube-peers.weave.works/peers"
+	KubePeersAnnotationKey = KubePeersPrefix + "peers"
 )
 
 func (cml *configMapAnnotations) Init() error {
@@ -130,46 +132,59 @@ func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
 	return cml.UpdateAnnotation(KubePeersAnnotationKey, string(recordBytes))
 }
 
-func (cml *configMapAnnotations) UpdateAnnotation(key, value string) error {
+// Clean up a string so it meets the Kubernetes requiremements for Annotation keys:
+// name part must consist of alphanumeric characters, '-', '_' or '.', and must
+// start and end with an alphanumeric character (e.g. 'MyName', or 'my.name', or '123-abc')
+func cleanKey(key string) string {
+	buf := []byte(key)
+	for i, c := range buf {
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '/' {
+			continue
+		}
+		buf[i] = '_'
+	}
+	return string(buf)
+}
+
+func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
+	value, ok := cml.cm.Annotations[cleanKey(key)]
+	return value, ok
+}
+
+func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error) {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
-	cm := cml.cm
-	cm.Annotations[key] = value
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	if err == nil {
-		cml.cm = cm
-	}
+	// speculatively change the state, then replace with whatever comes back
+	// from Update(), which will be the latest on the server whatever happened
+	cml.cm.Annotations[cleanKey(key)] = value
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	return err
 }
 
-func (cml *configMapAnnotations) RemoveAnnotation(key string) error {
+func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
-	cm := cml.cm
-	delete(cm.Annotations, key)
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	if err == nil {
-		cml.cm = cm
-	}
+	// speculatively change the state, then replace with whatever comes back
+	// from Update(), which will be the latest on the server whatever happened
+	delete(cml.cm.Annotations, cleanKey(key))
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	return err
 }
 
-func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) error {
+func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) (err error) {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
-	cm := cml.cm
-	for key, value := range cm.Annotations {
+	// speculatively change the state, then replace with whatever comes back
+	// from Update(), which will be the latest on the server whatever happened
+	for key, value := range cml.cm.Annotations {
 		if value == valueToRemove {
-			delete(cm.Annotations, key)
+			delete(cml.cm.Annotations, key) // don't need to clean this key as it came from the map
 		}
 	}
-	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	if err == nil {
-		cml.cm = cm
-	}
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	return err
 }
 
