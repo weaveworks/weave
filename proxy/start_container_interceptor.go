@@ -50,8 +50,8 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 						return err
 					}
 				}
-				if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
-					if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
+				if !i.proxy.WithoutDNS {
+					if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, i.proxy.DNSDomain); err != nil {
 						return err
 					}
 				}

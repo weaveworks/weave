@@ -62,6 +62,7 @@ type Config struct {
 	TLSConfig           TLSConfig
 	WithoutDNS          bool
 	DNSListenAddress    string
+	DNSDomain           string
 	NoMulticastRoute    bool
 	KeepTXOn            bool
 	DockerBridge        string
@@ -601,14 +602,6 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 	}
 
 	return nil
-}
-
-func (proxy *Proxy) getDNSDomain() string {
-	if proxy.WithoutDNS {
-		return ""
-	}
-	domain, _ := proxy.weave.DNSDomain()
-	return domain
 }
 
 func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {

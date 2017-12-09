@@ -272,6 +272,7 @@ func main() {
 	var err error
 	if proxyConfig.Enabled {
 		proxyConfig.DNSListenAddress = dnsConfig.addressOnly()
+		proxyConfig.DNSDomain = dnsConfig.Domain
 		if noDNS {
 			proxyConfig.WithoutDNS = true
 		}
