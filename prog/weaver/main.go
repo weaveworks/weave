@@ -45,12 +45,20 @@ type ipamConfig struct {
 }
 
 type dnsConfig struct {
-	Domain                 string
-	ListenAddress          string
-	TTL                    int
-	ClientTimeout          time.Duration
-	EffectiveListenAddress string
-	ResolvConf             string
+	Domain        string
+	ListenAddress string
+	TTL           int
+	ClientTimeout time.Duration
+	ResolvConf    string
+}
+
+// return the address part of the DNS listen address, without ":53" on the end
+func (c dnsConfig) addressOnly() string {
+	addr, _, err := net.SplitHostPort(c.ListenAddress)
+	if err != nil {
+		Log.Fatalf("Error when parsing DNS listen address %q: %s", c.ListenAddress, err)
+	}
+	return addr
 }
 
 func (c *ipamConfig) Enabled() bool {
@@ -193,7 +201,6 @@ func main() {
 	mflag.StringVar(&dnsConfig.ListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
 	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
-	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
 	mflag.StringVar(&bridgeConfig.DatapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.BoolVar(&bridgeConfig.NoFastdp, []string{"-no-fastdp"}, false, "Disable Fast Datapath")
@@ -636,17 +643,13 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	gossip, err := router.NewGossip("nameserver", ns)
 	checkFatal(err)
 	ns.SetGossip(gossip)
-	upstream := nameserver.NewUpstream(config.ResolvConf, config.EffectiveListenAddress)
+	upstream := nameserver.NewUpstream(config.ResolvConf, config.addressOnly())
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
 		upstream, uint32(config.TTL), config.ClientTimeout)
 	if err != nil {
 		Log.Fatal("Unable to start dns server: ", err)
 	}
-	listenAddr := config.ListenAddress
-	if config.EffectiveListenAddress != "" {
-		listenAddr = config.EffectiveListenAddress
-	}
-	Log.Println("Listening for DNS queries on", listenAddr)
+	Log.Println("Listening for DNS queries on", config.ListenAddress)
 	return ns, dnsserver
 }
 
