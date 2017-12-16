@@ -1494,7 +1494,6 @@ case "$COMMAND" in
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
-        create_bridge
         expose_ip
         show_addrs $ALL_CIDRS
         ;;
@@ -1502,7 +1501,6 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         ipam_cidrs lookup weave:expose $CIDR_ARGS
-        create_bridge
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR
