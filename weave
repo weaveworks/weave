@@ -918,9 +918,7 @@ check_overlap() {
 }
 
 detect_awsvpc() {
-    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
-    # steps, because "attach" should work without the weave router running.
-    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+    [ "$(call_weave GET /ipinfo/tracker 2>/dev/null)" != "awsvpc" ] || AWSVPC=1
 }
 
 # Call IPAM as necessary to lookup or allocate addresses
@@ -1436,7 +1434,6 @@ case "$COMMAND" in
         done
         [ $# -eq 1 ] || usage
         CONTAINER=$(util_op container-id $1)
-        create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         if [ -n "$REWRITE_HOSTS" ] ; then
             # rewrite /etc/hosts, unlinking the file (so Docker does
@@ -1444,7 +1441,7 @@ case "$COMMAND" in
             util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" $DNS_EXTRA_HOSTS
         fi
         [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
-        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU $ALL_CIDRS >/dev/null
+        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $ALL_CIDRS >/dev/null
         [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
