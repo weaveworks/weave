@@ -405,27 +405,6 @@ detect_bridge_type() {
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
-try_create_bridge() {
-    # Pass /dev/null because we do not have access to the weavedb files when this runs; BoltDB
-    # cannot open the file anyway if weaver is running, which is likely for attach|expose|hide.
-    MAC=$(util_op unique-id "/dev/null" "$HOST_ROOT")
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
-    # Set some variables that are expected by code that comes later
-    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
-    MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
-}
-
-create_bridge() {
-    validate_bridge_type
-    if ! try_create_bridge "$@" ; then
-        echo "Creating bridge '$BRIDGE' failed" >&2
-        # reset to original value so we destroy both kinds
-        DATAPATH=datapath
-        destroy_bridge
-        exit 1
-    fi
-}
-
 validate_bridge_type() {
     detect_bridge_type || return 0
 
