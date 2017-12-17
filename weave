@@ -536,6 +536,7 @@ router_bridge_opts() {
     echo --docker-bridge "$DOCKER_BRIDGE" --weave-bridge "$BRIDGE" --datapath "$DATAPATH"
     [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
     [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
+    [ -z $WEAVE_NO_BRIDGED_FASTDP ] || echo --no-bridged-fastdp
 }
 
 ######################################################################
