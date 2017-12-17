@@ -227,12 +227,19 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 }
 
 func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Bridge, error) {
-	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
-	if bridgeType != nil || err != nil {
-		return bridgeType, err
+	existingBridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
+	if err != nil {
+		return nil, err
 	}
 
-	bridgeType = config.configuredBridgeType()
+	bridgeType := config.configuredBridgeType()
+
+	if existingBridgeType != nil && bridgeType.String() != existingBridgeType.String() {
+		return nil,
+			fmt.Errorf("Existing bridge type %q is different than requested %q. Please do 'weave reset' and try again",
+				existingBridgeType, bridgeType)
+	}
+
 	for {
 		if err := bridgeType.init(config); err != nil {
 			if errors.Cause(err) == errBridgeNotSupported {
@@ -288,7 +295,7 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 		config.MTU = 65535
 	}
 	b.bridge = &netlink.Bridge{LinkAttrs: linkAttrs}
-	if err = netlink.LinkAdd(b.bridge); err != nil {
+	if err := LinkAddIfNotExist(b.bridge); err != nil {
 		return errors.Wrapf(err, "creating bridge %q", config.WeaveBridgeName)
 	}
 	if err := netlink.LinkSetHardwareAddr(b.bridge, mac); err != nil {
@@ -320,7 +327,7 @@ func (b bridgeImpl) init(config *BridgeConfig) error {
 	if err := b.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		return netlink.LinkSetUp(veth)
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
@@ -370,11 +377,11 @@ func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
 	if err := bf.bridgeImpl.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
-		if err := odp.AddDatapathInterface(bf.datapathName, veth.Attrs().Name); err != nil {
+		if err := odp.AddDatapathInterfaceIfNotExist(bf.datapathName, veth.Attrs().Name); err != nil {
 			return errors.Wrapf(err, "adding interface %q to datapath %q", veth.Attrs().Name, bf.datapathName)
 		}
 		return nil
@@ -394,7 +401,7 @@ func (bf bridgedFastdpImpl) attach(veth *netlink.Veth) error {
 }
 
 func (f fastdpImpl) attach(veth *netlink.Veth) error {
-	return odp.AddDatapathInterface(f.datapathName, veth.Attrs().Name)
+	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
 func configureIPTables(config *BridgeConfig) error {
@@ -404,9 +411,17 @@ func configureIPTables(config *BridgeConfig) error {
 	}
 	if config.DockerBridgeName != "" {
 		if config.WeaveBridgeName != config.DockerBridgeName {
-			err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
+			// This check is not ideal, as the rule should be at the very top
+			// of the chain.
+			found, err := ipt.Exists("filter", "FORWARD", "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
 			if err != nil {
 				return err
+			}
+			if !found {
+				err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
+				if err != nil {
+					return err
+				}
 			}
 		}
 

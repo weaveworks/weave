@@ -13,7 +13,7 @@ import (
 )
 
 // create and attach a veth to the Weave bridge
-func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bool, init func(peer netlink.Link) error) (*netlink.Veth, error) {
+func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bool, errIfLinkExist bool, init func(peer netlink.Link) error) (*netlink.Veth, error) {
 	bridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
@@ -28,7 +28,12 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bo
 			MTU:  mtu},
 		PeerName: peerName,
 	}
-	if err := netlink.LinkAdd(veth); err != nil {
+
+	linkAdd := LinkAddIfNotExist
+	if errIfLinkExist {
+		linkAdd = netlink.LinkAdd
+	}
+	if err := linkAdd(veth); err != nil {
 		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, name, peerName, err)
 	}
 
@@ -116,7 +121,7 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
 		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
-		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, func(veth netlink.Link) error {
+		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
