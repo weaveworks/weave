@@ -70,7 +70,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, bridgeCon
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
 		func(mac net.HardwareAddr, peer *mesh.Peer) {
-			log.Println("Expired MAC", mac, "at", peer)
+			log.Debugln("Expired MAC", mac, "at", peer)
 		})
 	router.Peers.OnGC(func(peer *mesh.Peer) { router.Macs.Delete(peer) })
 	return router, nil
@@ -92,7 +92,7 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 
 	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
 	case newSrcMac:
-		log.Println("Discovered local MAC", srcMac)
+		log.Debugln("Discovered local MAC", srcMac)
 	case conflictPeer != nil:
 		// The MAC cache has an entry for the source MAC
 		// associated with another peer.  This probably means
