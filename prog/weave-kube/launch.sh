@@ -67,6 +67,13 @@ if [ -n "$HOSTNAME" ] ; then
     NICKNAME_ARG="--nickname=$HOSTNAME"
 fi
 
+# Router password. You can create a Kubernetes secret and specify that as the
+# weave password through the WEAVE_SECRET environment variable.
+PASSWORD_ARG=""
+if [ -n "$WEAVE_SECRET" ] ; then
+    PASSWORD_ARG="--password=$WEAVE_SECRET"
+fi
+
 router_bridge_opts() {
     echo --datapath=datapath
     [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
@@ -146,7 +153,7 @@ post_start_actions &
      --host-root=$HOST_ROOT \
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
      --db-prefix="$DB_PREFIX" \
-     --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
+     --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG $PASSWORD_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \
      $WEAVE_NPC_OPTS \
