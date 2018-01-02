@@ -134,6 +134,22 @@ spec:
     run: nettest
 EOF
 
+# And a NodePort service so we can test virtual IP access
+run_on $HOST1 "$KUBECTL create -f -" <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: netvirt
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 31138
+  selector:
+    run: nettest
+EOF
+
 podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
 check_all_pods_communicate() {
@@ -169,6 +185,15 @@ assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# check access via virtual IP
+VIRTUAL_IP=$($SSH $HOST1 $KUBECTL get service netvirt -o template --template={{.spec.clusterIP}})
+assert_raises   "$SSH $HOST1 $KUBECTL exec     $podName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+
+# host should not be able to reach pods via service virtual IP or NodePort
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 # allow access for nettest-deny
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
@@ -210,6 +235,10 @@ spec:
 EOF
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# Virtual IP and NodePort should now work
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 tear_down_kubeadm
 
