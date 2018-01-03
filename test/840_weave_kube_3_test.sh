@@ -18,6 +18,7 @@ NUM_HOSTS=$(howmany $HOSTS)
 SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
 KUBE_PORT=6443
+WEAVE_NETWORK=10.32.0.0/12
 IMAGE=weaveworks/network-tester:latest
 DOMAIN=nettest.default.svc.cluster.local.
 
@@ -28,12 +29,14 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
 
 # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
-k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
+#k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
+# Hack! Override version here as installation via package is broken http://github.com/kubernetes/kubernetes/issues/57334
+k8s_version="v1.8.5"
 k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
     fi
