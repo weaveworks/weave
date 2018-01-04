@@ -11,7 +11,9 @@ The following topics are discussed:
  * [Upgrading the Daemon Sets](#daemon-sets)
  * [CPU and Memory Requirements](#resources)
  * [Pod Eviction](#eviction)
-* [Network Policy Controller](#npc)
+* [Features](#features)
+ * [Pod Network](#pod-network)
+ * [Network Policy](#npc)
 * [Troubleshooting](#troubleshooting)
  * [Troubleshooting Blocked Connections](#blocked-connections)
  * [Things to watch out for](#key-points)
@@ -147,7 +149,25 @@ mypod-09vkd         0/1       Evicted   0          1h        <none>      node-1
 If you see this in your cluster, consider some of the above steps to
 reduce disruption.
 
-## <a name="npc"></a>Network Policy Controller
+## <a name="features"></a>Features
+
+### <a name="pod-network"></a>Pod Network
+
+Weave Net provides a network to connect all pods together,
+implementing the [Kubernetes
+model](https://kubernetes.io/docs/concepts/cluster-administration/networking/#kubernetes-model).
+
+Kubernetes uses the _Container Network Interface_
+([CNI](https://github.com/containernetworking/cni)) to join pods onto Weave Net.
+
+Kubernetes implements many network features itself on top of the pod
+network.  This includes
+[Services](https://kubernetes.io/docs/concepts/services-networking/service/),
+[Service Discovery via DNS](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+and [Ingress into the cluster](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+WeaveDNS is disabled when using the Kubernetes addon.
+
+### <a name="npc"></a>Network Policy
 
 The addon also supports the [Kubernetes policy
 API](http://kubernetes.io/docs/user-guide/networkpolicies/) so that
