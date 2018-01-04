@@ -169,12 +169,11 @@ WeaveDNS is disabled when using the Kubernetes addon.
 
 ### <a name="npc"></a>Network Policy
 
-The addon also supports the [Kubernetes policy
-API](http://kubernetes.io/docs/user-guide/networkpolicies/) so that
-you can securely isolate pods from each other based on namespaces and
+[Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) let
+you securely isolate pods from each other based on namespaces and
 labels. For more information on configuring network policies in
 Kubernetes see the
-[walkthrough](http://kubernetes.io/docs/getting-started-guides/network-policy/walkthrough/)
+[walkthrough](https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/)
 and the [NetworkPolicy API object
 definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpolicy-v1-networking)
 
@@ -186,6 +185,11 @@ definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpoli
   argument to `weave-npc` in the YAML configuration.
 
 ## <a name="troubleshooting"></a> Troubleshooting
+
+Many Kubernetes network issues occur at a higher level than Weave Net.
+The [Kubernetes Service Debugging Guide]
+(https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
+has a detailed step-by-step guide.
 
 The status of Weave Net can be checked by running its CLI commands. This can be done in various ways:
 
