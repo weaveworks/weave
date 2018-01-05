@@ -504,7 +504,7 @@ func linkSetUpByName(linkName string) error {
 // ensureRules ensures the presence of given iptables rules.
 //
 // If any rule from the list is missing, the function deletes all given
-// rules and re-appends them to ensure the order of the rules.
+// rules and re-inserts them to ensure the order of the rules.
 func ensureRules(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
 	allFound := true
 
@@ -524,13 +524,13 @@ func ensureRules(table, chain string, rulespecs [][]string, ipt *iptables.IPTabl
 		return nil
 	}
 
-	for _, rs := range rulespecs {
+	for pos, rs := range rulespecs {
 		// If any is missing, then delete all, as we need to preserve the order of
 		// given rules. Ignore errors, as rule might not exist.
 		if !allFound {
 			ipt.Delete(table, chain, rs...)
 		}
-		if err := ipt.Append(table, chain, rs...); err != nil {
+		if err := ipt.Insert(table, chain, pos+1, rs...); err != nil {
 			return errors.Wrapf(err, "ipt.Append(%s, %s, %s)", table, chain, rs)
 		}
 	}
