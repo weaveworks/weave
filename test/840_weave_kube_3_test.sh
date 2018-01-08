@@ -29,7 +29,7 @@ fi
 
 tear_down_kubeadm
 
-function setup_kubernetes_cluster {
+setup_kubernetes_cluster () {
     # Make an ipset, so we can check it doesn't get wiped out by Weave Net
     docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
     docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
@@ -64,7 +64,7 @@ check_connections() {
 
 assert_raises 'wait_for_x check_connections "connections to establish"'
 
-function check_can_ping_between_weave_bridge_IPs {
+check_can_ping_between_weave_bridge_IPs () {
     # Check we can ping between the Weave bridg IPs on each host
     HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
     HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
@@ -75,7 +75,7 @@ function check_can_ping_between_weave_bridge_IPs {
 }
 check_can_ping_between_weave_bridge_IPs
 
-function check_weave_does_not_generate_defunct_processes {
+check_weave_does_not_generate_defunct_processes () {
     # Ensure we do not generate any defunct process (e.g. launch.sh) after starting weaver:
     assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
     assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
@@ -83,7 +83,7 @@ function check_weave_does_not_generate_defunct_processes {
 }
 check_weave_does_not_generate_defunct_processes
 
-function setup_pod_networking {
+setup_pod_networking () {
     # Set up a simple network policy so all our test pods can talk to each other
     run_on $HOST1 "$KUBECTL annotate ns default net.beta.kubernetes.io/network-policy='{\"ingress\":{\"isolation\":\"DefaultDeny\"}}'"
     run_on $HOST1 "$KUBECTL apply -f -" <<EOF
@@ -130,7 +130,7 @@ check_ready() {
 
 assert_raises 'wait_for_x check_ready "hosts to be ready"'
 
-function setup_nettest_service {
+setup_nettest_service () {
     # See if we can get some pods running that connect to the network
     run_on $HOST1 "$KUBECTL run --image-pull-policy=Never nettest --image=$IMAGE --replicas=3 -- -peers=3 -dns-name=$DOMAIN"
     # Create a headless service so they can be found in Kubernetes DNS
@@ -171,7 +171,7 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 # Check that our pods haven't crashed
 assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
 
-function setup_pod_with_policy {
+setup_pod_with_policy () {
     # Start pod which should not have access to nettest
     run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
     denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
@@ -180,7 +180,7 @@ setup_pod_with_policy
 
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-function setup_weave_with_npc_in_non_legacy_mode {
+setup_weave_with_npc_in_non_legacy_mode () {
     # Restart weave-net with npc in non-legacy mode
     $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
     sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
@@ -194,7 +194,7 @@ assert_raises 'wait_for_x check_all_pods_communicate pods'
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-function setup_create_k8s_networkpolicy_allowing_nettest_deny {
+setup_create_k8s_networkpolicy_allowing_nettest_deny () {
     # allow access for nettest-deny
     run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
@@ -217,7 +217,7 @@ setup_create_k8s_networkpolicy_allowing_nettest_deny
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-function setup_remove_k8s_networkpolicy_allowing_nettest_deny {
+setup_remove_k8s_networkpolicy_allowing_nettest_deny () {
     # remove the access for nettest-deny
     run_on $HOST1 "$KUBECTL delete netpol allow-nettest-deny"
 }
@@ -225,7 +225,7 @@ function setup_remove_k8s_networkpolicy_allowing_nettest_deny {
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-function setup_create_k8s_networkpolicy_allowing_all {
+setup_create_k8s_networkpolicy_allowing_all () {
     # allow access for all
     run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
