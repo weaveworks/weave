@@ -13,7 +13,7 @@ it is recommended to run the tests from the build VM and not the host.
 
 > **NOTE WELL** The number of hosts required by a test must be specified in the test name. For example, `000_some_test.sh` will use one host, while `001_some_other_3_test.sh` will use three hosts. The number of hosts must be the last part of the test name before the `_test.sh` prefix. See `/tools/runner/runner.go` for details
 
-## Running tests
+## Running tests locally using VMs
 
 **TL;DR**: You can run the steps 2. to 7. below with one command: 
 
@@ -23,46 +23,62 @@ it is recommended to run the tests from the build VM and not the host.
 
   1. Start the build virtual machine (see above article for more details):
 
+        ```
         vagrant up
+        ```
 
   2. Start the three testing VMs:
 
+        ```
         cd test
         vagrant up
+        ```
 
   3. SSH into the build VM and go to Weave Net's sources:
 
+        ```
         cd ..
         vagrant ssh
         # you are now on the build VM:
         cd ~/weave 
+        ```
 
   4. Compile all code and dependencies:
 
+        ```
         make
         make testrunner
         cd test
+        ```
 
   5. Upload the weave images from where the `Makefile` puts them (`weave.tar.gz`) to 
      the three docker hosts, `docker load` these, and copies the `weave` script over:
 
+        ```
         ./setup.sh
+        ```
 
   6. Run individual tests, e.g.:
 
+        ```
         ./200_dns_test.sh
+        ```
 
      or run all tests (everything named `*_test.sh`):
 
+        ```
         ./run_all.sh
+        ```
 
   7. Stop all VMs:
 
+        ```
         exit
         # you are now on your host machine
         vagrant destroy -f
         cd test
         vagrant destroy -f
+        ```
 
 
 ## Using other VMs
