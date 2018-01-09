@@ -111,7 +111,7 @@ Subsequent builds will then simply re-use the template.
 
 ## Running the tests on a cloud provider
 
-Running the tests against a remote provider instead of local vagrant VMs is a little more involved, and reproduces the environment used for CI. It is recommended that you use the build VM to coordinate the build phase.
+Running the tests against a remote provider instead of local vagrant VMs is a little more involved, and reproduces the environment used for CI. It is recommended that you use the build VM to coordinate the build phase. Make sure you ahve a recent version of [ansible](https://github.com/ansible/ansible) installed, terraform will fail to provision the VMs.
 
 1. Create the build VM in the repository root and log in
     
