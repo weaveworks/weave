@@ -197,6 +197,7 @@ func main() {
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
 	mflag.StringVar(&bridgeConfig.DatapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.BoolVar(&bridgeConfig.NoFastdp, []string{"-no-fastdp"}, false, "Disable Fast Datapath")
+	mflag.BoolVar(&bridgeConfig.NoBridgedFastdp, []string{"-no-bridged-fastdp"}, false, "Disable Bridged Fast Datapath")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
 	mflag.StringVar(&procPath, []string{"-proc-path"}, "/proc", "path to reach host /proc filesystem")

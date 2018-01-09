@@ -227,12 +227,19 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 }
 
 func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Bridge, error) {
-	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
-	if bridgeType != nil || err != nil {
-		return bridgeType, err
+	existingBridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
+	if err != nil {
+		return nil, err
 	}
 
-	bridgeType = config.configuredBridgeType()
+	bridgeType := config.configuredBridgeType()
+
+	if existingBridgeType != nil && bridgeType.String() != existingBridgeType.String() {
+		return nil,
+			fmt.Errorf("Existing bridge type %q is different than requested %q. Please do 'weave reset' and try again",
+				existingBridgeType, bridgeType)
+	}
+
 	for {
 		if err := bridgeType.init(config); err != nil {
 			if errors.Cause(err) == errBridgeNotSupported {
@@ -288,7 +295,7 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 		config.MTU = 65535
 	}
 	b.bridge = &netlink.Bridge{LinkAttrs: linkAttrs}
-	if err = netlink.LinkAdd(b.bridge); err != nil {
+	if err := LinkAddIfNotExist(b.bridge); err != nil {
 		return errors.Wrapf(err, "creating bridge %q", config.WeaveBridgeName)
 	}
 	if err := netlink.LinkSetHardwareAddr(b.bridge, mac); err != nil {
@@ -320,7 +327,7 @@ func (b bridgeImpl) init(config *BridgeConfig) error {
 	if err := b.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		return netlink.LinkSetUp(veth)
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
@@ -370,11 +377,11 @@ func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
 	if err := bf.bridgeImpl.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
-		if err := odp.AddDatapathInterface(bf.datapathName, veth.Attrs().Name); err != nil {
+		if err := odp.AddDatapathInterfaceIfNotExist(bf.datapathName, veth.Attrs().Name); err != nil {
 			return errors.Wrapf(err, "adding interface %q to datapath %q", veth.Attrs().Name, bf.datapathName)
 		}
 		return nil
@@ -394,7 +401,7 @@ func (bf bridgedFastdpImpl) attach(veth *netlink.Veth) error {
 }
 
 func (f fastdpImpl) attach(veth *netlink.Veth) error {
-	return odp.AddDatapathInterface(f.datapathName, veth.Attrs().Name)
+	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
 func configureIPTables(config *BridgeConfig) error {
@@ -404,9 +411,17 @@ func configureIPTables(config *BridgeConfig) error {
 	}
 	if config.DockerBridgeName != "" {
 		if config.WeaveBridgeName != config.DockerBridgeName {
-			err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
+			// This is not ideal, as it does not check whether the rule is at the top
+			// of the chain.
+			found, err := ipt.Exists("filter", "FORWARD", "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
 			if err != nil {
 				return err
+			}
+			if !found {
+				err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -435,48 +450,46 @@ func configureIPTables(config *BridgeConfig) error {
 		}
 	}
 
+	// The order among weave filter/FORWARD rules is important!
+	fwdRules := make([][]string, 0)
+
 	if config.NPC {
 		// Steer traffic via the NPC
 		_ = ipt.NewChain("filter", "WEAVE-NPC") // ignore error because it might already exist
-		// If WEAVE-NPC chain doesn't exist then next line will fail
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
-			return err
-		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"); err != nil {
-			return err
-		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "DROP"); err != nil {
-			return err
-		}
+		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
+		fwdRules = append(fwdRules,
+			[][]string{
+				{"-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"},
+				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
+				{"-o", config.WeaveBridgeName, "-j", "DROP"},
+			}...)
 	} else {
 		// Work around the situation where there are no rules allowing traffic
 		// across our bridge. E.g. ufw
-		if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
-			return err
-		}
+		fwdRules = append(fwdRules, []string{"-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"})
 	}
 
 	if !config.NPC {
 		// Create a chain for allowing ingress traffic when the bridge is exposed
 		_ = ipt.NewChain("filter", "WEAVE-EXPOSE")
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"); err != nil {
-			return err
-		}
+		fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"})
 	}
 
 	// Forward from weave to the rest of the world
-	if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "!", "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
-		return err
-	}
+	fwdRules = append(fwdRules, []string{"-i", config.WeaveBridgeName, "!", "-o", config.WeaveBridgeName, "-j", "ACCEPT"})
 	// and allow replies back
-	if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
+	fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
+
+	if err := ensureRules("filter", "FORWARD", fwdRules, ipt); err != nil {
 		return err
 	}
 
 	// create a chain for masquerading
-	if err = ipt.ClearChain("nat", "WEAVE"); err != nil {
-		return errors.Wrap(err, "clearing WEAVE chain")
-	}
+	//
+	// NB: we do not clear the chain to preserve existing rules
+	// inserted by "weave expose".
+	_ = ipt.NewChain("nat", "WEAVE")
+
 	return ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE")
 }
 
@@ -486,4 +499,41 @@ func linkSetUpByName(linkName string) error {
 		return errors.Wrapf(err, "setting link up on %q", linkName)
 	}
 	return netlink.LinkSetUp(link)
+}
+
+// ensureRules ensures the presence of given iptables rules.
+//
+// If any rule from the list is missing, the function deletes all given
+// rules and re-appends them to ensure the order of the rules.
+func ensureRules(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
+	allFound := true
+
+	for _, rs := range rulespecs {
+		found, err := ipt.Exists(table, chain, rs...)
+		if err != nil {
+			return errors.Wrapf(err, "ipt.Exists(%s, %s, %s)", table, chain, rs)
+		}
+		if !found {
+			allFound = false
+			break
+		}
+	}
+
+	// All rules exist, do nothing.
+	if allFound {
+		return nil
+	}
+
+	for _, rs := range rulespecs {
+		// If any is missing, then delete all, as we need to preserve the order of
+		// given rules. Ignore errors, as rule might not exist.
+		if !allFound {
+			ipt.Delete(table, chain, rs...)
+		}
+		if err := ipt.Append(table, chain, rs...); err != nil {
+			return errors.Wrapf(err, "ipt.Append(%s, %s, %s)", table, chain, rs)
+		}
+	}
+
+	return nil
 }

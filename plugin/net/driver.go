@@ -134,7 +134,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 
 	// create veths. note we assume endpoint IDs are unique in the first 9 chars
 	name, peerName := vethPair(create.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, true, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
