@@ -152,7 +152,6 @@ check_all_pods_communicate() {
 setup_pod_with_policy () {
     # Start pod which should not have access to nettest
     run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
-    denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
 }
 
 setup_weave_with_npc_in_non_legacy_mode () {
@@ -242,12 +241,19 @@ main () {
 
     assert_raises 'wait_for_x check_all_pods_communicate pods'
 
-    # nettest-deny should still not be able to reach nettest pods
-    assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+    local podUnderTest=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
 
+    #  Network Policy can be created and removed
+    assert_raises "! $SSH $HOST1 $KUBECTL exec $podUnderTest -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
     setup_create_k8s_networkpolicy_allowing_nettest_deny
+    assert_raises "$SSH $HOST1 $KUBECTL exec $podUnderTest -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+    setup_remove_k8s_networkpolicy_allowing_nettest_deny
+    assert_raises "! $SSH $HOST1 $KUBECTL exec $podUnderTest -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-    assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+    # Allowall network policy will allow communication
+    assert_raises "! $SSH $HOST1 $KUBECTL exec $podUnderTest -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+    setup_create_k8s_networkpolicy_allowing_all
+    assert_raises "$SSH $HOST1 $KUBECTL exec $podUnderTest -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
     tear_down_kubeadm
 
