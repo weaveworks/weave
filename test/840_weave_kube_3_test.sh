@@ -10,8 +10,6 @@ tear_down_kubeadm() {
 
 howmany() { echo $#; }
 
-
-
 TOKEN=112233.4455667788990000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
 NUM_HOSTS=$(howmany $HOSTS)
@@ -43,8 +41,6 @@ setup_kubernetes_cluster () {
         run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
         fi
     done
-
-    
 
     # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
     sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
@@ -249,15 +245,7 @@ main () {
     # nettest-deny should still not be able to reach nettest pods
     assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-
-    assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
-
     setup_create_k8s_networkpolicy_allowing_nettest_deny
-
-    assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
-
-    # nettest-deny should still not be able to reach nettest pods
-    assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
     assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
