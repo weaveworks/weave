@@ -133,8 +133,8 @@ Finally, for **Mainline** releases only:
 * Close the [milestone](https://github.com/weaveworks/weave/milestones) in GitHub and create the next milestone
 * Update the `#weavenetwork` topic heading on freenode (requires 'chanops' permission)
 * For a mainline release vX.Y.0, create a release branch X.Y from the
-  tag and push to GitHub - this will result in X.Y.0 site docs being
-  published to https://www.weave.works
+  tag, push to GitHub and set [WEAVE_NET_REV](https://github.com/weaveworks/website-next/blob/master/Makefile)
+  to X.Y via a PR - this will result in X.Y.0 site docs being published to https://www.weave.works
 * Add the new version of `weave-net` to the checkpoint system at
   https://checkpoint-api.weave.works/admin
 * File a PR to update the version of the daemonset at
