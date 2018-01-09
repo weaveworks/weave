@@ -116,17 +116,17 @@ Running the tests against a remote provider instead of local vagrant VMs is a li
 1. Create the build VM in the repository root and log in
     
     ```
-    ➤ vagrant up
-    # ...
-    ➤ vagrant ssh
+    # On your development machine
+    $ vagrant up
+    $ vagrant ssh
     ```
 
 2. Once in the build vm, install the `gcloud` tools as [per the documentation](https://cloud.google.com/sdk/downloads). You need to do this manually as the circleCI VMs are already provisioned with `gcloud`.
 
     ```
-    vagrant@vagrant:~$ curl https://sdk.cloud.google.com | bash
-    # ...
-    vagrant@vagrant:~$ exec -l $SHELL
+    # On the build VM
+    $ curl https://sdk.cloud.google.com | bash
+    $ exec -l $SHELL
     ```
 
     You don't need to initialise the `gcloud` tools by running `gcloud init`.
@@ -134,33 +134,39 @@ Running the tests against a remote provider instead of local vagrant VMs is a li
 3. Export the secret key needed to decrypt the cloud credentials - This assumes you're using the build tools 
 
     ```
-    vagrant@vagrant:~$ export SECRET_KEY="XXXXXXXXXX"
+    # On the build VM
+    $ export SECRET_KEY="XXXXXXXXXX"
     ```
 
 4. Navigate to the test directory and provision the VMs
 
     ```
-    vagrant@vagrant:~$ cd weave/test
-    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh up
-    #...
+    # On the build VM
+    $ cd weave/test
+    /weave/test$ ./run-integration-tests.sh up
     ```
 5. Run the tests you need
 
     ```
-    vagrant@vagrant:~/weave/test$ export TESTS="./090_docker_restart_policy_2_test.sh" 
-    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh test
+    # On the build VM
+    /weave/test$ export TESTS="./090_docker_restart_policy_2_test.sh" 
+    /weave/test$ ./run-integration-tests.sh test
     ```
 
 6. Don't forget to close down your remote VMs when you're done
 
     ```
-    vagrant@vagrant:~/weave/test$ ./run-integration-tests.sh destroy
+    # On the build VM
+    /weave/test$ ./run-integration-tests.sh destroy
     ```
 
 7. And switch off your build VM
 
     ```
-    vagrant@vagrant:~/weave/test$ exit
-    ➤ vagrant destroy -f 
+    # On the build VM
+    /weave/test$ exit
+
+    # On your development machine
+    $ vagrant destroy -f 
     # or "vagrant suspend" if you want to preserve the machine state
     ```
