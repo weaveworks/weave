@@ -323,12 +323,14 @@ You can customise the YAML you get from `cloud.weave.works` by passing some of W
   - `disable-npc`: boolean (`true|false`). Default: `false`.
   - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
   - `seLinuxOptions.NAME=VALUE`: add SELinux option `NAME` and set it to `VALUE`, e.g. `seLinuxOptions.type=spc_t`
-  - `use-legacy-netpol`: use [legacy NetworkPolicy semantics](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpolicy-v1-networking), boolean (`true|false`). Default: `true` for Kubernetes version <= 1.6, `false` for > 1.6.
+  - `use-legacy-netpol`: use [legacy NetworkPolicy semantics](https://v1-6.docs.kubernetes.io/docs/api-reference/v1.6/#networkpolicy-v1beta1-extensions), boolean (`true|false`). Default: `true` for Kubernetes version <= 1.6, `false` for > 1.6.
 
 The list of variables you can set is:
 
 * `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
   versions (default is blank, i.e. check is enabled)
+* `CONN_LIMIT` - soft limit on the number of connections between
+  peers. Defaults to 30.
 * `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
   the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
   kernel is one of those that can panic if hairpin is enabled, then you can disable it
