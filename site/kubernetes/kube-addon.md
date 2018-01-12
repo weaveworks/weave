@@ -329,6 +329,8 @@ The list of variables you can set is:
 
 * `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
   versions (default is blank, i.e. check is enabled)
+* `CONN_LIMIT` - soft limit on the number of connections between
+  peers. Defaults to 30.
 * `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
   the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
   kernel is one of those that can panic if hairpin is enabled, then you can disable it
