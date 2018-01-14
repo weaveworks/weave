@@ -18,6 +18,7 @@ NUM_HOSTS=$(howmany $HOSTS)
 SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
 KUBE_PORT=6443
+WEAVE_NETWORK=10.32.0.0/12
 IMAGE=weaveworks/network-tester:latest
 DOMAIN=nettest.default.svc.cluster.local.
 
@@ -28,12 +29,14 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
 
 # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
-k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
+#k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
+# Hack! Override version here as installation via package is broken http://github.com/kubernetes/kubernetes/issues/57334
+k8s_version="v1.8.5"
 k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
     fi
@@ -134,6 +137,22 @@ spec:
     run: nettest
 EOF
 
+# And a NodePort service so we can test virtual IP access
+run_on $HOST1 "$KUBECTL create -f -" <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: netvirt
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 31138
+  selector:
+    run: nettest
+EOF
+
 podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
 check_all_pods_communicate() {
@@ -169,6 +188,15 @@ assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# check access via virtual IP
+VIRTUAL_IP=$($SSH $HOST1 $KUBECTL get service netvirt -o template --template={{.spec.clusterIP}})
+assert_raises   "$SSH $HOST1 $KUBECTL exec     $podName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+
+# host should not be able to reach pods via service virtual IP or NodePort
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 # allow access for nettest-deny
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
@@ -210,6 +238,10 @@ spec:
 EOF
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# Virtual IP and NodePort should now work
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 tear_down_kubeadm
 
