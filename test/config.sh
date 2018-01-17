@@ -141,6 +141,9 @@ weave_on() {
 
 stop_weave_on() {
     host=$1
+    echo "printing $host ..."
+    docker_on $host logs weave || true
+    run_on $host "sudo iptables-save" || true
     weave_on $host stop 1>/dev/null 2>&1 || true
     if [ -n "$COVERAGE" ]; then
         collect_coverage $host weave
