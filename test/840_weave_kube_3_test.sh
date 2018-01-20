@@ -36,7 +36,7 @@ for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
     fi
 done
 
