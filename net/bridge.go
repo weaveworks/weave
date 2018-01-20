@@ -409,20 +409,13 @@ func configureIPTables(config *BridgeConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "creating iptables object")
 	}
+
+	// The order among weave filter/FORWARD rules is important!
+	fwdRules := make([][]string, 0)
+
 	if config.DockerBridgeName != "" {
 		if config.WeaveBridgeName != config.DockerBridgeName {
-			// This is not ideal, as it does not check whether the rule is at the top
-			// of the chain.
-			found, err := ipt.Exists("filter", "FORWARD", "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
-			if err != nil {
-				return err
-			}
-			if !found {
-				err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
-				if err != nil {
-					return err
-				}
-			}
+			fwdRules = append(fwdRules, []string{"-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP"})
 		}
 
 		dockerBridgeIP, err := FindBridgeIP(config.DockerBridgeName, nil)
@@ -449,9 +442,6 @@ func configureIPTables(config *BridgeConfig) error {
 			return err
 		}
 	}
-
-	// The order among weave filter/FORWARD rules is important!
-	fwdRules := make([][]string, 0)
 
 	if config.NPC {
 		// Steer traffic via the NPC
