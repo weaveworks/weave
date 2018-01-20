@@ -470,7 +470,7 @@ func configureIPTables(config *BridgeConfig) error {
 	// and allow replies back
 	fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
 
-	if err := ensureRules("filter", "FORWARD", fwdRules, ipt); err != nil {
+	if err := ensureRulesAtTop("filter", "FORWARD", fwdRules, ipt); err != nil {
 		return err
 	}
 
@@ -491,11 +491,11 @@ func linkSetUpByName(linkName string) error {
 	return netlink.LinkSetUp(link)
 }
 
-// ensureRules ensures the presence of given iptables rules.
+// ensureRulesAtTop ensures the presence of given iptables rules.
 //
 // If any rule from the list is missing, the function deletes all given
-// rules and re-inserts them to ensure the order of the rules.
-func ensureRules(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
+// rules and re-inserts them at the top of the chain to ensure the order of the rules.
+func ensureRulesAtTop(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
 	allFound := true
 
 	for _, rs := range rulespecs {
