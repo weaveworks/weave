@@ -449,7 +449,9 @@ func configureIPTables(config *BridgeConfig) error {
 		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
 		fwdRules = append(fwdRules,
 			[][]string{
-				{"-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"},
+				{"-o", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", "WEAVE-NPC"},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)
