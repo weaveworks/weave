@@ -62,7 +62,7 @@ check_connections() {
 
 assert_raises 'wait_for_x check_connections "connections to establish"'
 
-run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "sudo iptables-save -c"
 run_on $HOST2 "ps auxf"
 
 # Check we can ping between the Weave bridg IPs on each host
@@ -182,7 +182,7 @@ denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template=
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 echo "before restart"
-run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "sudo iptables-save -c"
 
 # Restart weave-net with npc in non-legacy mode
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
@@ -193,7 +193,7 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 echo "after restart"
-run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "sudo iptables-save -c"
 
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
@@ -248,16 +248,18 @@ EOF
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
+$SSH $HOST1 $KUBECTL get pods -o wide
 echo "before test"
 run_on $HOST2 "sudo iptables-save"
 
 # Virtual IP and NodePort should now work
-assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 echo "after test"
-run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "sudo iptables-save -c"
 run_on $HOST2 "ps auxf"
+
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 
 tear_down_kubeadm
 
