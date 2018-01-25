@@ -62,6 +62,9 @@ check_connections() {
 
 assert_raises 'wait_for_x check_connections "connections to establish"'
 
+run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "ps auxf"
+
 # Check we can ping between the Weave bridg IPs on each host
 HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
 HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
@@ -239,9 +242,14 @@ EOF
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
+run_on $HOST2 "sudo iptables-save"
+
 # Virtual IP and NodePort should now work
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+run_on $HOST2 "sudo iptables-save"
+run_on $HOST2 "ps auxf"
 
 tear_down_kubeadm
 
