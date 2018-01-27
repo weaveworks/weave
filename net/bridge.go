@@ -480,6 +480,9 @@ func configureIPTables(config *BridgeConfig) error {
 	// and allow replies back
 	fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
 
+	rules, _ := ipt.List("filter", "FORWARD")
+	fmt.Println("!!! filter/FORWARD", rules)
+
 	if err := ensureRules("filter", "FORWARD", fwdRules, ipt); err != nil {
 		return err
 	}

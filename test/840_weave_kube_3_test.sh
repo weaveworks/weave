@@ -12,6 +12,9 @@ howmany() { echo $#; }
 
 start_suite "Test weave-kube image with Kubernetes"
 
+echo ">>>>>>>>>>>>> BEFORE <<<<<<<<<<<<<<<<<<<<<"
+run_on $HOST2 "sudo iptables-save -c"
+
 TOKEN=112233.4455667788990000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
 NUM_HOSTS=$(howmany $HOSTS)
@@ -23,6 +26,9 @@ IMAGE=weaveworks/network-tester:latest
 DOMAIN=nettest.default.svc.cluster.local.
 
 tear_down_kubeadm
+
+echo ">>>>>>>>>>>>> AFTER TEAR DOWN <<<<<<<<<<<<<<<<<<<<<"
+run_on $HOST2 "sudo iptables-save -c"
 
 # Make an ipset, so we can check it doesn't get wiped out by Weave Net
 docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
@@ -72,6 +78,10 @@ HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
 assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
 assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
 assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
+
+echo ">>> WEAVE NET LOGS <<<"
+tmpPod=$($SSH $HOST1 "$KUBECTL get pods -n=kube-system |grep weave-net | head -n1 | awk '{print $1}'")
+run_on $HOST1 "$KUBECTL logs -n kube-system $tmpPod weave"
 
 # Ensure we do not generate any defunct process (e.g. launch.sh) after starting weaver:
 assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
