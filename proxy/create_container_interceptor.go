@@ -68,11 +68,11 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
-			if err := i.setHostname(container, hostname, dnsDomain); err != nil {
+		if !i.proxy.WithoutDNS {
+			if err := i.setHostname(container, hostname, i.proxy.DNSDomain); err != nil {
 				return err
 			}
-			if err := i.proxy.setWeaveDNS(hostConfig, hostname, dnsDomain); err != nil {
+			if err := i.proxy.setWeaveDNS(hostConfig, hostname, i.proxy.DNSDomain); err != nil {
 				return err
 			}
 		}
