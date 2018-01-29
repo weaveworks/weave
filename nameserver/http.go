@@ -84,3 +84,9 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 		}
 	})
 }
+
+func (d *DNSServer) HandleHTTP(router *mux.Router) {
+	router.Methods("GET").Path("/dns-address").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, d.address)
+	})
+}

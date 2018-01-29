@@ -43,6 +43,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--host <ip_address>]
                     [--name <mac>] [--nickname <nickname>]
                     [--no-restart] [--resume] [--no-discovery] [--no-dns]
+                    [--dns-listen-address <address>:<port>]
                     [--ipalloc-init <mode>]
                     [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                     [--plugin=false] [--proxy=false]
@@ -773,6 +774,7 @@ dns_args() {
     DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null)} || retval=$?
     [ "$retval" -eq 4 ] && return 0
     DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
+    DNS_ADDRESS=${DNS_ADDRESS:-$(call_weave GET /dns-address 2>/dev/null)}
 
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
@@ -801,8 +803,7 @@ dns_args() {
     done
     [ -n "$WITHOUT_DNS" ] && return 0
 
-    [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-    DNS_ARGS="--dns=$DOCKER_BRIDGE_IP"
+    DNS_ARGS="--dns=$DNS_ADDRESS"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
         if [ ${#HOSTNAME} -gt 64 ] ; then
@@ -1487,8 +1488,8 @@ case "$COMMAND" in
         ;;
     dns-lookup)
         [ $# -eq 1 ] || usage
-        DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-        dig @$DOCKER_BRIDGE_IP +short $1
+        DNS_ADDRESS=${DNS_ADDRESS:-$(call_weave GET /dns-address 2>/dev/null)}
+        dig @${DNS_ADDRESS%:*} -p ${DNS_ADDRESS#*:} +short $1
         ;;
     expose)
         collect_cidr_args "$@"

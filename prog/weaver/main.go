@@ -465,6 +465,7 @@ func main() {
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)
+			dnsserver.HandleHTTP(muxRouter)
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)
