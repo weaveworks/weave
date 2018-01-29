@@ -5,6 +5,10 @@
 tear_down_kubeadm() {
     for host in $HOSTS; do
         run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+        # Remove the rule to ensure that api-server is not accessible while kube-proxy
+        # is not ready. Otherwise, we have a race between "-j KUBE-FORWARD" and "-j WEAVE-NPC"
+        # which makes the NodePort isolation test case to fail.
+        run_on $host "sudo iptables -t nat -D PREROUTING -m comment --comment \"kubernetes service portals\" -j KUBE-SERVICES" || true
     done
 }
 
@@ -29,16 +33,14 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
 
 # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
-#k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
-# Hack! Override version here as installation via package is broken http://github.com/kubernetes/kubernetes/issues/57334
-k8s_version="v1.8.5"
+k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
 k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
     fi
 done
 
