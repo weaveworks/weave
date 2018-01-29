@@ -48,7 +48,7 @@ IPT_BEFORE=$(mktemp)
 IPT_AFTER=$(mktemp)
 run_on $HOST1 "sudo iptables-save | grep -i weave | grep -v '\[.*:.*\]' > $IPT_BEFORE"
 
-run_on $HOST1 sudo iptables -t filter -D FORWARD -o weave -j WEAVE-NPC
+run_on $HOST1 "sudo iptables -t filter -D FORWARD -o weave -m comment --comment \"NOTE: this must go before '-j KUBE-FORWARD'\" -j WEAVE-NPC"
 run_on $HOST1 sudo iptables -t nat -D POSTROUTING -j WEAVE
 kill_weaver # should re-create the bridge and iptables friends
 

@@ -409,20 +409,13 @@ func configureIPTables(config *BridgeConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "creating iptables object")
 	}
+
+	// The order among weave filter/FORWARD rules is important!
+	fwdRules := make([][]string, 0)
+
 	if config.DockerBridgeName != "" {
 		if config.WeaveBridgeName != config.DockerBridgeName {
-			// This is not ideal, as it does not check whether the rule is at the top
-			// of the chain.
-			found, err := ipt.Exists("filter", "FORWARD", "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
-			if err != nil {
-				return err
-			}
-			if !found {
-				err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
-				if err != nil {
-					return err
-				}
-			}
+			fwdRules = append(fwdRules, []string{"-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP"})
 		}
 
 		dockerBridgeIP, err := FindBridgeIP(config.DockerBridgeName, nil)
@@ -450,16 +443,15 @@ func configureIPTables(config *BridgeConfig) error {
 		}
 	}
 
-	// The order among weave filter/FORWARD rules is important!
-	fwdRules := make([][]string, 0)
-
 	if config.NPC {
 		// Steer traffic via the NPC
 		_ = ipt.NewChain("filter", "WEAVE-NPC") // ignore error because it might already exist
 		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
 		fwdRules = append(fwdRules,
 			[][]string{
-				{"-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"},
+				{"-o", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", "WEAVE-NPC"},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)
@@ -480,7 +472,7 @@ func configureIPTables(config *BridgeConfig) error {
 	// and allow replies back
 	fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
 
-	if err := ensureRules("filter", "FORWARD", fwdRules, ipt); err != nil {
+	if err := ensureRulesAtTop("filter", "FORWARD", fwdRules, ipt); err != nil {
 		return err
 	}
 
@@ -501,11 +493,11 @@ func linkSetUpByName(linkName string) error {
 	return netlink.LinkSetUp(link)
 }
 
-// ensureRules ensures the presence of given iptables rules.
+// ensureRulesAtTop ensures the presence of given iptables rules.
 //
 // If any rule from the list is missing, the function deletes all given
-// rules and re-inserts them to ensure the order of the rules.
-func ensureRules(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
+// rules and re-inserts them at the top of the chain to ensure the order of the rules.
+func ensureRulesAtTop(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
 	allFound := true
 
 	for _, rs := range rulespecs {
