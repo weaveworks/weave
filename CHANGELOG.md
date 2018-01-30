@@ -1,3 +1,41 @@
+## Release 2.2.0
+
+This release improves the way Weave Net configures Linux network
+devices and network filter rules, so that it is more robust in the face
+of unexpected changes in its environment. #3204,#3224
+
+As a consequence of these changes, the `weave attach` command will now
+fail unless the Weave Net daemon is up and running - previously it was
+possible to run independently as long as you managed all IP addresses
+yourself.
+
+## Other improvements
+
+* Update library miekg/dns for CVE-2017-15133 (details under embargo) #3223,#3227
+* Reduce the volume of logging from weave-npc #3183
+* Add ability to set log level for Docker "v2" plugin, and change
+  default log level from DEBUG to INFO #3197
+* Downgrade log messages about Discovery and Expiration to DEBUG level #3202,#3203
+* Use command-line parameter for WeaveDNS address in Docker proxy #3196
+
+## Bug fixes
+
+* Ensure that rules to block traffic for NetworkPolicy are placed
+  ahead of rules that Kubernetes has added to allow other traffic #3209,#3210
+
+## Build and test
+
+* Update CI tests to use Kubernetes 1.9.2 #3229
+* Remove "daily update" from test VMs that only run for a few minutes #3224
+
+## External Contributors
+
+Thanks to the following contributors:
+@vetal4444
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/67?closed=1)
+
+
 ## Release 2.1.3
 
 This release fixes a race-condition in the IP reclaim code for weave-kube
