@@ -37,6 +37,7 @@ type controller struct {
 
 	nss         map[string]*ns // ns name -> ns struct
 	nsSelectors *selectorSet   // selector string -> nsSelector
+	exceptedIPs *exceptedIPBlockSet
 
 	legacy bool // use legacy network policy semantics (k8s pre-1.7)
 }
@@ -51,6 +52,7 @@ func New(nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interfa
 
 	doNothing := func(*selector) error { return nil }
 	c.nsSelectors = newSelectorSet(ips, c.onNewNsSelector, doNothing, doNothing)
+	c.exceptedIPs = newExceptedIPBlockSet(ips)
 
 	return c
 }
@@ -71,7 +73,7 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		newNs, err := newNS(name, npc.nodeName, npc.legacy, npc.ipt, npc.ips, npc.nsSelectors)
+		newNs, err := newNS(name, npc.nodeName, npc.legacy, npc.ipt, npc.ips, npc.nsSelectors, npc.exceptedIPs)
 		if err != nil {
 			return err
 		}
