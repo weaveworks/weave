@@ -21,11 +21,11 @@ RUN apk add --update \
     util-linux \
     conntrack-tools \
     bind-tools \
+    ca-certificates \
   && rm -rf /var/cache/apk/*
 
 ADD ./weave ./weaver /home/weave/
 ADD ./weaveutil /usr/bin/
 ADD weavedata.db /weavedb/
-COPY ca-certificates.crt /etc/ssl/certs/
 ENTRYPOINT ["/home/weave/weaver"]
 WORKDIR /home/weave
