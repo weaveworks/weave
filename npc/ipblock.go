@@ -17,14 +17,12 @@ type ipBlock struct {
 }
 
 func newIPBlock(ipb *networkingv1.IPBlock, ns string) (b *ipBlock, err error) {
-	_, _, err = net.ParseCIDR(ipb.CIDR)
-	if err != nil {
+	if _, _, err = net.ParseCIDR(ipb.CIDR); err != nil {
 		return
 	}
 
 	for _, ex := range ipb.Except {
-		_, _, err = net.ParseCIDR(ex)
-		if err != nil {
+		if _, _, err = net.ParseCIDR(ex); err != nil {
 			return
 		}
 	}
@@ -64,7 +62,7 @@ func newExceptedIPBlockSet(ips ipset.Interface) *exceptedIPBlockSet {
 }
 
 func (s *exceptedIPBlockSet) deprovision(uid types.UID, current *ipBlock) (err error) {
-	if current == nil {
+	if current == nil || len(current.ipsetName) == 0 {
 		return
 	}
 
@@ -75,11 +73,8 @@ func (s *exceptedIPBlockSet) deprovision(uid types.UID, current *ipBlock) (err e
 
 	s.users[key]--
 	if s.users[key] == 0 {
-		if len(current.ipsetName) > 0 {
-			err = s.ips.Destroy(current.ipsetName)
-			if err != nil {
-				return
-			}
+		if err = s.ips.Destroy(current.ipsetName); err != nil {
+			return
 		}
 
 		delete(s.users, key)
@@ -89,7 +84,7 @@ func (s *exceptedIPBlockSet) deprovision(uid types.UID, current *ipBlock) (err e
 }
 
 func (s *exceptedIPBlockSet) provision(uid types.UID, desired *ipBlock) (err error) {
-	if desired == nil {
+	if desired == nil || len(desired.ipsetName) == 0 {
 		return
 	}
 
@@ -100,26 +95,17 @@ func (s *exceptedIPBlockSet) provision(uid types.UID, desired *ipBlock) (err err
 		return
 	}
 
-	if len(desired.ipsetName) > 0 {
-		err = s.ips.Create(desired.ipsetName, ipset.HashNet)
-		if err != nil {
-			return
-		}
+	err = s.ips.Create(desired.ipsetName, ipset.HashNet)
+	if err != nil {
+		return
+	}
 
-		comment := `excepted from ` + desired.spec.CIDR
-		for _, excepted := range desired.spec.Except {
-			err = s.ips.AddEntry(uid, desired.ipsetName, excepted, comment)
-			if err != nil {
-				break
-			}
-		}
-
-		if err != nil {
-			details := s.ips.Destroy(desired.ipsetName)
-			if details != nil {
+	comment := `excepted from ` + desired.spec.CIDR
+	for _, excepted := range desired.spec.Except {
+		if err = s.ips.AddEntry(uid, desired.ipsetName, excepted, comment); err != nil {
+			if details := s.ips.Destroy(desired.ipsetName); details != nil {
 				common.Log.Warn("can't destroy ipset ", desired.ipsetName, ":", details)
 			}
-
 			return
 		}
 	}

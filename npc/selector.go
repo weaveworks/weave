@@ -5,9 +5,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
+	"fmt"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"
-	"fmt"
 )
 
 type selectorSpec struct {
