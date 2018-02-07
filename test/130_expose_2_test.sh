@@ -83,6 +83,7 @@ weave_on1 "expose $EXP/24"
 # Make c3 reachable from host2 w/o installing a route on host2 which does
 # not work on GCP.
 run_on1   "sudo iptables -t nat -A PREROUTING -p tcp --dport $PORT -j DNAT --to-destination $C3:$PORT"
+run_on1   "sudo ip route"
 run_on2   "sh -c \"echo hello | nc -w1 $HOST1 $PORT\""
 weave_on1 "hide"
 run_on1   "sudo iptables -t nat -D PREROUTING -p tcp --dport $PORT -j DNAT --to-destination $C3:$PORT"
