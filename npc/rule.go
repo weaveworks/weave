@@ -11,12 +11,14 @@ import (
 )
 
 type ruleHostSpec interface {
-	GetRuleArgs() (args []string, comment string)
+	GetRuleSpec() *ruleSpec
 }
 
 type ruleSpec struct {
-	key  string
-	args []string
+	key     string
+	args    []string
+	chain   string
+	comment string
 }
 
 func newRuleSpec(proto *string, srcHost ruleHostSpec, dstHost ruleHostSpec, dstPort *string) *ruleSpec {
@@ -26,17 +28,19 @@ func newRuleSpec(proto *string, srcHost ruleHostSpec, dstHost ruleHostSpec, dstP
 	}
 
 	srcComment := "anywhere"
+	dstComment := "anywhere"
+	chain := IngressChain
 	if srcHost != nil {
-		var srcArgs []string
-		srcArgs, srcComment = srcHost.GetRuleArgs()
-		args = append(args, srcArgs...)
+		srcSpec := srcHost.GetRuleSpec()
+		args = append(args, srcSpec.args...)
+		srcComment = srcSpec.comment
+		chain = srcSpec.chain
 	}
 
-	dstComment := "anywhere"
 	if dstHost != nil {
-		var dstArgs []string
-		dstArgs, dstComment = dstHost.GetRuleArgs()
-		args = append(args, dstArgs...)
+		dstSpec := dstHost.GetRuleSpec()
+		args = append(args, dstSpec.args...)
+		dstComment = dstSpec.comment
 	}
 
 	if dstPort != nil {
@@ -47,7 +51,10 @@ func newRuleSpec(proto *string, srcHost ruleHostSpec, dstHost ruleHostSpec, dstP
 	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
 	key := strings.Join(args, " ")
 
-	return &ruleSpec{key, args}
+	return &ruleSpec{
+		key:   key,
+		chain: chain,
+		args:  args}
 }
 
 type ruleSet struct {
@@ -65,7 +72,7 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
 				common.Log.Infof("deleting rule: %v", spec.args)
-				if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); err != nil {
+				if err := rs.ipt.Delete(TableFilter, spec.chain, spec.args...); err != nil {
 					return err
 				}
 				delete(rs.users, key)
@@ -81,7 +88,7 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
 				common.Log.Infof("adding rule: %v", spec.args)
-				if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); err != nil {
+				if err := rs.ipt.Append(TableFilter, spec.chain, spec.args...); err != nil {
 					return err
 				}
 				rs.users[key] = make(map[types.UID]struct{})

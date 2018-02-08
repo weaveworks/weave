@@ -38,30 +38,36 @@ func newIPBlock(ipb *networkingv1.IPBlock, ns string) (b *ipBlock, err error) {
 	return
 }
 
-func (ipb ipBlock) GetRuleArgs() (args []string, comment string) {
+func (ipb ipBlock) GetRuleSpec() (spec *ruleSpec) {
+	spec = &ruleSpec{
+		chain: IngressIPBlockChain,
+	}
+
 	if len(ipb.spec.Except) == 0 {
-		args = append(args, "-s", ipb.spec.CIDR)
-		comment = fmt.Sprintf("cidr: %s", ipb.spec.CIDR)
+		spec.args = append(spec.args, "-s", ipb.spec.CIDR)
+		spec.comment = fmt.Sprintf("cidr: %s", ipb.spec.CIDR)
 	} else {
-		args = append(args, "-s", ipb.spec.CIDR, "-m", "set", "!", "--match-set", string(ipb.ipsetName), "src")
-		comment = fmt.Sprintf("cidr: %s except [%s]", ipb.spec.CIDR, strings.Join(ipb.spec.Except, `,`))
+		spec.args = append(spec.args, "-s", ipb.spec.CIDR, "-m", "set", "!", "--match-set",
+			string(ipb.ipsetName), "src")
+		spec.comment = fmt.Sprintf("cidr: %s except [%s]", ipb.spec.CIDR,
+			strings.Join(ipb.spec.Except, `,`))
 	}
 	return
 }
 
-type exceptedIPBlockSet struct {
+type ipBlockSet struct {
 	ips   ipset.Interface
 	users map[string]int
 }
 
-func newExceptedIPBlockSet(ips ipset.Interface) *exceptedIPBlockSet {
-	return &exceptedIPBlockSet{
+func newIPBlockSet(ips ipset.Interface) *ipBlockSet {
+	return &ipBlockSet{
 		ips:   ips,
 		users: make(map[string]int),
 	}
 }
 
-func (s *exceptedIPBlockSet) deprovision(uid types.UID, current *ipBlock) (err error) {
+func (s *ipBlockSet) deprovision(uid types.UID, current *ipBlock) (err error) {
 	if current == nil || len(current.ipsetName) == 0 {
 		return
 	}
@@ -83,7 +89,7 @@ func (s *exceptedIPBlockSet) deprovision(uid types.UID, current *ipBlock) (err e
 	return
 }
 
-func (s *exceptedIPBlockSet) provision(uid types.UID, desired *ipBlock) (err error) {
+func (s *ipBlockSet) provision(uid types.UID, desired *ipBlock) (err error) {
 	if desired == nil || len(desired.ipsetName) == 0 {
 		return
 	}

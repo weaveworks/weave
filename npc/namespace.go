@@ -39,14 +39,14 @@ type ns struct {
 
 	nsSelectors  *selectorSet
 	podSelectors *selectorSet
-	exceptedIPs  *exceptedIPBlockSet
+	ipBlocks     *ipBlockSet
 	rules        *ruleSet
 
 	legacy bool
 }
 
-func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet,
-	exceptedIPs *exceptedIPBlockSet) (*ns, error) {
+func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interface,
+	nsSelectors *selectorSet) (*ns, error) {
 	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, false, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset
 		uid:         uuid.NewUUID(),
 		allPods:     allPods,
 		nsSelectors: nsSelectors,
-		exceptedIPs: exceptedIPs,
+		ipBlocks:    newIPBlockSet(ips),
 		rules:       newRuleSet(ipt),
 		legacy:      legacy}
 
@@ -174,7 +174,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	if ns.checkLocalPod(obj) {
+	if ns.legacy && ns.checkLocalPod(obj) {
 		ns.ips.AddEntry(obj.ObjectMeta.UID, LocalIpset, obj.Status.PodIP, podComment(obj))
 	}
 
@@ -201,7 +201,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if hasIP(oldObj) && !hasIP(newObj) {
-		if ns.checkLocalPod(oldObj) {
+		if ns.legacy && ns.checkLocalPod(oldObj) {
 			ns.ips.DelEntry(oldObj.ObjectMeta.UID, LocalIpset, oldObj.Status.PodIP)
 		}
 
@@ -215,7 +215,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
-		if ns.checkLocalPod(newObj) {
+		if ns.legacy && ns.checkLocalPod(newObj) {
 			ns.ips.AddEntry(newObj.ObjectMeta.UID, LocalIpset, newObj.Status.PodIP, podComment(newObj))
 		}
 		found, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
@@ -292,7 +292,7 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	if ns.checkLocalPod(obj) {
+	if ns.legacy && ns.checkLocalPod(obj) {
 		ns.ips.DelEntry(obj.ObjectMeta.UID, LocalIpset, obj.Status.PodIP)
 	}
 
@@ -320,7 +320,7 @@ func (ns *ns) addNetworkPolicy(obj interface{}) error {
 	if err := ns.podSelectors.provision(uid, nil, podSelectors); err != nil {
 		return err
 	}
-	if err := ns.exceptedIPs.provision(uid, ipb); err != nil {
+	if err := ns.ipBlocks.provision(uid, ipb); err != nil {
 		return err
 	}
 	return ns.rules.provision(uid, nil, rules)
@@ -350,7 +350,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj interface{}) error {
 	if err := ns.podSelectors.deprovision(oldUID, oldPodSelectors, newPodSelectors); err != nil {
 		return err
 	}
-	if err := ns.exceptedIPs.deprovision(oldUID, oldIPBlock); err != nil {
+	if err := ns.ipBlocks.deprovision(oldUID, oldIPBlock); err != nil {
 		return err
 	}
 	if err := ns.nsSelectors.provision(oldUID, oldNsSelectors, newNsSelectors); err != nil {
@@ -359,7 +359,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj interface{}) error {
 	if err := ns.podSelectors.provision(oldUID, oldPodSelectors, newPodSelectors); err != nil {
 		return err
 	}
-	if err := ns.exceptedIPs.provision(oldUID, newIPBlock); err != nil {
+	if err := ns.ipBlocks.provision(oldUID, newIPBlock); err != nil {
 		return err
 	}
 	return ns.rules.provision(oldUID, oldRules, newRules)
@@ -381,7 +381,7 @@ func (ns *ns) deleteNetworkPolicy(obj interface{}) error {
 	if err := ns.nsSelectors.deprovision(uid, nsSelectors, nil); err != nil {
 		return err
 	}
-	if err := ns.exceptedIPs.deprovision(uid, ipb); err != nil {
+	if err := ns.ipBlocks.deprovision(uid, ipb); err != nil {
 		return err
 	}
 	return ns.podSelectors.deprovision(uid, podSelectors, nil)

@@ -20,16 +20,20 @@ type selectorSpec struct {
 	nsName    string     // Namespace name
 }
 
-func (selector selectorSpec) GetRuleArgs() (args []string, comment string) {
+func (selector selectorSpec) GetRuleSpec() (spec *ruleSpec) {
+	spec = &ruleSpec{
+		chain: IngressChain,
+	}
+
 	if selector.dst {
-		args = append(args, "-m", "set", "--match-set", string(selector.ipsetName), "dst")
-		comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
+		spec.args = append(spec.args, "-m", "set", "--match-set", string(selector.ipsetName), "dst")
+		spec.comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
 	} else {
-		args = append(args, "-m", "set", "--match-set", string(selector.ipsetName), "src")
+		spec.args = append(spec.args, "-m", "set", "--match-set", string(selector.ipsetName), "src")
 		if selector.nsName != "" {
-			comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
+			spec.comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
 		} else {
-			comment = fmt.Sprintf("namespaces: selector: %s", selector.key)
+			spec.comment = fmt.Sprintf("namespaces: selector: %s", selector.key)
 		}
 	}
 	return
