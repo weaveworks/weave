@@ -143,6 +143,11 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 			return err
 		}
 
+		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "NFLOG", "--nflog-group",
+			"86"); err != nil {
+			return err
+		}
+
 		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "DROP"); err != nil {
 			return err
 		}
