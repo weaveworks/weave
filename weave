@@ -497,6 +497,10 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -o $BRIDGE -j DROP 2>/dev/null || true
     run_iptables -X WEAVE-NPC >/dev/null 2>&1 || true
 
+    run_iptables -F WEAVE-NPC-LOCAL-INGRESS >/dev/null 2>&1 || true
+    run_iptables -t filter -D OUTPUT -d $IPRANGE -m state --state NEW -j WEAVE-NPC-LOCAL-INGRESS 2>/dev/null || true
+    run_iptables -X WEAVE-NPC-LOCAL-INGRESS >/dev/null 2>&1 || true
+
     run_iptables -F WEAVE-EXPOSE >/dev/null 2>&1 || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-EXPOSE 2>/dev/null || true
     run_iptables -X WEAVE-EXPOSE >/dev/null 2>&1 || true
