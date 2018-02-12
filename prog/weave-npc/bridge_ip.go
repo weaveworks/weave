@@ -73,17 +73,16 @@ func doExec(args ...string) error {
 	return nil
 }
 
-func addBridgeIpSetEntry(entry string, comment string) error {
-	common.Log.Printf("added entry %s to %s of %s", entry, npc.BridgeIpset)
+func addBridgeIPSetEntry(entry string, comment string) error {
+	common.Log.Printf("added entry %s to %s", entry, npc.BridgeIpset)
 	if len(comment) > 0 {
 		return doExec("add", npc.BridgeIpset, entry, "comment", comment)
-	} else {
-		return doExec("add", npc.BridgeIpset, entry)
 	}
+	return doExec("add", npc.BridgeIpset, entry)
 }
 
-func delBridgeIpSetEntry(entry string) error {
-	common.Log.Printf("deleting entry %s from %s of %s", entry)
+func delBridgeIPSetEntry(entry string) error {
+	common.Log.Printf("deleting entry %s from %s", entry, npc.BridgeIpset)
 	return doExec("del", npc.BridgeIpset, entry)
 }
 
@@ -108,7 +107,7 @@ func (c weaveDaemonController) updateBridgeIPs(deleted, added *coreapi.Pod) (err
 
 		if ip, found := bridgeIPs[added.Spec.NodeName]; found {
 			common.Log.Infof("Add bridge ip of %s[%s] to bridge ipset", added.Spec.NodeName, ip)
-			err = addBridgeIpSetEntry(ip, fmt.Sprintf("bridge IP of %s", added.Spec.NodeName))
+			err = addBridgeIPSetEntry(ip, fmt.Sprintf("bridge IP of %s", added.Spec.NodeName))
 			return
 		}
 
@@ -125,7 +124,7 @@ func (c weaveDaemonController) updateBridgeIPs(deleted, added *coreapi.Pod) (err
 
 		if ip, found := bridgeIPs[deleted.Spec.NodeName]; found {
 			common.Log.Infof("Remove bridge ip of %s[%s] from bridge ipset", deleted.Spec.NodeName, ip)
-			err = delBridgeIpSetEntry(ip)
+			err = delBridgeIPSetEntry(ip)
 			return
 		}
 
