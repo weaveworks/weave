@@ -25,12 +25,13 @@ import (
 )
 
 var (
-	version     = "unreleased"
-	metricsAddr string
-	logLevel    string
-	allowMcast  bool
-	nodeName    string
-	legacy      bool
+	version      = "unreleased"
+	metricsAddr  string
+	logLevel     string
+	allowMcast   bool
+	nodeName     string
+	legacy       bool
+	trustBridges bool
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -138,23 +139,25 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 			return err
 		}
 
-		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
-			string(npc.DefaultChain)); err != nil {
-			return err
-		}
+		if !trustBridges {
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
+				string(npc.DefaultChain)); err != nil {
+				return err
+			}
 
-		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
-			string(npc.IngressIPBlockChain)); err != nil {
-			return err
-		}
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
+				string(npc.IngressIPBlockChain)); err != nil {
+				return err
+			}
 
-		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "NFLOG", "--nflog-group",
-			"86"); err != nil {
-			return err
-		}
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "NFLOG", "--nflog-group",
+				"86"); err != nil {
+				return err
+			}
 
-		if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "DROP"); err != nil {
-			return err
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "DROP"); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -306,6 +309,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
+	rootCmd.PersistentFlags().BoolVar(&trustBridges, "trust-weave-bridges", false, "trust packets sent out from weave bridges")
 
 	handleError(rootCmd.Execute())
 }
