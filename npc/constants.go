@@ -13,5 +13,5 @@ const (
 
 	LocalIpset = IpsetNamePrefix + "local-pods"
 
-	BridgeIpset = "trusted-weave-bridges"
+	BridgeIpset = IpsetNamePrefix + "bridges"
 )

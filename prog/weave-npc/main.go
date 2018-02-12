@@ -93,6 +93,11 @@ func resetIPSets(ips ipset.Interface) error {
 		}
 	}
 
+	err = ips.Create(npc.BridgeIpset, ipset.HashIP)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -211,8 +216,8 @@ func root(cmd *cobra.Command, args []string) {
 
 	npc := npc.New(nodeName, legacy, ipt, ips)
 
-	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
-		cache.ResourceEventHandlerFuncs{
+	nsController := makeController(client.Core().RESTClient(), "namespaces",
+		&coreapi.Namespace{}, cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
 			},
@@ -231,8 +236,8 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
-	podController := makeController(client.Core().RESTClient(), "pods", &coreapi.Pod{},
-		cache.ResourceEventHandlerFuncs{
+	podController := makeController(client.Core().RESTClient(), "pods",
+		&coreapi.Pod{}, cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddPod(obj.(*coreapi.Pod)))
 			},
@@ -271,9 +276,14 @@ func root(cmd *cobra.Command, args []string) {
 		},
 	}
 	if legacy {
-		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
+		npController = makeController(client.Extensions().RESTClient(), "networkpolicies",
+			&extnapi.NetworkPolicy{}, npHandlers)
 	} else {
-		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
+		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies",
+			&networkingv1.NetworkPolicy{}, npHandlers)
+
+		weavePodController := makeWeaveDaemonController(client)
+		go weavePodController.Run(wait.NeverStop)
 	}
 
 	go nsController.Run(wait.NeverStop)

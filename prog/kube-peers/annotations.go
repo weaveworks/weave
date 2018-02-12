@@ -14,11 +14,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
-	wait "k8s.io/apimachinery/pkg/util/wait"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -44,6 +44,7 @@ type peerList struct {
 type peerInfo struct {
 	PeerName string // Weave internal unique ID
 	NodeName string // Kubernetes node name
+	BridgeIP string // Weave bridge IP. Could be empty.
 }
 
 func (pl peerList) contains(peerName string) bool {
@@ -55,8 +56,22 @@ func (pl peerList) contains(peerName string) bool {
 	return false
 }
 
-func (pl *peerList) add(peerName string, name string) {
-	pl.Peers = append(pl.Peers, peerInfo{PeerName: peerName, NodeName: name})
+func (pl peerList) index(peerName, name, bridgeIP string) (int, bool) {
+	for i, peer := range pl.Peers {
+		if peer.PeerName == peerName {
+			return i, peer.NodeName == name && peer.BridgeIP == bridgeIP
+		}
+	}
+
+	return -1, false
+}
+
+func (pl *peerList) add(peerName, name, bridgeIP string) {
+	pl.Peers = append(pl.Peers, peerInfo{PeerName: peerName, NodeName: name, BridgeIP: bridgeIP})
+}
+
+func (pl *peerList) replace(i int, peerName, name, bridgeIP string) {
+	pl.Peers[i] = peerInfo{PeerName: peerName, NodeName: name, BridgeIP: bridgeIP}
 }
 
 func (pl *peerList) remove(peerNameToRemove string) {
