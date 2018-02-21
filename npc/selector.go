@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
+	"fmt"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"
 )
@@ -17,6 +18,25 @@ type selectorSpec struct {
 	ipsetType ipset.Type // type of ipset to provision
 	ipsetName ipset.Name // generated ipset name
 	nsName    string     // Namespace name
+}
+
+func (selector selectorSpec) GetRuleSpec() (spec *ruleSpec) {
+	spec = &ruleSpec{
+		chain: IngressChain,
+	}
+
+	if selector.dst {
+		spec.args = append(spec.args, "-m", "set", "--match-set", string(selector.ipsetName), "dst")
+		spec.comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
+	} else {
+		spec.args = append(spec.args, "-m", "set", "--match-set", string(selector.ipsetName), "src")
+		if selector.nsName != "" {
+			spec.comment = fmt.Sprintf("pods: namespace: %s, selector: %s", selector.nsName, selector.key)
+		} else {
+			spec.comment = fmt.Sprintf("namespaces: selector: %s", selector.key)
+		}
+	}
+	return
 }
 
 func newSelectorSpec(json *metav1.LabelSelector, dst bool, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {

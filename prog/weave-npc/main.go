@@ -25,12 +25,13 @@ import (
 )
 
 var (
-	version     = "unreleased"
-	metricsAddr string
-	logLevel    string
-	allowMcast  bool
-	nodeName    string
-	legacy      bool
+	version      = "unreleased"
+	metricsAddr  string
+	logLevel     string
+	allowMcast   bool
+	nodeName     string
+	legacy       bool
+	trustBridges bool
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -44,6 +45,16 @@ func makeController(getter cache.Getter, resource string,
 
 func resetIPTables(ipt *iptables.IPTables) error {
 	// Flush chains first so there are no refs to extant ipsets
+	if !legacy {
+		if err := ipt.ClearChain(npc.TableFilter, npc.IngressIPBlockChain); err != nil {
+			return err
+		}
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.LocalIngressChain); err != nil {
+		return err
+	}
+
 	if err := ipt.ClearChain(npc.TableFilter, npc.IngressChain); err != nil {
 		return err
 	}
@@ -83,6 +94,11 @@ func resetIPSets(ips ipset.Interface) error {
 		}
 	}
 
+	err = ips.Create(npc.BridgeIpset, ipset.HashIP)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -110,12 +126,55 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
-	// If the destination address is not any of the local pods, let it through
-	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
-		return err
+	if !legacy {
+		if err := ipt.Append(npc.TableFilter, npc.IngressChain,
+			"-m", "set", "--match-set", npc.BridgeIpset, "src",
+			"-m", "comment", "--comment", "packets forwarded from weave bridges are safe",
+			"-j", "ACCEPT"); err != nil {
+			return err
+		}
+
+		if err := ipt.Append(npc.TableFilter, npc.IngressChain, "-j",
+			string(npc.IngressIPBlockChain)); err != nil {
+			return err
+		}
+
+		if !trustBridges {
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
+				string(npc.DefaultChain)); err != nil {
+				return err
+			}
+
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j",
+				string(npc.IngressIPBlockChain)); err != nil {
+				return err
+			}
+
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "NFLOG", "--nflog-group",
+				"86"); err != nil {
+				return err
+			}
+
+			if err := ipt.Append(npc.TableFilter, npc.LocalIngressChain, "-j", "DROP"); err != nil {
+				return err
+			}
+		}
 	}
-	return ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT")
+
+	if legacy {
+		// Keep it for legacy
+		// If the destination address is not any of the local pods, let it through
+		if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+			return err
+		}
+
+		if err := ipt.Append(npc.TableFilter, npc.MainChain,
+			"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func root(cmd *cobra.Command, args []string) {
@@ -160,8 +219,8 @@ func root(cmd *cobra.Command, args []string) {
 
 	npc := npc.New(nodeName, legacy, ipt, ips)
 
-	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
-		cache.ResourceEventHandlerFuncs{
+	nsController := makeController(client.Core().RESTClient(), "namespaces",
+		&coreapi.Namespace{}, cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
 			},
@@ -180,8 +239,8 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
-	podController := makeController(client.Core().RESTClient(), "pods", &coreapi.Pod{},
-		cache.ResourceEventHandlerFuncs{
+	podController := makeController(client.Core().RESTClient(), "pods",
+		&coreapi.Pod{}, cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddPod(obj.(*coreapi.Pod)))
 			},
@@ -220,9 +279,14 @@ func root(cmd *cobra.Command, args []string) {
 		},
 	}
 	if legacy {
-		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
+		npController = makeController(client.Extensions().RESTClient(), "networkpolicies",
+			&extnapi.NetworkPolicy{}, npHandlers)
 	} else {
-		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
+		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies",
+			&networkingv1.NetworkPolicy{}, npHandlers)
+
+		weavePodController := makeWeaveDaemonController(client)
+		go weavePodController.Run(wait.NeverStop)
 	}
 
 	go nsController.Run(wait.NeverStop)
@@ -245,6 +309,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
+	rootCmd.PersistentFlags().BoolVar(&trustBridges, "trust-weave-bridges", false, "trust packets sent out from weave bridges")
 
 	handleError(rootCmd.Execute())
 }

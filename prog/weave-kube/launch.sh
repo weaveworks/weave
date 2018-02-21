@@ -132,11 +132,12 @@ post_start_actions() {
     export HOST_ROOT
     /home/weave/weave --local setup-cni
 
-    # Attempt to run the reclaim process, but don't halt the script if it fails
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
-
     # Expose the weave network so host processes can communicate with pods
-    /home/weave/weave --local expose $WEAVE_EXPOSE_IP
+    local BRIDGE_IP=$(/home/weave/weave --local expose $WEAVE_EXPOSE_IP)
+    echo "weave bridge IP: ${BRIDGE_IP}"
+
+    # Attempt to run the reclaim process, but don't halt the script if it fails
+    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -bridge-ip=${BRIDGE_IP} -log-level=debug || true
 }
 
 post_start_actions &

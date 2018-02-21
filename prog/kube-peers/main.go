@@ -62,7 +62,7 @@ const (
 )
 
 // update the list of all peers that have gone through this code path
-func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
+func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name, bridgeIP string) (*peerList, error) {
 	var list *peerList
 	err := cml.LoopUpdate(func() error {
 		var err error
@@ -70,13 +70,21 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 		if err != nil {
 			return err
 		}
-		if !list.contains(peerName) {
-			list.add(peerName, name)
+
+		if i, found := list.index(peerName, name, bridgeIP); !found {
+			if i < 0 {
+				list.add(peerName, name, bridgeIP)
+			} else {
+				// For upgrade from non-bridgeIP version
+				list.replace(i, peerName, name, bridgeIP)
+			}
+
 			err = cml.UpdatePeerList(*list)
 			if err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 	return list, err
@@ -180,12 +188,14 @@ func main() {
 		justCheck   bool
 		peerName    string
 		nodeName    string
+		bridgeIP    string
 		logLevel    string
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
 	flag.BoolVar(&justCheck, "check-peer-new", false, "return success if peer name is not stored in annotation")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
+	flag.StringVar(&bridgeIP, "bridge-ip", "", "ip of weave bridge")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.Parse()
 
@@ -217,7 +227,7 @@ func main() {
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
 
-		list, err := addMyselfToPeerList(cml, c, peerName, nodeName)
+		list, err := addMyselfToPeerList(cml, c, peerName, nodeName, bridgeIP)
 		if err != nil {
 			common.Log.Fatalf("[kube-peers] Could not update peer list: %v", err)
 		}
