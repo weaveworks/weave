@@ -6,7 +6,7 @@ search_type: Documentation
 You only need to build Weave Net if you want to work on the Weave Net codebase
 (or you just enjoy building software).
 
-Apart from the `weave` shell script, weave is delivered as a set of
+Apart from the `weave` shell script, Weave Net is delivered as a set of
 container images.  There is no distribution-specific packaging, so in
 principle it shouldn't matter which Linux distribution you build
 under.  But naturally, Docker is a prerequisite (version 1.6.0 or
