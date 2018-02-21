@@ -27,6 +27,7 @@ workspace conventions](https://golang.org/doc/code.html#Workspaces):
 $ WEAVE=github.com/weaveworks/weave
 $ git clone https://$WEAVE $GOPATH/src/$WEAVE
 $ cd $GOPATH/src/$WEAVE
+$ git submodule update --init
 ```
 
 Next install Docker if you haven't already, by following the instructions
