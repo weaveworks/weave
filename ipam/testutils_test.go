@@ -117,7 +117,7 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 		m := alloc.gossip.(*mockGossipComms)
 		m.RLock()
 		if len(m.messages) > 0 {
-			require.FailNow(m, fmt.Sprintf("%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages))
+			require.FailNow(m, fmt.Sprintf("%s: Gossip message(s) not sent as expected: \n%v", m.name, m.messages))
 		}
 		m.RUnlock()
 	}
