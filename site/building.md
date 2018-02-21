@@ -20,7 +20,7 @@ a Vagrant VM.
 ## <a name="ubuntu"></a>Building directly on your machine
 
 The weave git repository should be cloned into
-`$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the go
+`$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the Go
 workspace conventions](https://golang.org/doc/code.html#Workspaces):
 
 ```
@@ -44,7 +44,7 @@ On a fresh repository, the Makefile will do the following:
 - build the weave components in the build container
 - package them into two Docker images (`weaveworks/weave`,
 `weaveworks/weaveexec`)
-- Exported these images as `weave.tar.gz`
+- export these images as `weave.tar.gz`.
 
 The first two steps may take a while - don't worry, they are
 are cached and should not need to be redone very often.
@@ -65,16 +65,16 @@ $ git clone https://github.com/weaveworks/weave
 $ cd weave
 ```
 
-The `Vagrantfile` in the top directory constructs a VM that has
+The `Vagrantfile` in the top directory constructs a VM that has:
 
- * docker installed
- * go tools installed
- * weave dependencies installed
- * $GOPATH set to ~
+ * Docker installed
+ * Go tools installed
+ * Weave's dependencies installed
+ * `$GOPATH` set to `~`
  * the local working directory mapped as a synced folder into the
-   right place in $GOPATH
+   right place in `$GOPATH`.
 
-Once you are in the working directory you can issue
+Once you are in the working directory you can issue:
 
 ```
 $ vagrant up
@@ -86,7 +86,7 @@ installation is done just once). The working directory is sync'ed with
 use git and so on in the regular filesystem.
 
 To build and run the code, you need to use the VM. To log in and build
-the weave image, do
+the weave image, do:
 
 ```
 $ vagrant ssh
@@ -94,7 +94,7 @@ vm$ cd src/github.com/weaveworks/weave
 vm$ make
 ```
 
-The Docker daemon is also running in this VM, so you can then do
+The Docker daemon is also running in this VM, so you can then do:
 
 ```
 vm$ sudo ./weave launch
@@ -104,7 +104,7 @@ vm$ sudo docker ps
 and so on.
 
 If you are looking to just do a build and not run anything on this VM,
-you can do so with
+you can do so with:
 
 ```
 $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
@@ -112,7 +112,7 @@ $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
 
 you should then find a `weave.tar.gz` container snapshot tarball in the
 top-level directory. You can use that snapshot with `docker load`
-against a different host, e.g.
+against a different host, e.g.:
 
 ```
 $ export DOCKER_HOST=tcp://<HOST:PORT>
