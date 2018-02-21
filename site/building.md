@@ -13,7 +13,7 @@ under.  But naturally, Docker is a prerequisite (version 1.6.0 or
 later).
 
 The only way to build is by using the the build container; the
-Makefile is setup to make this transparent.  This method is
+`Makefile` is setup to make this transparent.  This method is
 documented below, and can be run directly on your machine or using
 a Vagrant VM.
 
