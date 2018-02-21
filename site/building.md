@@ -64,6 +64,7 @@ First, check out the code:
 ```
 $ git clone https://github.com/weaveworks/weave
 $ cd weave
+$ git submodule update --init
 ```
 
 The `Vagrantfile` in the top directory constructs a VM that has:
