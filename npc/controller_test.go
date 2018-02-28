@@ -376,3 +376,76 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	require.Equal(t, 0, len(m.sets[defaultAllowIPSetName].subSets))
 	require.False(t, m.entryExists(runBarIPSetName, podIP))
 }
+
+// Test case for https://github.com/weaveworks/weave/issues/3222
+func TestNewDstSelector(t *testing.T) {
+	const (
+		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
+		podIP                 = "10.32.0.10"
+	)
+
+	m := newMockIPSet()
+	controller := New("baz", false, &mockIPTables{}, &m)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	controller.AddNamespace(defaultNamespace)
+
+	podFoo := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "foo",
+			Namespace: "default",
+			Name:      "foo",
+			Labels:    map[string]string{"run": "foo"}},
+		Status: coreapi.PodStatus{PodIP: podIP}}
+	controller.AddPod(podFoo)
+
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	netpolBar := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-bar",
+			Name:      "allow-from-default-1",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolBar)
+
+	// netpolBar dst selector selects podFoo
+	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	netpolFoo := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo",
+			Name:      "allow-from-default-2",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolFoo)
+
+	controller.DeleteNetworkPolicy(netpolBar)
+	// netpolFoo dst-selects podFoo
+	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	controller.DeleteNetworkPolicy(netpolFoo)
+	// No netpol dst-selects podFoo
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+}
