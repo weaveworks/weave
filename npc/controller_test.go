@@ -89,7 +89,9 @@ func (i *mockIPSet) FlushAll() error {
 func (i *mockIPSet) Destroy(ipsetName ipset.Name) error {
 	if _, ok := i.sets[string(ipsetName)]; !ok {
 		return errors.Errorf("ipset %s does not exist", ipsetName)
-	}
+	} else if len(set.subSets) != 0 {
+		return errors.Errorf("cannot destroy non-empty ipset %s %v", ipsetName, set.subSets)
+    }
 	delete(i.sets, string(ipsetName))
 	return nil
 }
@@ -294,6 +296,11 @@ func TestDefaultAllow(t *testing.T) {
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
 	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+
+	controller.DeleteNamespace(defaultNamespace)
+	// Should remove the defaultIPSet
+	require.NotContains(t, m.sets, defaultAllowIPSetName)
+
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {

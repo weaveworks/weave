@@ -471,7 +471,13 @@ func (ns *ns) deleteNamespace(obj *coreapi.Namespace) error {
 	}
 
 	// Remove namespace ipset from any matching namespace selectors
-	return ns.nsSelectors.delFromMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName))
+	err := ns.nsSelectors.delFromMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName))
+	if err != nil {
+		return err
+	}
+
+	// Delete default ipSet
+	return ns.ips.Destroy(ns.defaultAllowIPSet)
 }
 
 func (ns *ns) isDefaultDeny(namespace *coreapi.Namespace) bool {
