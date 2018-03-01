@@ -294,6 +294,11 @@ func TestDefaultAllow(t *testing.T) {
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
 	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+
+	controller.DeleteNamespace(defaultNamespace)
+	// Should remove default ipset
+	require.NotContains(t, m.sets, defaultAllowIPSetName)
+
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
