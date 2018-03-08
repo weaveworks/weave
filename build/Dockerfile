@@ -21,16 +21,6 @@ ENV GCC_CROSSCOMPILERS \
 	aarch64-linux-gnu \
 	powerpc64le-linux-gnu
 
-# Temporarily add the Debian repositories, because we're going to install gcc cross-compilers from there
-# Install the build-essential and crossbuild-essential-ARCH packages
-RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && curl http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
-  && for platform in ${DEB_CROSSPLATFORMS}; do dpkg --add-architecture $platform; done \
-  && apt-get update \
-  && apt-get install -y build-essential \
-  && for platform in ${DEB_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
-  && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 # Install some required packages
 # libpcap is required because we're linking against its C libraries from the prog/weaver binary
 # flex and bison are required packages for compiling libpcap manually later
@@ -42,6 +32,15 @@ RUN apt-get update \
 		file \
 		flex \
 		bison
+
+# Use dynamic cgo linking for architectures other than amd64 for the server platforms
+# To install crossbuild essential for other architectures add the following repository.
+RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
+  && apt-get update \
+  && apt-get install -y build-essential \
+  && for platform in ${DEB_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt_v1.3.0_linux_amd64 && \
 	echo "b1925c2c405458811f0c227266402cf1868b4de529f114722c2e3a5af4ac7bb2  shfmt" | sha256sum -c && \
