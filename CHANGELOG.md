@@ -1,3 +1,30 @@
+## Release 2.2.1
+
+### Bug fixes
+
+* Fix a bug in weave-npc which would allow ingress traffic to Kubernetes Pods selected
+  by a NetworkPolicy in which source and destination selectors were the same #3222,#3237
+* Fix a bug in weave-npc which would crash if a previously deleted Kubernetes Namespace
+  has been created again #3247,#3250
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100), so that
+  more peers could directly connect #3234
+* When doing a rolling update of Weave Net on Kubernetes, allow each node five seconds
+  to initialize before rolling next Weave Net Pod, so that issues at startup will halt
+  the rollout and not spread across the whole cluster #3235
+* Install common CA certificates from Alpine Linux package instead of copying
+  them manually #3236
+
+### External contributors
+
+Thanks to the following contributors:
+
+* @alok87
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/71?closed=1)
+
 ## Release 2.2.0
 
 This release improves the way Weave Net configures Linux network
