@@ -136,7 +136,7 @@ Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-
 * Under "_My Products_", select "_owners (weaveworks)_". Weave Net should be listed among our products.
 * Click "_Actions_" > "_Edit Product_".
 * Go to "_Plans & Pricing_" > "_Free Tier_".
-* Under "_Source Repositories & Tags", click on "_Add Source_", select "_net-plugin_" under "_Repository_" and the version to release under "_Tag_".
+* Under "_Source Repositories & Tags_", click on "_Add Source_", select "_net-plugin_" under "_Repository_" and the version to release under "_Tag_".
 * Under "_Resources_" > "_Installation Instructions_", update the lines containing `export NET_VERSION=<version>`.
 * Click "_Submit For Review_". You should see a message like: "_Your product has been submitted for approval. [...] We'll be in touch with next steps soon!_".
 * Hope Docker eventually contacts us and/or performs the release. If nothing happens within a couple days, contact their support team: support@docker.com
