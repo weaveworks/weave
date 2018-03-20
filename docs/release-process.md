@@ -139,7 +139,15 @@ Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-
 * Under "_Source Repositories & Tags_", click on "_Add Source_", select "_net-plugin_" under "_Repository_" and the version to release under "_Tag_".
 * Under "_Resources_" > "_Installation Instructions_", update the lines containing `export NET_VERSION=<version>`.
 * Click "_Submit For Review_". You should see a message like: "_Your product has been submitted for approval. [...] We'll be in touch with next steps soon!_".
-* Hope Docker eventually contacts us and/or performs the release. If nothing happens within a couple days, contact their support team: support@docker.com
+* You should receive an email saying:
+
+> This email confirms that we received your submission on \<date\> of Weave Net to the Docker Store.
+>
+> We're reviewing your submission to ensure that it meets our security guidelines and complies with our best practices. Don't worry! We'll let you know if there's anything you need to change before we publish your submission. You should hear back from us within the next 14 days.
+> 
+> Thanks for submitting your content to the Docker Store!
+
+* Hope Docker eventually performs the release or contacts us. If nothing happens within 14 days, contact their support team: publisher-support@docker.com.
 
 ### Finish up
 
