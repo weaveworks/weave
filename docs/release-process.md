@@ -143,7 +143,7 @@ Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-
 
 > This email confirms that we received your submission on \<date\> of Weave Net to the Docker Store.
 >
-> We're reviewing your submission to ensure that it meets our security guidelines and complies with our best practices. Don't worry! We'll let you know if there's anything you need to change before we publish your submission. You should hear back from us within the next 14 days.
+> We're reviewing your submission to ensure that it meets our [security guidelines](https://success.docker.com/Store#Security_and_Audit_Policies) and complies with our [best practices](https://success.docker.com/Store#Create_Great_Content). Don't worry! We'll let you know if there's anything you need to change before we publish your submission. You should hear back from us within the next 14 days.
 > 
 > Thanks for submitting your content to the Docker Store!
 
