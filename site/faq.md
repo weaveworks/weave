@@ -40,6 +40,15 @@ A simple way to accomplish this would be to run Weave on the host and then run, 
 Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/tasks/manage/service-management.md#exporting).
 
 
+<a name="duplicate-peer"></a>
+**Q: Why am I seeing "peer names collision" and failed connections?**
+
+This sometimes happens when machines are cloned; we require each
+machine in your cluster to have a unique identity.
+
+For more information see [Peer Names](/site/operational-guide/concepts.md#peer-name).
+
+
 <a name="duplicate-ip"></a>
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
 
