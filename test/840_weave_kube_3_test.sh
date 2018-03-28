@@ -34,11 +34,10 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 
 # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
 k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
-k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --kubernetes-version=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
     fi
