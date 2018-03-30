@@ -115,13 +115,13 @@ WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
 RUNNER_EXE=tools/runner/runner
-MANIFEST_TOOL_DIR=vendor/github.com/estesp/manifest-tool
-MANIFEST_TOOL_EXE=$(MANIFEST_TOOL_DIR)/manifest-tool
+# manifest-tool needs registry credentials; we assume here that the active user has logged in
+MANIFEST_TOOL_CMD="docker run --rm -v $HOME/.docker:/.docker weshigbee/manifest-tool --docker-cfg=/.docker"
 TEST_TLS_EXE=test/tls/tls
 NETWORKTESTER_EXE=test/images/network-tester/webserver
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE) $(NETWORKTESTER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(NETWORKTESTER_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
@@ -183,7 +183,6 @@ $(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(RUNNER_EXE): tools/runner/*.go
-$(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
@@ -231,7 +230,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE) $(MANIFEST_TOOL_EXE):
+$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
@@ -319,7 +318,7 @@ $(NETWORKTESTER_UPTODATE): test/images/network-tester/Dockerfile $(NETWORKTESTER
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
-tools/.git $(MANIFEST_TOOL_DIR)/.git:
+tools/.git:
 	git submodule update --init
 
 # CODE FOR PUBLISHING THE IMAGES
@@ -375,13 +374,13 @@ endif
 
 # This target pushes a manifest list; it takes one parameter, the image name.
 # The variable UPDATE_LATEST controls whether it updates the versioned tag and/or the latest tag
-$(PUSH_ML): push_ml_%: $(MANIFEST_TOOL_EXE)
+$(PUSH_ML): push_ml_%:
 ifneq ($(UPDATE_LATEST),latest-only)
-	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(MANIFEST_TOOL_CMD) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 endif
 ifneq ($(UPDATE_LATEST),false)
 # Push the manifest list to :latest as well
-	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
+	$(MANIFEST_TOOL_CMD) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
 endif
 
 clean-work-dir:
@@ -395,7 +394,7 @@ clean-bin:
 
 clean: clean-bin clean-work-dir
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
-	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE) $(MANIFEST_TOOL_EXE)
+	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
 
 build:
 	$(SUDO) go clean -i net
