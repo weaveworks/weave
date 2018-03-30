@@ -12,9 +12,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/crypto/hkdf"
 

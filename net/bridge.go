@@ -6,9 +6,9 @@ import (
 	"net"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 
 	"github.com/weaveworks/weave/common/odp"
