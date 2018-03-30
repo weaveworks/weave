@@ -1,0 +1,3 @@
+[submodule "tools"]
+	path = tools
+	url = http://github.com/weaveworks/build-tools
