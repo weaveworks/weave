@@ -22,6 +22,8 @@ machine:
     # Google Cloud Platorm images for integration tests:
     USE_IMAGE: 1
     DISK_NAME_PREFIX: test-$CIRCLE_BUILD_NUM-0
+  post:
+    - rm $SRCDIR/.ruby-version
 
 dependencies:
   cache_directories:
