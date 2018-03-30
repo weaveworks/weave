@@ -132,7 +132,7 @@ func TestBadHttp(t *testing.T) {
 	// Verb that's not handled
 	resp, err := doHTTP("HEAD", fmt.Sprintf("http://localhost:%d/ip/%s/%s", port, containerID, testAddr1))
 	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, resp.StatusCode, "http response")
+	require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode, "http response")
 	// Mis-spelled URL
 	resp, err = doHTTP("POST", fmt.Sprintf("http://localhost:%d/xip/%s/", port, containerID))
 	require.NoError(t, err)
