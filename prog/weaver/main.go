@@ -220,6 +220,8 @@ func main() {
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 
+	mflag.BoolVar(&bridgeConfig.K8s, []string{"-k8s"}, false, "run on Kubernetes")
+
 	proxyConfig := newProxyConfig()
 
 	// crude way of detecting that we probably have been started in a
@@ -482,22 +484,27 @@ func main() {
 		go plugin.Start(httpAddr, dockerCli, waitReady.Add())
 	}
 
-	if bridgeConfig.AWSVPC {
-		// Run this on its own goroutine because the allocator can block
-		// We remove the default route installed by the kernel,
-		// because awsvpc has installed it as well
-		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
+	// TODO brb: race with waitReady?
+
+	if bridgeConfig.AWSVPC || bridgeConfig.K8s {
+		// Run this on its own goroutine because the allocator can block.
+		go expose(allocator, defaultSubnet, &bridgeConfig, waitReady.Add())
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)
 }
 
-func exposeForAWSVPC(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, ready func()) {
+func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeConfig *weavenetBridgeConfig, ready func()) {
+	//bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC, bridgeConfig.K8s
 	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
 	checkFatal(err)
 	cidr := address.MakeCIDR(subnet, addr)
-	err = weavenet.Expose(bridgeName, cidr.IPNet(), true, false)
+
+	// In the case of AWSVPC, we remove the default route installed by the kernel,
+	// because awsvpc has installed it as well.
+	err = weavenet.Expose(bridgeName, cidr.IPNet(), bridgeConfig.AWSVPC, bridgeConfig.K8s, bridgeConfig.NPC)
 	checkFatal(err)
+
 	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
 	ready()
 }

@@ -213,6 +213,7 @@ type BridgeConfig struct {
 	MTU              int
 	Mac              string
 	Port             int
+	K8s              bool
 }
 
 func (config *BridgeConfig) configuredBridgeType() Bridge {

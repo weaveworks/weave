@@ -136,7 +136,7 @@ post_start_actions() {
     /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
 
     # Expose the weave network so host processes can communicate with pods
-    /home/weave/weave --local expose $WEAVE_EXPOSE_IP
+    # /home/weave/weave --local expose $WEAVE_EXPOSE_IP
 }
 
 post_start_actions &
@@ -149,6 +149,7 @@ post_start_actions &
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \
+     --k8s \
      $WEAVE_NPC_OPTS \
      "$@" \
      $KUBE_PEERS

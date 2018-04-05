@@ -100,7 +100,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 			}
 			bridgeCIDR := bridgeIPResult.IPs[0].Address
 
-			if err := c.weave.Expose(&bridgeCIDR); err != nil {
+			if err := c.weave.Expose(&bridgeCIDR, true); err != nil {
 				return fmt.Errorf("unable to expose bridge %q: %s", conf.BrName, err)
 			}
 

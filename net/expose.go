@@ -17,8 +17,9 @@ import (
 // * "bridgeName" - a name of the weave bridge.
 // * "ipAddr" - IP addr to be assigned to the bridge.
 // * "removeDefaultRoute" - whether to remove a default route installed by the kernel (used only in the AWSVPC mode).
+// * "k8s" - whether weaver is running on (for) Kubernetes.
 // * "npc" - whether is Weave NPC running.
-func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool) error {
+func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, k8s, npc bool) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "iptables.New")
@@ -29,7 +30,7 @@ func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool) 
 		return errors.Wrap(err, "addBridgeIPAddr")
 	}
 
-	if err := exposeNAT(ipt, cidr); err != nil {
+	if err := exposeNAT(ipt, cidr, k8s); err != nil {
 		return errors.Wrap(err, "exposeNAT")
 	}
 
@@ -86,12 +87,15 @@ func addBridgeIPAddr(bridgeName string, addr *net.IPNet, removeDefaultRoute bool
 	return nil
 }
 
-func exposeNAT(ipt *iptables.IPTables, cidr string) error {
+func exposeNAT(ipt *iptables.IPTables, cidr string, k8s bool) error {
 	if err := addNatRule(ipt, "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
 		return err
 	}
-	if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
-		return err
+	// TODO (brb) A proper comment why
+	if !k8s {
+		if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
+			return err
+		}
 	}
 	return addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE")
 }
