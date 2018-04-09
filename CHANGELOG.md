@@ -1,3 +1,22 @@
+## Release 2.3.0
+
+### Security fixes
+
+* By default, do not expose Weave "/status" and "/report" to all (0.0.0.0) when
+  running on Kubernetes #3271
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100) when
+running on Kubernetes, so that more peers could directly connect #3265
+
+## Build and test
+
+* Build Weave Net with Go 1.10.1 #3273
+* Run integration tests against Kubernetes 1.10.0 #3266
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/70?closed=1)
+
 ## Release 2.2.1
 
 ### Bug fixes
