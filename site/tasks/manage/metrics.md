@@ -34,7 +34,7 @@ exposed:
 
 When installed as a Kubernetes Addon, the router listens for metrics
 requests on 0.0.0.0:6782 and the Network Policy Controller listens on
-0.0.0.0:6781.  No other requests are served on these endpoints.
+0.0.0.0:6781. No other requests are served on these endpoints.
 
 >Note: If your Kubernetes hosts are exposed to the public internet
 then these metrics endpoints will also be exposed.
@@ -48,9 +48,8 @@ publish your metrics throughout your cluster, you can set
 
 Set it to an empty string to disable.
 
-You can also add `--metrics-addr=X.X.X.X:PORT` to specify an address
-to listen for metrics only.
-
+You can also pass the parameter `--metrics-addr=X.X.X.X:PORT` to
+`weave launch` to specify an address to listen for metrics only.
 
 # Static Configuration for Weave Net
 
