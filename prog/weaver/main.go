@@ -155,6 +155,7 @@ func main() {
 		noDiscovery        bool
 		httpAddr           string
 		statusAddr         string
+		metricsAddr        string
 		ipamConfig         ipamConfig
 		dockerAPI          string
 		peers              []string
@@ -192,6 +193,7 @@ func main() {
 	mflag.IntVar(&bridgeConfig.MTU, []string{"-mtu"}, 0, "MTU size")
 	mflag.StringVar(&httpAddr, []string{"-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&statusAddr, []string{"-status-addr"}, "", "address to bind status+metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&metricsAddr, []string{"-metrics-addr"}, "", "address to bind metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
 	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
@@ -474,8 +476,15 @@ func main() {
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)
-		Log.Println("Listening for metrics requests on", statusAddr)
+		Log.Println("Listening for status+metrics requests on", statusAddr)
 		go listenAndServeHTTP(statusAddr, statusMux)
+	}
+
+	if metricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", metricsHandler(router, allocator, ns, dnsserver))
+		Log.Println("Listening for metrics requests on", metricsAddr)
+		go listenAndServeHTTP(metricsAddr, metricsMux)
 	}
 
 	if plugin != nil {

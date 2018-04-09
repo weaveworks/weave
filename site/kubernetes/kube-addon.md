@@ -346,6 +346,10 @@ The list of variables you can set is:
 * `WEAVE_EXPOSE_IP` - set the IP address used as a gateway from the
   Weave network to the host network - this is useful if you are
   configuring the addon as a static pod.
+* `WEAVE_METRICS_ADDR` - address and port that the Weave Net
+  daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
+* `WEAVE_STATUS_ADDR` - address and port that the Weave Net
+  daemon will serve status requests on (defaults to disabled)
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo

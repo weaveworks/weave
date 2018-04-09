@@ -10,9 +10,6 @@ controller](/site/kubernetes/kube-addon.md#npc).
 
 ### Router Metrics
 
-The endpoint address is `localhost:6782`; the following metrics are
-exposed:
-
 * `weave_connections` - Number of peer-to-peer connections.
 * `weave_connection_terminations_total` - Number of peer-to-peer
   connections terminated.
@@ -25,26 +22,34 @@ exposed:
 * `weave_ipam_pending_allocates` - Number of pending allocates.
 * `weave_ipam_pending_claims` - Number of pending claims.
 
-#### Publish Router Metrics Endpoint
-
-By default, when started via `weave launch`, weave listens on its local
-interface to serve metrics. To publish your metrics throughout your cluster,
-e.g. if your prometheus server is installed on a different host machine,
-you need to set `WEAVE_STATUS_ADDR` to your corresponding IP and port.
-Default port is 6782.
-
-`WEAVE_STATUS_ADDR=X.X.X.X:PORT`
-
-You can set `WEAVE_STATUS_ADDR=0.0.0.0:6782` to listen on all interfaces,
-but be aware, this may expose your metrics to the public internet.
-
 ### Kubernetes Network Policy Controller Metrics
 
-The endpoint address is `localhost:6781`; the following metric is
+The following metric is
 exposed:
 
 * `weavenpc_blocked_connections_total` - Connection attempts blocked
   by policy controller.
+
+### Metrics Endpoint Addresses
+
+When installed as a Kubernetes Addon, the router listens for metrics
+requests on 0.0.0.0:6782 and the Network Policy Controller listens on
+0.0.0.0:6781. No other requests are served on these endpoints.
+
+>Note: If your Kubernetes hosts are exposed to the public internet
+then these metrics endpoints will also be exposed.
+
+When started via `weave launch`, by default weave listens on its local
+interface to serve metrics and other read-only status requests. To
+publish your metrics throughout your cluster, you can set
+`WEAVE_STATUS_ADDR`:
+
+`WEAVE_STATUS_ADDR=X.X.X.X:PORT`
+
+Set it to an empty string to disable.
+
+You can also pass the parameter `--metrics-addr=X.X.X.X:PORT` to
+`weave launch` to specify an address to listen for metrics only.
 
 # Static Configuration for Weave Net
 
