@@ -36,9 +36,8 @@ func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 			http.Error(w, fmt.Sprint("unable to parse ip addr: ", err.Error()), http.StatusBadRequest)
 			return
 		}
-		k8s := r.FormValue("k8s") == "true"
 
-		if err = net.Expose(router.BridgeConfig.WeaveBridgeName, cidr.IPNet(), router.BridgeConfig.AWSVPC, router.BridgeConfig.NPC, false, k8s); err != nil {
+		if err = net.Expose(router.BridgeConfig.WeaveBridgeName, cidr.IPNet(), router.BridgeConfig.AWSVPC, router.BridgeConfig.K8s, router.BridgeConfig.NPC); err != nil {
 			http.Error(w, fmt.Sprint("unable to expose: ", err.Error()), http.StatusInternalServerError)
 			return
 		}

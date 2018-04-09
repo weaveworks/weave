@@ -88,6 +88,7 @@ func addBridgeIPAddr(bridgeName string, addr *net.IPNet, removeDefaultRoute bool
 }
 
 func exposeNAT(ipt *iptables.IPTables, cidr string, k8s bool) error {
+	// TODO(mp) proper cleanup of NAT rules in the beginning
 	if err := addNatRule(ipt, "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
 		return err
 	}

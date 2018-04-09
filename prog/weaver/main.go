@@ -443,6 +443,11 @@ func main() {
 	}
 	checkFatal(router.CreateRestartSentinel())
 
+	if bridgeConfig.AWSVPC || bridgeConfig.K8s {
+		// Run this on its own goroutine because the allocator can block.
+		go expose(allocator, defaultSubnet, bridgeConfig, waitReady.Add())
+	}
+
 	pluginConfig.DNS = !noDNS
 	pluginConfig.DefaultSubnet = defaultSubnet.String()
 	plugin := plugin.NewPlugin(pluginConfig)
@@ -480,21 +485,15 @@ func main() {
 		go listenAndServeHTTP(statusAddr, statusMux)
 	}
 
+	// TODO(mp) A possible race window: waitReady is incremented after it gets checked in "/status".
 	if plugin != nil {
 		go plugin.Start(httpAddr, dockerCli, waitReady.Add())
-	}
-
-	// TODO brb: race with waitReady?
-
-	if bridgeConfig.AWSVPC || bridgeConfig.K8s {
-		// Run this on its own goroutine because the allocator can block.
-		go expose(allocator, defaultSubnet, &bridgeConfig, waitReady.Add())
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)
 }
 
-func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeConfig *weavenetBridgeConfig, ready func()) {
+func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeConfig weavenet.BridgeConfig, ready func()) {
 	//bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC, bridgeConfig.K8s
 	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
 	checkFatal(err)
@@ -502,10 +501,10 @@ func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeConfig *weavenetBr
 
 	// In the case of AWSVPC, we remove the default route installed by the kernel,
 	// because awsvpc has installed it as well.
-	err = weavenet.Expose(bridgeName, cidr.IPNet(), bridgeConfig.AWSVPC, bridgeConfig.K8s, bridgeConfig.NPC)
+	err = weavenet.Expose(bridgeConfig.WeaveBridgeName, cidr.IPNet(), bridgeConfig.AWSVPC, bridgeConfig.K8s, bridgeConfig.NPC)
 	checkFatal(err)
 
-	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
+	Log.Printf("Bridge %q exposed on address %v", bridgeConfig.WeaveBridgeName, cidr)
 	ready()
 }
 
