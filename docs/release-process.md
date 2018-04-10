@@ -127,6 +127,22 @@ Finally, for **Mainline** releases only:
 
 * Images tagged `latest` are updated on DockerHub
 
+Now, you can validate whether images were published for all platforms:
+
+    # Required platforms for each image:
+    grep '^ML_PLATFORMS=' Makefile
+
+    # Published platforms per image:
+    for img in $(grep '^PUBLISH=' Makefile); do
+        img="weaveworks/$(echo $img | cut -d_ -f2):${TAG#v}"
+        platforms=$(vendor/github.com/estesp/manifest-tool/manifest-tool \
+                inspect --raw "$img" | \
+                jq '.[].Platform | .os + "/" +.architecture' | \
+                tr '\n' ' ')
+        echo "$img: $platforms"
+    done
+
+
 ### Docker Store
 
 Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-net-plugin) and should also be released there.
