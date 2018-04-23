@@ -24,6 +24,25 @@ taking the time to read this guide.
 * Keep pull requests small so core developers can review them quickly.
 * Keep each pull request focused on a specific topic.  If you have two things to change, create two pull requests. This helps reviewers to understand the meat of your contribution.
 
+## Managing Vendored Dependencies
+
+We copy all Go dependencies into the `vendor` subdirectory and use
+[`dep`](https://github.com/golang/dep) to manage them.
+
+If you add a dependency in the code, run `dep ensure` to include it in
+the config and vendor dir. Same if you remove a dependency from the code.
+
+To update a single dependency run `dep ensure -update github.com/foo/bar`
+
+To override `dep`'s choice of library version, you can add
+[rules](https://golang.github.io/dep/docs/daily-dep.html#rule-changes-in-gopkgtoml).
+Please add a comment saying why the override is necessary and when it can be
+removed.
+
+These operations result in staged but uncommitted changes to your
+branch; you will need to commit them as normal. Execute them in the
+root of your checkout.
+
 ## Workflow
 See [WorkingOnWeave](https://github.com/weaveworks/weave/wiki/WorkingOnWeave)
 
