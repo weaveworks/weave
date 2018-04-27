@@ -329,7 +329,7 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			w.Write(json)
 		})
 
-	muxRouter.Methods("GET").Path("/report").Queries("format", "{format}").HandlerFunc(
+	muxRouter.Methods("GET").Path("/report").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			funcs := template.FuncMap{
 				"json": func(v interface{}) string {
@@ -337,7 +337,12 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 					return string(a)
 				},
 			}
-			formatTemplate, err := template.New("format").Funcs(funcs).Parse(mux.Vars(r)["format"])
+			format, ok := r.URL.Query()["format"]
+			if !ok || len(format) != 1 {
+				http.Error(w, "error: must supply one format parameter", http.StatusBadRequest)
+				return
+			}
+			formatTemplate, err := template.New("format").Funcs(funcs).Parse(format[0])
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return

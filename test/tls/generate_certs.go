@@ -41,15 +41,15 @@ func main() {
 			log.Fatalf("The client key already exists.  Please remove it or specify a different key/cert.")
 		}
 
-		err = cert.GenerateCert(
-			[]string{""},
-			clientCertPath,
-			clientKeyPath,
-			caCertPath,
-			caKeyPath,
-			org,
-			bits,
-		)
+		err = cert.GenerateCert(&cert.Options{
+			Hosts:     []string{""},
+			CertFile:  clientCertPath,
+			KeyFile:   clientKeyPath,
+			CAFile:    caCertPath,
+			CAKeyFile: caKeyPath,
+			Org:       org,
+			Bits:      bits,
+		})
 		if err != nil {
 			log.Fatalf("Error generating client certificate: %s", err)
 		}
@@ -64,15 +64,15 @@ func main() {
 
 		if _, err := os.Stat(serverCertPath); os.IsNotExist(err) {
 			log.Printf("Creating server certificate: %s", serverCertPath)
-			err = cert.GenerateCert(
-				[]string{ip},
-				serverCertPath,
-				serverKeyPath,
-				caCertPath,
-				caKeyPath,
-				org,
-				bits,
-			)
+			err = cert.GenerateCert(&cert.Options{
+				Hosts:     []string{ip},
+				CertFile:  serverCertPath,
+				KeyFile:   serverKeyPath,
+				CAFile:    caCertPath,
+				CAKeyFile: caKeyPath,
+				Org:       org,
+				Bits:      bits,
+			})
 			if err != nil {
 				log.Fatalf("error generating server cert: %s", err)
 			}

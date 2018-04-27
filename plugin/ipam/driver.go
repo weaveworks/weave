@@ -110,6 +110,10 @@ func (i *Ipam) ReleaseAddress(poolID string, address net.IP) error {
 	return i.weave.ReleaseIPsFor(address.String())
 }
 
+func (i *Ipam) IsBuiltIn() bool {
+	return false
+}
+
 // Functions required by ipamapi "contract" but not actually used.
 
 func (i *Ipam) DiscoverNew(discoverapi.DiscoveryType, interface{}) error {

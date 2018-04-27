@@ -1,0 +1,13 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  override:
+    - git submodule update --init --recursive
+
+test:
+  override:
+    - make RM= lint
+    - make 
+    - make test
