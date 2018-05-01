@@ -90,10 +90,10 @@ func exposeNAT(ipt *iptables.IPTables, cidr string) error {
 	if err := addNatRule(ipt, "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
 		return err
 	}
-	if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
+	if err := addNatRule(ipt, "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE", "--random-fully"); err != nil {
 		return err
 	}
-	return addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE")
+	return addNatRule(ipt, "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE", "--random-fully")
 }
 
 func addNatRule(ipt *iptables.IPTables, rulespec ...string) error {

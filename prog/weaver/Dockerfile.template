@@ -12,17 +12,18 @@ LABEL works.weave.role=system \
       org.label-schema.vcs-url="https://github.com/weaveworks/weave" \
       org.label-schema.vendor="Weaveworks"
 
+RUN apk add iptables --update-cache \
+    --repository http://dl-3.alpinelinux.org/alpine/edge/main/
 RUN apk add --update \
     curl \
     ethtool \
-    iptables \
     ipset \
     iproute2 \
     util-linux \
     conntrack-tools \
     bind-tools \
-    ca-certificates \
-  && rm -rf /var/cache/apk/*
+    ca-certificates
+RUN rm -rf /var/cache/apk/*
 
 ADD ./weave ./weaver /home/weave/
 ADD ./weaveutil /usr/bin/
