@@ -8,7 +8,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 )
 
 // analysePolicyLegacy is used to analyse extensions/v1beta1/NetworkPolicy (legacy) and

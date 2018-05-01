@@ -19,7 +19,7 @@ import (
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc"
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
 	"github.com/weaveworks/weave/npc/ulogd"
 )

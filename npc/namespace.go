@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
