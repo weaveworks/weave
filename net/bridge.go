@@ -279,6 +279,12 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Br
 		return bridgeType, errors.Wrapf(err, "configuring ARP cache on bridge %q", config.WeaveBridgeName)
 	}
 
+	// NB: No concurrent call to Expose is possible, as EnsureBridge is called
+	// before any service has been started.
+	if err := reexpose(config, log); err != nil {
+		return bridgeType, err
+	}
+
 	return bridgeType, nil
 }
 
@@ -463,7 +469,10 @@ func configureIPTables(config *BridgeConfig) error {
 
 	if !config.NPC {
 		// Create a chain for allowing ingress traffic when the bridge is exposed
-		_ = ipt.NewChain("filter", "WEAVE-EXPOSE")
+		if err := ipt.ClearChain("filter", "WEAVE-EXPOSE"); err != nil {
+			return errors.Wrap(err, "failed to clear/create filter/WEAVE-EXPOSE chain")
+		}
+
 		fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"})
 	}
 
@@ -476,11 +485,10 @@ func configureIPTables(config *BridgeConfig) error {
 		return err
 	}
 
-	// create a chain for masquerading
-	//
-	// NB: we do not clear the chain to preserve existing rules
-	// inserted by "weave expose".
-	_ = ipt.NewChain("nat", "WEAVE")
+	// Create a chain for masquerading
+	if err := ipt.ClearChain("nat", "WEAVE"); err != nil {
+		return errors.Wrap(err, "failed to clear/create nat/WEAVE chain")
+	}
 
 	return ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE")
 }
@@ -524,6 +532,30 @@ func ensureRulesAtTop(table, chain string, rulespecs [][]string, ipt *iptables.I
 		}
 		if err := ipt.Insert(table, chain, pos+1, rs...); err != nil {
 			return errors.Wrapf(err, "ipt.Append(%s, %s, %s)", table, chain, rs)
+		}
+	}
+
+	return nil
+}
+
+func reexpose(config *BridgeConfig, log *logrus.Logger) error {
+	// Get existing IP addrs of the weave bridge.
+	// Ideally, we should consult IPAM for IP addrs allocated to "weave:expose",
+	// but we don't want to introduce dependency on IPAM, as weave should be able
+	// to run w/o IPAM.
+	link, err := netlink.LinkByName(config.WeaveBridgeName)
+	if err != nil {
+		return errors.Wrapf(err, "cannot find bridge %q", config.WeaveBridgeName)
+	}
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return errors.Wrapf(err, "cannot list IPv4 addrs of bridge %q", config.WeaveBridgeName)
+	}
+
+	for _, addr := range addrs {
+		log.Infof("Re-exposing %s on bridge %q", addr.IPNet, config.WeaveBridgeName)
+		if err := Expose(config.WeaveBridgeName, addr.IPNet, config.AWSVPC, config.NPC); err != nil {
+			return errors.Wrapf(err, "unable to re-expose %s on bridge: %q", addr.IPNet, config.WeaveBridgeName)
 		}
 	}
 
