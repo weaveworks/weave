@@ -20,7 +20,7 @@ var (
 			Name: "weavenpc_blocked_connections_total",
 			Help: "Connection attempts blocked by policy controller.",
 		},
-		[]string{"protocol", "dport"},
+		[]string{"protocol", "src", "dst", "dport"},
 	)
 )
 
@@ -46,7 +46,7 @@ func gatherMetrics() {
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
 			if tcp.SYN && !tcp.ACK { // Only plain SYN constitutes a NEW TCP connection
-				blockedConnections.With(prometheus.Labels{"protocol": "tcp", "dport": strconv.Itoa(int(tcp.DstPort))}).Inc()
+				blockedConnections.With(prometheus.Labels{"protocol": "tcp", "src": srcIP(packet), "dst": dstIP(packet), "dport": strconv.Itoa(int(tcp.DstPort))}).Inc()
 				common.Log.Warnf("TCP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), tcp.SrcPort, dstIP(packet), tcp.DstPort)
 				continue
 			}
@@ -54,7 +54,7 @@ func gatherMetrics() {
 
 		if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			udp, _ := udpLayer.(*layers.UDP)
-			blockedConnections.With(prometheus.Labels{"protocol": "udp", "dport": strconv.Itoa(int(udp.DstPort))}).Inc()
+			blockedConnections.With(prometheus.Labels{"protocol": "udp", "src": srcIP(packet), "dst": dstIP(packet), "dport": strconv.Itoa(int(udp.DstPort))}).Inc()
 			common.Log.Warnf("UDP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), udp.SrcPort, dstIP(packet), udp.DstPort)
 			continue
 		}
