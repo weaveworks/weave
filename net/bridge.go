@@ -10,9 +10,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/odp"
+	"github.com/weaveworks/weave/ipam/tracker"
+	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
 )
 
@@ -499,7 +502,8 @@ func configureIPTables(config *BridgeConfig) error {
 
 	// k8s-only: Create the ipset to store CIDRs allocated by IPAM for local pods.
 	// External traffic sent to these CIDRs avoids SNAT'ing so that NodePort
-	// with `"externalTrafficPolicy":"Local"` would have the correct src IP addr.
+	// with `"externalTrafficPolicy":"Local"` would receive packets with correct
+	// src IP addr.
 	if config.NoMasqLocal {
 		ips := ipset.New(common.LogLogger())
 		_ = ips.Destroy(NoMasqLocalIpset)
@@ -507,6 +511,42 @@ func configureIPTables(config *BridgeConfig) error {
 			return err
 		}
 		if err := ipt.Insert("nat", "WEAVE", 1, "-m", "set", "--match-set", string(NoMasqLocalIpset), "dst", "-j", "RETURN"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type NoMasqLocalTracker struct {
+	ips   ipset.Interface
+	owner types.UID
+}
+
+func NewNoMasqLocalTracker() *NoMasqLocalTracker {
+	return &NoMasqLocalTracker{
+		// TODO(mp) Reuse ipset object as each time calling New creates a test set.
+		ips:   ipset.New(common.LogLogger()),
+		owner: types.UID(0), // dummy ipset owner
+	}
+}
+
+func (t *NoMasqLocalTracker) String() string {
+	return "no-masq-local"
+}
+
+func (t *NoMasqLocalTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
+	prev, curr := tracker.RemoveCommon(
+		address.NewCIDRs(tracker.Merge(prevRanges)),
+		address.NewCIDRs(tracker.Merge(currRanges)))
+
+	for _, cidr := range curr {
+		if err := t.ips.AddEntry(t.owner, NoMasqLocalIpset, cidr.String(), ""); err != nil {
+			return err
+		}
+	}
+	for _, cidr := range prev {
+		if err := t.ips.DelEntry(t.owner, NoMasqLocalIpset, cidr.String()); err != nil {
 			return err
 		}
 	}

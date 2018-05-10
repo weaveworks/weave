@@ -337,6 +337,9 @@ func main() {
 	if bridgeConfig.AWSVPC && !ipamConfig.Enabled() {
 		Log.Fatalf("--awsvpc mode requires IPAM enabled")
 	}
+	if bridgeConfig.AWSVPC && bridgeConfig.NoMasqLocal {
+		Log.Fatalf("--awsvpc mode is not compatible with the --no-masq-local option")
+	}
 
 	db, err := db.NewBoltDB(dbPrefix)
 	checkFatal(err)
@@ -400,11 +403,15 @@ func main() {
 	if ipamConfig.Enabled() {
 		var t tracker.LocalRangeTracker
 		if bridgeConfig.AWSVPC {
-			Log.Infoln("Creating AWSVPC LocalRangeTracker")
 			t, err = tracker.NewAWSVPCTracker(bridgeConfig.WeaveBridgeName)
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
+		} else if bridgeConfig.NoMasqLocal {
+			t = weavenet.NewNoMasqLocalTracker()
+		}
+		if t != nil {
+			Log.Infof("Using %q LocalRangeTracker", t)
 		}
 
 		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
