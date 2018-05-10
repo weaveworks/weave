@@ -505,6 +505,8 @@ destroy_bridge() {
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+
+    ipset destroy weave-no-masq-local >/dev/null 2>&1 || true
 }
 
 add_iface_fastdp() {
