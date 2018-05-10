@@ -11,7 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/odp"
+	"github.com/weaveworks/weave/net/ipset"
 )
 
 /* This code implements three possible configurations to connect
@@ -47,11 +49,12 @@ datapath of old kernel versions (https://github.com/weaveworks/weave/issues/1577
 */
 
 const (
-	WeaveBridgeName = "weave"
-	DatapathName    = "datapath"
-	DatapathIfName  = "vethwe-datapath"
-	BridgeIfName    = "vethwe-bridge"
-	PcapIfName      = "vethwe-pcap"
+	WeaveBridgeName  = "weave"
+	DatapathName     = "datapath"
+	DatapathIfName   = "vethwe-datapath"
+	BridgeIfName     = "vethwe-bridge"
+	PcapIfName       = "vethwe-pcap"
+	NoMasqLocalIpset = ipset.Name("weave-no-masq-local")
 )
 
 type Bridge interface {
@@ -213,6 +216,7 @@ type BridgeConfig struct {
 	MTU              int
 	Mac              string
 	Port             int
+	NoMasqLocal      bool
 }
 
 func (config *BridgeConfig) configuredBridgeType() Bridge {
@@ -489,8 +493,25 @@ func configureIPTables(config *BridgeConfig) error {
 	if err := ipt.ClearChain("nat", "WEAVE"); err != nil {
 		return errors.Wrap(err, "failed to clear/create nat/WEAVE chain")
 	}
+	if err := ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
+		return err
+	}
 
-	return ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE")
+	// k8s-only: Create the ipset to store CIDRs allocated by IPAM for local pods.
+	// External traffic sent to these CIDRs avoids SNAT'ing so that NodePort
+	// with `"externalTrafficPolicy":"Local"` would have the correct src IP addr.
+	if config.NoMasqLocal {
+		ips := ipset.New(common.LogLogger())
+		_ = ips.Destroy(NoMasqLocalIpset)
+		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
+			return err
+		}
+		if err := ipt.Insert("nat", "WEAVE", 1, "-m", "set", "--match-set", string(NoMasqLocalIpset), "dst", "-j", "RETURN"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func linkSetUpByName(linkName string) error {

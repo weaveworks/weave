@@ -221,6 +221,7 @@ func main() {
 	mflag.BoolVar(&pluginConfig.EnableV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
+	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to pods running on this node (Kubernetes only)")
 
 	proxyConfig := newProxyConfig()
 
