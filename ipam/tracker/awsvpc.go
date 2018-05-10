@@ -84,7 +84,7 @@ func NewAWSVPCTracker(bridgeName string) (*AWSVPCTracker, error) {
 func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
 	t.debugf("replacing %q by %q; local(%t)", prevRanges, currRanges, local)
 
-	prev, curr := removeCommon(address.NewCIDRs(merge(prevRanges)), address.NewCIDRs(merge(currRanges)))
+	prev, curr := RemoveCommon(address.NewCIDRs(Merge(prevRanges)), address.NewCIDRs(Merge(currRanges)))
 
 	// It might make sense to do the removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might
@@ -235,47 +235,6 @@ func (t *AWSVPCTracker) infof(fmt string, args ...interface{}) {
 }
 
 // Helpers
-
-// merge merges adjacent range entries.
-// The given slice has to be sorted in increasing order.
-func merge(r []address.Range) []address.Range {
-	var merged []address.Range
-
-	for i := range r {
-		if prev := len(merged) - 1; prev >= 0 && merged[prev].End == r[i].Start {
-			merged[prev].End = r[i].End
-		} else {
-			merged = append(merged, r[i])
-		}
-	}
-
-	return merged
-}
-
-// removeCommon filters out CIDR ranges which are contained in both a and b slices.
-// Both slices have to be sorted in increasing order.
-func removeCommon(a, b []address.CIDR) (newA, newB []address.CIDR) {
-	i, j := 0, 0
-
-	for i < len(a) && j < len(b) {
-		switch {
-		case a[i].Start() < b[j].Start() || a[i].End() < b[j].End():
-			newA = append(newA, a[i])
-			i++
-		case a[i].Start() > b[j].Start() || a[i].End() > b[j].End():
-			newB = append(newB, b[j])
-			j++
-		default:
-			i++
-			j++
-		}
-
-	}
-	newA = append(newA, a[i:]...)
-	newB = append(newB, b[j:]...)
-
-	return
-}
 
 func parseCIDR(cidr string) (*net.IPNet, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)

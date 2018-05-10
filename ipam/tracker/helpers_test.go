@@ -19,7 +19,7 @@ var (
 func TestRemoveCommon(t *testing.T) {
 	a := []address.CIDR{r0to127, r1dot0to255}
 	b := []address.CIDR{r1dot0to255, r2dot0to255}
-	newA, newB := removeCommon(a, b)
+	newA, newB := RemoveCommon(a, b)
 	require.Equal(t, []address.CIDR{r0to127}, newA)
 	require.Equal(t, []address.CIDR{r2dot0to255}, newB)
 }
@@ -30,7 +30,7 @@ func TestMerge(t *testing.T) {
 		r128to255.Range(),
 		r2dot0to255.Range(),
 	}
-	require.Equal(t, []address.Range{r0to255.Range(), r2dot0to255.Range()}, merge(ranges))
+	require.Equal(t, []address.Range{r0to255.Range(), r2dot0to255.Range()}, Merge(ranges))
 }
 
 // Helper
