@@ -66,6 +66,11 @@ if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
 fi
 
+NO_MASQ_LOCAL_OPT=""
+if [ -n "${NO_MASQ_LOCAL}" ]; then
+    NO_MASQ_LOCAL_OPT="--no-masq-local"
+fi
+
 # Kubernetes sets HOSTNAME to the host's hostname
 # when running a pod in host namespace.
 NICKNAME_ARG=""
@@ -156,5 +161,6 @@ post_start_actions &
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \
      $WEAVE_NPC_OPTS \
+     $NO_MASQ_LOCAL_OPT \
      "$@" \
      $KUBE_PEERS
