@@ -45,13 +45,13 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 			// From is not provided, this rule matches all sources (traffic not restricted by source).
 			if ingressRule.Ports == nil {
 				// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-				rule := newRuleSpec(nil, nil, dstSelector, nil)
+				rule := newRuleSpec(ingress, nil, nil, dstSelector, nil)
 				rules[rule.key] = rule
 			} else {
 				// Ports is present and contains at least one item, then this rule allows traffic
 				// only if the traffic matches at least one port in the ports list.
 				withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-					rule := newRuleSpec(&proto, nil, dstSelector, &port)
+					rule := newRuleSpec(ingress, &proto, nil, dstSelector, &port)
 					rules[rule.key] = rule
 				})
 			}
@@ -77,13 +77,13 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 
 				if ingressRule.Ports == nil {
 					// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-					rule := newRuleSpec(nil, srcSelector, dstSelector, nil)
+					rule := newRuleSpec(ingress, nil, srcSelector, dstSelector, nil)
 					rules[rule.key] = rule
 				} else {
 					// Ports is present and contains at least one item, then this rule allows traffic
 					// only if the traffic matches at least one port in the ports list.
 					withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(&proto, srcSelector, dstSelector, &port)
+						rule := newRuleSpec(ingress, &proto, srcSelector, dstSelector, &port)
 						rules[rule.key] = rule
 					})
 				}
@@ -128,11 +128,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 		if allSources {
 			if allPorts {
-				rule := newRuleSpec(nil, nil, dstSelector, nil)
+				rule := newRuleSpec(ingress, nil, nil, dstSelector, nil)
 				rules[rule.key] = rule
 			} else {
 				withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-					rule := newRuleSpec(&proto, nil, dstSelector, &port)
+					rule := newRuleSpec(ingress, &proto, nil, dstSelector, &port)
 					rules[rule.key] = rule
 				})
 			}
@@ -158,11 +158,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 				}
 
 				if allPorts {
-					rule := newRuleSpec(nil, srcSelector, dstSelector, nil)
+					rule := newRuleSpec(ingress, nil, srcSelector, dstSelector, nil)
 					rules[rule.key] = rule
 				} else {
 					withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(&proto, srcSelector, dstSelector, &port)
+						rule := newRuleSpec(ingress, &proto, srcSelector, dstSelector, &port)
 						rules[rule.key] = rule
 					})
 				}

@@ -10,12 +10,20 @@ import (
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
+type ruleType byte
+
+const (
+	ingress ruleType = iota
+	egress
+)
+
 type ruleSpec struct {
-	key  string
-	args []string
+	key      string
+	args     []string
+	ruleType ruleType
 }
 
-func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, dstPort *string) *ruleSpec {
+func newRuleSpec(ruleType ruleType, proto *string, srcHost *selectorSpec, dstHost *selectorSpec, dstPort *string) *ruleSpec {
 	args := []string{}
 	if proto != nil {
 		args = append(args, "-p", *proto)
@@ -41,7 +49,7 @@ func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, ds
 	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
 	key := strings.Join(args, " ")
 
-	return &ruleSpec{key, args}
+	return &ruleSpec{key, args, ruleType}
 }
 
 type ruleSet struct {
@@ -58,8 +66,12 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
-				common.Log.Infof("deleting rule: %v", spec.args)
-				if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); err != nil {
+				chain := IngressChain
+				if spec.ruleType == egress {
+					chain = EgressCustomChain
+				}
+				common.Log.Infof("deleting rule %v from %q chain", spec.args, chain)
+				if err := rs.ipt.Delete(TableFilter, chain, spec.args...); err != nil {
 					return err
 				}
 				delete(rs.users, key)
@@ -74,8 +86,12 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
-				common.Log.Infof("adding rule: %v", spec.args)
-				if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); err != nil {
+				chain := IngressChain
+				if spec.ruleType == egress {
+					chain = EgressCustomChain
+				}
+				common.Log.Infof("adding rule %v to %q chain", spec.args, chain)
+				if err := rs.ipt.Append(TableFilter, chain, spec.args...); err != nil {
 					return err
 				}
 				rs.users[key] = make(map[types.UID]struct{})
