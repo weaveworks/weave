@@ -53,7 +53,23 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	return ipt.ClearChain(npc.TableFilter, npc.MainChain)
+	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressCustomChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressDefaultChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressChain); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func resetIPSets(ips ipset.Interface) error {
@@ -115,8 +131,51 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
 		return err
 	}
-	return ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT")
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"); err != nil {
+		return err
+	}
+	if allowMcast {
+		if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+			"-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
+			return err
+		}
+	}
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "state", "--state", "NEW",
+		"-j", string(npc.EgressDefaultChain)); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "state", "--state", "NEW",
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "src",
+		"-j", "RETURN"); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "state", "--state", "NEW",
+		"-m", "mark", "!", "--mark", npc.EgressMark,
+		"-j", string(npc.EgressCustomChain)); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "state", "--state", "NEW",
+		"-m", "mark", "!", "--mark", npc.EgressMark,
+		"-j", "NFLOG", "--nflog-group", "86"); err != nil {
+		return err
+	}
+	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
+		"-m", "mark", "!", "--mark", npc.EgressMark,
+		"-j", "DROP"); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func root(cmd *cobra.Command, args []string) {
