@@ -97,6 +97,7 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	rules map[string]*ruleSpec,
 	nsSelectors, podSelectors map[string]*selectorSpec,
+	ipb *ipBlock,
 	err error) {
 
 	nsSelectors = make(map[string]*selectorSpec)
@@ -106,7 +107,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	// If empty, matches all pods in a namespace
 	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, ns.name, ipset.HashIP)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	podSelectors[dstSelector.key] = dstSelector
 
@@ -133,31 +134,40 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			}
 		} else {
 			for _, peer := range ingressRule.From {
-				var srcSelector *selectorSpec
+				var srcHost ruleHostSpec
 
 				// NetworkPolicyPeer describes a peer to allow traffic from.
 				// Exactly one of its fields must be specified.
 				if peer.PodSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.PodSelector, false, ns.name, ipset.HashIP)
+					srcSelector, err := newSelectorSpec(peer.PodSelector, false, ns.name, ipset.HashIP)
 					if err != nil {
-						return nil, nil, nil, err
+						return nil, nil, nil, nil, err
 					}
 					podSelectors[srcSelector.key] = srcSelector
+					srcHost = srcSelector
 
 				} else if peer.NamespaceSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, "", ipset.ListSet)
+					srcSelector, err := newSelectorSpec(peer.NamespaceSelector, false, "", ipset.ListSet)
 					if err != nil {
-						return nil, nil, nil, err
+						return nil, nil, nil, nil, err
 					}
 					nsSelectors[srcSelector.key] = srcSelector
+					srcHost = srcSelector
+				} else if peer.IPBlock != nil {
+					ipb, err = newIPBlock(peer.IPBlock, ns.name)
+					if err != nil {
+						return nil, nil, nil, nil, err
+					}
+
+					srcHost = ipb
 				}
 
 				if allPorts {
-					rule := newRuleSpec(nil, srcSelector, dstSelector, nil)
+					rule := newRuleSpec(nil, srcHost, dstSelector, nil)
 					rules[rule.key] = rule
 				} else {
 					withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(&proto, srcSelector, dstSelector, &port)
+						rule := newRuleSpec(&proto, srcHost, dstSelector, &port)
 						rules[rule.key] = rule
 					})
 				}
@@ -165,7 +175,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 		}
 	}
 
-	return rules, nsSelectors, podSelectors, nil
+	return rules, nsSelectors, podSelectors, ipb, nil
 }
 
 func withNormalisedProtoAndPortLegacy(npps []extnapi.NetworkPolicyPort, f func(proto, port string)) {

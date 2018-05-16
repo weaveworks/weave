@@ -18,6 +18,7 @@ import (
 	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/mesh"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
@@ -406,6 +407,11 @@ func main() {
 			trackerName = "awsvpc"
 		}
 
+		if bridgeConfig.NPC {
+			err = setupNPCRules(ipamConfig.IPRangeCIDR)
+			checkFatal(err)
+		}
+
 		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
 		checkFatal(err)
 
@@ -757,4 +763,22 @@ func checkFatal(e error) {
 	if e != nil {
 		Log.Fatal(e)
 	}
+}
+
+func setupNPCRules(cidr string) (err error) {
+	ipt, err := iptables.New()
+	if err != nil {
+		return
+	}
+
+	const LocalIngressChain = "WEAVE-NPC-LOCAL-INGRESS"
+
+	// ignore errors since this chain may exists
+	ipt.NewChain("filter", LocalIngressChain)
+	if err = ipt.AppendUnique("filter", "OUTPUT", "-d", cidr, "-m", "state", "--state", "NEW",
+		"-j", LocalIngressChain); err != nil {
+		return
+	}
+
+	return
 }

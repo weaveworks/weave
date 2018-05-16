@@ -178,3 +178,39 @@
 [submodule "vendor/gopkg.in/yaml.v2"]
 	path = vendor/gopkg.in/yaml.v2
 	url = https://gopkg.in/yaml.v2
+[submodule "vendor/github.com/ghodss/yaml"]
+	path = vendor/github.com/ghodss/yaml
+	url = https://github.com/ghodss/yaml.git
+[submodule "vendor/github.com/gogo/protobuf"]
+	path = vendor/github.com/gogo/protobuf
+	url = https://github.com/gogo/protobuf.git
+[submodule "vendor/github.com/googleapis/gnostic"]
+	path = vendor/github.com/googleapis/gnostic
+	url = https://github.com/googleapis/gnostic.git
+[submodule "vendor/github.com/gregjones/httpcache"]
+	path = vendor/github.com/gregjones/httpcache
+	url = https://github.com/gregjones/httpcache.git
+[submodule "vendor/github.com/json-iterator/go"]
+	path = vendor/github.com/json-iterator/go
+	url = https://github.com/json-iterator/go.git
+[submodule "vendor/github.com/juju/ratelimit"]
+	path = vendor/github.com/juju/ratelimit
+	url = https://github.com/juju/ratelimit.git
+[submodule "vendor/github.com/peterbourgon/diskv"]
+	path = vendor/github.com/peterbourgon/diskv
+	url = https://github.com/peterbourgon/diskv.git
+[submodule "vendor/gopkg.in/inf.v0"]
+	path = vendor/gopkg.in/inf.v0
+	url = https://github.com/go-inf/inf.git
+[submodule "vendor/github.com/google/btree"]
+	path = vendor/github.com/google/btree
+	url = https://github.com/google/btree.git
+[submodule "vendor/github.com/davecgh/go-spew"]
+	path = vendor/github.com/davecgh/go-spew
+	url = https://github.com/davecgh/go-spew.git
+[submodule "vendor/github.com/hashicorp/golang-lru"]
+	path = vendor/github.com/hashicorp/golang-lru
+	url = https://github.com/hashicorp/golang-lru.git
+[submodule "vendor/github.com/pborman/uuid"]
+	path = vendor/github.com/pborman/uuid
+	url = https://github.com/pborman/uuid.git

@@ -16,6 +16,7 @@ type Type string
 const (
 	ListSet = Type("list:set")
 	HashIP  = Type("hash:ip")
+	HashNet = Type("hash:net")
 )
 
 type Interface interface {
