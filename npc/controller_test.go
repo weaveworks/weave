@@ -196,10 +196,10 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 // Tests default-allow ipset behavior when running in non-legacy mode.
 func TestDefaultAllow(t *testing.T) {
 	const (
-		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
-		fooPodIP              = "10.32.0.10"
-		barPodIP              = "10.32.0.11"
-		barPodNewIP           = "10.32.0.12"
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		fooPodIP                     = "10.32.0.10"
+		barPodIP                     = "10.32.0.11"
+		barPodNewIP                  = "10.32.0.12"
 	)
 
 	m := newMockIPSet()
@@ -213,7 +213,7 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddNamespace(defaultNamespace)
 
 	// Should create an ipset for default-allow
-	require.Contains(t, m.sets, defaultAllowIPSetName)
+	require.Contains(t, m.sets, ingressDefaultAllowIPSetName)
 
 	podFoo := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -225,7 +225,7 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddPod(podFoo)
 
 	// Should add the foo pod to default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -239,7 +239,7 @@ func TestDefaultAllow(t *testing.T) {
 	controller.UpdatePod(podBarNoIP, podBar)
 
 	// Should add the bar pod to default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
 
 	// Allow access from the bar pod to the foo pod
 	netpol := &networkingv1.NetworkPolicy{
@@ -261,51 +261,51 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddNetworkPolicy(netpol)
 
 	// Should remove the foo pod from default-allow as the netpol selects it
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
 
 	podBarWithNewIP := *podBar
 	podBarWithNewIP.Status.PodIP = barPodNewIP
 	controller.UpdatePod(podBar, &podBarWithNewIP)
 
 	// Should update IP addr of the bar pod in default-allow
-	require.False(t, m.entryExists(defaultAllowIPSetName, barPodIP))
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
 
 	controller.UpdatePod(&podBarWithNewIP, podBarNoIP)
 	// Should remove the bar pod from default-allow as it does not have any IP addr
-	require.False(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
 
 	podFooWithNewLabel := *podFoo
 	podFooWithNewLabel.ObjectMeta.Labels = map[string]string{"run": "new-foo"}
 	controller.UpdatePod(podFoo, &podFooWithNewLabel)
 
 	// Should bring back the foo pod to default-allow as it does not match dst of any netpol
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
 
 	controller.UpdatePod(&podFooWithNewLabel, podFoo)
 	// Should remove from default-allow as it matches the netpol after the update
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNetworkPolicy(netpol)
 	// Should bring back the foo pod to default-allow as no netpol selects it
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNamespace(defaultNamespace)
 	// Should remove default ipset
-	require.NotContains(t, m.sets, defaultAllowIPSetName)
+	require.NotContains(t, m.sets, ingressDefaultAllowIPSetName)
 
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
 	const (
-		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
-		runBarIPSetName       = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
-		podIP                 = "10.32.0.10"
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		runBarIPSetName              = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
+		podIP                        = "10.32.0.10"
 	)
 
 	m := newMockIPSet()
@@ -328,7 +328,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddPod(podFoo)
 
 	// Should be in default-allow as no netpol selects podFoo
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	netpol := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -349,7 +349,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddNetworkPolicy(netpol)
 
 	// Shouldn't be in default-allow as netpol above selects podFoo
-	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -361,8 +361,8 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddPod(podBar)
 
 	// Should be in default-allow as no netpol selects podBar
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
-	require.True(t, m.Exist(podBar.ObjectMeta.UID, defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+	require.True(t, m.Exist(podBar.ObjectMeta.UID, ingressDefaultAllowIPSetName, podIP))
 	// Should be in run=bar ipset
 	require.True(t, m.entryExists(runBarIPSetName, podIP))
 
@@ -373,20 +373,20 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 
 	// Should be in default-allow as no netpol selects podBar and podFoo removal
 	// should not affect podBar in default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	controller.DeletePod(podBar)
 
 	// Should remove from default-allow and run=bar ipsets
-	require.Equal(t, 0, len(m.sets[defaultAllowIPSetName].subSets))
+	require.Equal(t, 0, len(m.sets[ingressDefaultAllowIPSetName].subSets))
 	require.False(t, m.entryExists(runBarIPSetName, podIP))
 }
 
 // Test case for https://github.com/weaveworks/weave/issues/3222
 func TestNewDstSelector(t *testing.T) {
 	const (
-		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
-		podIP                 = "10.32.0.10"
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		podIP                        = "10.32.0.10"
 	)
 
 	m := newMockIPSet()
@@ -408,7 +408,7 @@ func TestNewDstSelector(t *testing.T) {
 		Status: coreapi.PodStatus{PodIP: podIP}}
 	controller.AddPod(podFoo)
 
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	netpolBar := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -428,7 +428,7 @@ func TestNewDstSelector(t *testing.T) {
 	controller.AddNetworkPolicy(netpolBar)
 
 	// netpolBar dst selector selects podFoo
-	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	netpolFoo := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -449,8 +449,8 @@ func TestNewDstSelector(t *testing.T) {
 
 	controller.DeleteNetworkPolicy(netpolBar)
 	// netpolFoo dst-selects podFoo
-	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 	controller.DeleteNetworkPolicy(netpolFoo)
 	// No netpol dst-selects podFoo
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 }
