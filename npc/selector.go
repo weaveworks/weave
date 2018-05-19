@@ -89,20 +89,23 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewDstSelec
 		dstSelectorsCount:    make(map[string]map[policyType]int)}
 }
 
-func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string, entry string, comment string) (bool, error) {
+func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string, entry string, comment string) (bool, bool, error) {
 	foundIngress := false
-	// TODO(brb) foundEgress
+	foundEgress := false
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
 			if ss.dstSelectorExist(s, ingressPolicy) {
 				foundIngress = true
 			}
+			if ss.dstSelectorExist(s, egressPolicy) {
+				foundEgress = true
+			}
 			if err := s.addEntry(user, entry, comment); err != nil {
-				return foundIngress, err
+				return foundIngress, foundEgress, err
 			}
 		}
 	}
-	return foundIngress, nil
+	return foundIngress, foundEgress, nil
 }
 
 func (ss *selectorSet) delFromMatching(user types.UID, labelMap map[string]string, entry string) error {

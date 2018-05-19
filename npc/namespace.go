@@ -34,8 +34,9 @@ type ns struct {
 
 	// stores IP addrs of pods which are not selected by any dst podSelector of
 	// any netpol; used only in non-legacy mode and is used as a dst in
-	// the WEAVE-NPC-DEFAULT iptables chain.
+	// the WEAVE-NPC-{INGRESS,EGRESS}-DEFAULT iptables chain.
 	ingressDefaultAllowIPSet ipset.Name
+	egressDefaultAllowIPSet  ipset.Name
 
 	nsSelectors  *selectorSet
 	podSelectors *selectorSet
@@ -71,6 +72,13 @@ func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset
 			return nil, err
 		}
 		ns.ingressDefaultAllowIPSet = ingressDefaultAllowIPSet
+
+		egressDefaultAllowIPSet := ipset.Name(IpsetNamePrefix + shortName("egress-default-allow:"+name))
+		if err := ips.Create(egressDefaultAllowIPSet, ipset.HashIP); err != nil {
+			return nil, err
+		}
+		ns.egressDefaultAllowIPSet = egressDefaultAllowIPSet
+
 	}
 
 	if err := ns.podSelectors.provision(ns.uid, nil, map[string]*selectorSpec{ns.allPods.key: ns.allPods}); err != nil {
@@ -112,7 +120,7 @@ func (ns *ns) onNewDstPodSelector(selector *selector, policyType policyType) err
 			// Remove the pod from default-allow if dst podselector matches the pod
 			ipset := ns.ingressDefaultAllowIPSet
 			if policyType == egressPolicy {
-				// TODO(brb) ipset = ns.egressDefaultAllowIPSet
+				ipset = ns.egressDefaultAllowIPSet
 			}
 			if selector.matches(pod.ObjectMeta.Labels) {
 				if err := ns.ips.DelEntry(pod.ObjectMeta.UID, ipset, pod.Status.PodIP); err != nil {
@@ -156,7 +164,7 @@ func (ns *ns) addToDefaultAllowIfNoMatching(pod *coreapi.Pod, policyType policyT
 	if !found {
 		ipset := ns.ingressDefaultAllowIPSet
 		if policyType == egressPolicy {
-			// TODO(brb) ipset = ns.egressDefaultAllowIPSet
+			ipset = ns.egressDefaultAllowIPSet
 		}
 		if err := ns.ips.AddEntry(pod.ObjectMeta.UID, ipset, pod.Status.PodIP, podComment(pod)); err != nil {
 			return err
@@ -183,14 +191,21 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		ns.ips.AddEntry(obj.ObjectMeta.UID, LocalIpset, obj.Status.PodIP, podComment(obj))
 	}
 
-	foundIngress, err := ns.podSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, obj.Status.PodIP, podComment(obj))
+	foundIngress, foundEgress, err := ns.podSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, obj.Status.PodIP, podComment(obj))
 	if err != nil {
 		return err
 	}
 	// If there are no matching dst selectors, add the pod to default-allow
-	if !ns.legacy && !foundIngress {
-		if err := ns.ips.AddEntry(obj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, obj.Status.PodIP, podComment(obj)); err != nil {
-			return err
+	if !ns.legacy {
+		if !foundIngress {
+			if err := ns.ips.AddEntry(obj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, obj.Status.PodIP, podComment(obj)); err != nil {
+				return err
+			}
+		}
+		if !foundEgress {
+			if err := ns.ips.AddEntry(obj.ObjectMeta.UID, ns.egressDefaultAllowIPSet, obj.Status.PodIP, podComment(obj)); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -214,6 +229,9 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 			if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, oldObj.Status.PodIP); err != nil {
 				return err
 			}
+			if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ns.egressDefaultAllowIPSet, oldObj.Status.PodIP); err != nil {
+				return err
+			}
 		}
 
 		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.UID, oldObj.ObjectMeta.Labels, oldObj.Status.PodIP)
@@ -223,31 +241,32 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 		if ns.checkLocalPod(newObj) {
 			ns.ips.AddEntry(newObj.ObjectMeta.UID, LocalIpset, newObj.Status.PodIP, podComment(newObj))
 		}
-		foundIngress, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
+		foundIngress, foundEgress, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
 		if err != nil {
 			return err
 		}
 
-		if !ns.legacy && !foundIngress {
-			if err := ns.ips.AddEntry(newObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, newObj.Status.PodIP, podComment(newObj)); err != nil {
-				return err
+		if !ns.legacy {
+			if !foundIngress {
+				if err := ns.ips.AddEntry(newObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, newObj.Status.PodIP, podComment(newObj)); err != nil {
+					return err
+				}
+			}
+			if !foundEgress {
+				if err := ns.ips.AddEntry(newObj.ObjectMeta.UID, ns.egressDefaultAllowIPSet, newObj.Status.PodIP, podComment(newObj)); err != nil {
+					return err
+				}
 			}
 		}
 
 		return nil
 	}
 
-	if !ns.legacy &&
-		oldObj.Status.PodIP != newObj.Status.PodIP &&
-		ns.ips.Exist(oldObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, oldObj.Status.PodIP) {
-		// Instead of iterating over all selectors we check whether old pod IP
-		// has been inserted into default-allow ipset to decide whether the IP
-		// in the ipset has to be updated.
-
-		if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, oldObj.Status.PodIP); err != nil {
+	if !ns.legacy && oldObj.Status.PodIP != newObj.Status.PodIP {
+		if err := ns.updateDefaultAllowIPSetEntry(oldObj, newObj, ns.ingressDefaultAllowIPSet); err != nil {
 			return err
 		}
-		if err := ns.ips.AddEntry(newObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, newObj.Status.PodIP, podComment(newObj)); err != nil {
+		if err := ns.updateDefaultAllowIPSetEntry(oldObj, newObj, ns.egressDefaultAllowIPSet); err != nil {
 			return err
 		}
 	}
@@ -272,17 +291,35 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 				}
 			}
 
-			if !ns.legacy && ns.podSelectors.dstSelectorExist(ps, ingressPolicy) {
-				switch {
-				case !oldMatch && newMatch:
-					if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, oldObj.Status.PodIP); err != nil {
-						return err
-					}
-				case oldMatch && !newMatch:
-					if err := ns.addToDefaultAllowIfNoMatching(newObj, ingressPolicy); err != nil {
-						return err
-					}
+			if !ns.legacy {
+				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, ingressPolicy); err != nil {
+					return err
 				}
+				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, egressPolicy); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (ns *ns) addOrRemoveToDefaultAllowIPSet(ps *selector, oldObj, newObj *coreapi.Pod, oldMatch, newMatch bool, policyType policyType) error {
+	ipset := ns.ingressDefaultAllowIPSet
+	if policyType == egressPolicy {
+		ipset = ns.egressDefaultAllowIPSet
+	}
+
+	if ns.podSelectors.dstSelectorExist(ps, policyType) {
+		switch {
+		case !oldMatch && newMatch:
+			if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ipset, oldObj.Status.PodIP); err != nil {
+				return err
+			}
+		case oldMatch && !newMatch:
+			if err := ns.addToDefaultAllowIfNoMatching(newObj, policyType); err != nil {
+				return err
 			}
 		}
 	}
@@ -303,6 +340,9 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 
 	if !ns.legacy {
 		if err := ns.ips.DelEntry(obj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, obj.Status.PodIP); err != nil {
+			return err
+		}
+		if err := ns.ips.DelEntry(obj.ObjectMeta.UID, ns.egressDefaultAllowIPSet, obj.Status.PodIP); err != nil {
 			return err
 		}
 	}
@@ -380,6 +420,22 @@ func (ns *ns) deleteNetworkPolicy(obj interface{}) error {
 	return ns.podSelectors.deprovision(uid, podSelectors, nil)
 }
 
+func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetName ipset.Name) error {
+	// Instead of iterating over all selectors we check whether old pod IP
+	// has been inserted into default-allow ipset to decide whether the IP
+	// in the ipset has to be updated.
+	if ns.ips.Exist(oldObj.ObjectMeta.UID, ipsetName, oldObj.Status.PodIP) {
+
+		if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ipsetName, oldObj.Status.PodIP); err != nil {
+			return err
+		}
+		if err := ns.ips.AddEntry(newObj.ObjectMeta.UID, ipsetName, newObj.Status.PodIP, podComment(newObj)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func bypassRule(nsIpsetName ipset.Name, namespace string) []string {
 	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace}
 }
@@ -419,7 +475,7 @@ func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 	}
 
 	// Add namespace ipset to matching namespace selectors
-	_, err := ns.nsSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName), namespaceComment(ns))
+	_, _, err := ns.nsSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName), namespaceComment(ns))
 	return err
 }
 
@@ -485,7 +541,12 @@ func (ns *ns) deleteNamespace(obj *coreapi.Namespace) error {
 	}
 
 	if !ns.legacy {
-		return ns.ips.Destroy(ns.ingressDefaultAllowIPSet)
+		if err := ns.ips.Destroy(ns.ingressDefaultAllowIPSet); err != nil {
+			return err
+		}
+		if err := ns.ips.Destroy(ns.egressDefaultAllowIPSet); err != nil {
+			return err
+		}
 	}
 
 	return nil
