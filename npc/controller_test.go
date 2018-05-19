@@ -236,6 +236,7 @@ func TestDefaultAllow(t *testing.T) {
 		Status: coreapi.PodStatus{PodIP: barPodIP}}
 	podBarNoIP := &coreapi.Pod{ObjectMeta: podBar.ObjectMeta}
 	controller.AddPod(podBarNoIP)
+
 	controller.UpdatePod(podBarNoIP, podBar)
 
 	// Should add the bar pod to default-allow

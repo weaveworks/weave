@@ -24,7 +24,8 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 	podSelectors = make(map[string]*selectorSpec)
 	rules = make(map[string]*ruleSpec)
 
-	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, ns.name, ipset.HashIP)
+	policyTypes := []policyType{ingressPolicy}
+	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -61,14 +62,14 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 			for _, peer := range ingressRule.From {
 				var srcSelector *selectorSpec
 				if peer.PodSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.PodSelector, false, ns.name, ipset.HashIP)
+					srcSelector, err = newSelectorSpec(peer.PodSelector, false, nil, ns.name, ipset.HashIP)
 					if err != nil {
 						return nil, nil, nil, err
 					}
 					podSelectors[srcSelector.key] = srcSelector
 				}
 				if peer.NamespaceSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, "", ipset.ListSet)
+					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, nil, "", ipset.ListSet)
 					if err != nil {
 						return nil, nil, nil, err
 					}
@@ -104,7 +105,8 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	rules = make(map[string]*ruleSpec)
 
 	// If empty, matches all pods in a namespace
-	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, ns.name, ipset.HashIP)
+	policyTypes := []policyType{ingressPolicy}
+	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -143,14 +145,14 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 				// NetworkPolicyPeer describes a peer to allow traffic from.
 				// Exactly one of its fields must be specified.
 				if peer.PodSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.PodSelector, false, ns.name, ipset.HashIP)
+					srcSelector, err = newSelectorSpec(peer.PodSelector, false, nil, ns.name, ipset.HashIP)
 					if err != nil {
 						return nil, nil, nil, err
 					}
 					addIfNotExist(srcSelector, podSelectors)
 
 				} else if peer.NamespaceSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, "", ipset.ListSet)
+					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, nil, "", ipset.ListSet)
 					if err != nil {
 						return nil, nil, nil, err
 					}

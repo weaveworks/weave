@@ -10,25 +10,27 @@ import (
 )
 
 type selectorSpec struct {
-	key      string          // string representation (for hash keying/equality comparison)
-	selector labels.Selector // k8s Selector object (for matching)
-	dst      bool            // destination selector
+	key         string          // string representation (for hash keying/equality comparison)
+	selector    labels.Selector // k8s Selector object (for matching)
+	dst         bool            // destination selector TODO(brb) not relevant
+	policyTypes []policyType    // TODO(brb) repharse: netpol types (egress, ingress or both) which initiated the dst selector
 
 	ipsetType ipset.Type // type of ipset to provision
 	ipsetName ipset.Name // generated ipset name
 	nsName    string     // Namespace name
 }
 
-func newSelectorSpec(json *metav1.LabelSelector, dst bool, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
+func newSelectorSpec(json *metav1.LabelSelector, dst bool, policyType []policyType, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
 	selector, err := metav1.LabelSelectorAsSelector(json)
 	if err != nil {
 		return nil, err
 	}
 	key := selector.String()
 	return &selectorSpec{
-		key:      key,
-		selector: selector,
-		dst:      dst,
+		key:         key,
+		selector:    selector,
+		dst:         dst,
+		policyTypes: policyType,
 		// We prefix the selector string with the namespace name when generating
 		// the shortname because you can specify the same selector in multiple
 		// namespaces - we need those to map to distinct ipsets
@@ -55,26 +57,28 @@ func (s *selector) delEntry(user types.UID, entry string) error {
 }
 
 type selectorFn func(selector *selector) error
+type selectorWithPolicyTypeFn func(selector *selector, policyType policyType) error
 
 type selectorSet struct {
 	ips           ipset.Interface
 	onNewSelector selectorFn
 
 	// invoked after dst selector has been provisioned for the first time
-	onNewDstSelector selectorFn
+	onNewDstSelector selectorWithPolicyTypeFn
 	// invoked after the last instance of dst selector has been deprovisioned
-	onDestroyDstSelector selectorFn
+	onDestroyDstSelector selectorWithPolicyTypeFn
 
 	users   map[string]map[types.UID]struct{} // list of users per selector
 	entries map[string]*selector
 
 	// We need to keep track of dst selector instances to be able to invoke
 	// onNewDstSelector and onDestroyDstSelector callbacks at the right time;
-	// selectorSpec.Key -> count
-	dstSelectorsCount map[string]int
+	// selectorSpec.Key -> policyType -> count
+	// TODO(brb) dst -> target?
+	dstSelectorsCount map[string]map[policyType]int
 }
 
-func newSelectorSet(ips ipset.Interface, onNewSelector, onNewDstSelector selectorFn, onDestroyDstSelector selectorFn) *selectorSet {
+func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewDstSelector, onDestroyDstSelector selectorWithPolicyTypeFn) *selectorSet {
 	return &selectorSet{
 		ips:                  ips,
 		onNewSelector:        onNewSelector,
@@ -82,22 +86,23 @@ func newSelectorSet(ips ipset.Interface, onNewSelector, onNewDstSelector selecto
 		onDestroyDstSelector: onDestroyDstSelector,
 		users:                make(map[string]map[types.UID]struct{}),
 		entries:              make(map[string]*selector),
-		dstSelectorsCount:    make(map[string]int)}
+		dstSelectorsCount:    make(map[string]map[policyType]int)}
 }
 
 func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string, entry string, comment string) (bool, error) {
-	found := false
+	foundIngress := false
+	// TODO(brb) foundEgress
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
-			if ss.dstSelectorExist(s) {
-				found = true
+			if ss.dstSelectorExist(s, ingressPolicy) {
+				foundIngress = true
 			}
 			if err := s.addEntry(user, entry, comment); err != nil {
-				return found, err
+				return foundIngress, err
 			}
 		}
 	}
-	return found, nil
+	return foundIngress, nil
 }
 
 func (ss *selectorSet) delFromMatching(user types.UID, labelMap map[string]string, entry string) error {
@@ -111,8 +116,8 @@ func (ss *selectorSet) delFromMatching(user types.UID, labelMap map[string]strin
 	return nil
 }
 
-func (ss *selectorSet) dstSelectorExist(s *selector) bool {
-	return ss.dstSelectorsCount[s.spec.key] > 0
+func (ss *selectorSet) dstSelectorExist(s *selector, policyType policyType) bool {
+	return ss.dstSelectorsCount[s.spec.key][policyType] > 0
 }
 
 func (ss *selectorSet) deprovision(user types.UID, current, desired map[string]*selectorSpec) error {
@@ -129,13 +134,14 @@ func (ss *selectorSet) deprovision(user types.UID, current, desired map[string]*
 				delete(ss.users, key)
 			}
 
-			if spec.dst {
-				ss.dstSelectorsCount[key]--
-				if ss.dstSelectorsCount[key] == 0 {
-					if err := ss.onDestroyDstSelector(&selector{ss.ips, spec}); err != nil {
+			for _, policyType := range spec.policyTypes {
+				ss.dstSelectorsCount[key][policyType]--
+				if ss.dstSelectorsCount[key][policyType] == 0 {
+					if err := ss.onDestroyDstSelector(&selector{ss.ips, spec}, policyType); err != nil {
 						return err
 					}
 				}
+				// TODO(brb) delete(...)
 			}
 		}
 	}
@@ -160,10 +166,13 @@ func (ss *selectorSet) provision(user types.UID, current, desired map[string]*se
 			}
 			ss.users[key][user] = struct{}{}
 
-			if spec.dst {
-				ss.dstSelectorsCount[key]++
-				if ss.dstSelectorsCount[key] == 1 {
-					if err := ss.onNewDstSelector(selector); err != nil {
+			for _, pt := range spec.policyTypes {
+				if _, found := ss.dstSelectorsCount[key]; !found {
+					ss.dstSelectorsCount[key] = make(map[policyType]int)
+				}
+				ss.dstSelectorsCount[key][pt]++
+				if ss.dstSelectorsCount[key][pt] == 1 {
+					if err := ss.onNewDstSelector(selector, pt); err != nil {
 						return err
 					}
 				}

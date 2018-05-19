@@ -49,7 +49,7 @@ func New(nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interfa
 		ips:      ips,
 		nss:      make(map[string]*ns)}
 
-	doNothing := func(*selector) error { return nil }
+	doNothing := func(*selector, policyType) error { return nil }
 	c.nsSelectors = newSelectorSet(ips, c.onNewNsSelector, doNothing, doNothing)
 
 	return c
