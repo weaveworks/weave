@@ -103,9 +103,17 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	nsSelectors = make(map[string]*selectorSpec)
 	podSelectors = make(map[string]*selectorSpec)
 	rules = make(map[string]*ruleSpec)
+	policyTypes := make([]policyType, 0)
 
+	for _, pt := range policy.Spec.PolicyTypes {
+		if pt == networkingv1.PolicyTypeIngress {
+			policyTypes = append(policyTypes, ingressPolicy)
+		}
+		if pt == networkingv1.PolicyTypeEgress {
+			policyTypes = append(policyTypes, egressPolicy)
+		}
+	}
 	// If empty, matches all pods in a namespace
-	policyTypes := []policyType{ingressPolicy}
 	dstSelector, err := newSelectorSpec(&policy.Spec.PodSelector, true, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
 		return nil, nil, nil, err

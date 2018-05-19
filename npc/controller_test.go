@@ -144,6 +144,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 			Namespace: "destination",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
 					From: []networkingv1.NetworkPolicyPeer{
@@ -249,6 +250,7 @@ func TestDefaultAllow(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -299,7 +301,6 @@ func TestDefaultAllow(t *testing.T) {
 	controller.DeleteNamespace(defaultNamespace)
 	// Should remove default ipset
 	require.NotContains(t, m.sets, ingressDefaultAllowIPSetName)
-
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
@@ -337,6 +338,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -418,6 +420,7 @@ func TestNewDstSelector(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			PodSelector: metav1.LabelSelector{},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -438,6 +441,7 @@ func TestNewDstSelector(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			PodSelector: metav1.LabelSelector{},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
