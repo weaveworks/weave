@@ -118,10 +118,7 @@ func (ns *ns) onNewDstPodSelector(selector *selector, policyType policyType) err
 	for _, pod := range ns.pods {
 		if hasIP(pod) {
 			// Remove the pod from default-allow if dst podselector matches the pod
-			ipset := ns.ingressDefaultAllowIPSet
-			if policyType == egressPolicy {
-				ipset = ns.egressDefaultAllowIPSet
-			}
+			ipset := ns.defaultAllowIPSetName(policyType)
 			if selector.matches(pod.ObjectMeta.Labels) {
 				if err := ns.ips.DelEntry(pod.ObjectMeta.UID, ipset, pod.Status.PodIP); err != nil {
 					return err
@@ -162,10 +159,7 @@ func (ns *ns) addToDefaultAllowIfNoMatching(pod *coreapi.Pod, policyType policyT
 		}
 	}
 	if !found {
-		ipset := ns.ingressDefaultAllowIPSet
-		if policyType == egressPolicy {
-			ipset = ns.egressDefaultAllowIPSet
-		}
+		ipset := ns.defaultAllowIPSetName(policyType)
 		if err := ns.ips.AddEntry(pod.ObjectMeta.UID, ipset, pod.Status.PodIP, podComment(pod)); err != nil {
 			return err
 		}
@@ -306,11 +300,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 }
 
 func (ns *ns) addOrRemoveToDefaultAllowIPSet(ps *selector, oldObj, newObj *coreapi.Pod, oldMatch, newMatch bool, policyType policyType) error {
-	ipset := ns.ingressDefaultAllowIPSet
-	if policyType == egressPolicy {
-		ipset = ns.egressDefaultAllowIPSet
-	}
-
+	ipset := ns.defaultAllowIPSetName(policyType)
 	if ns.podSelectors.dstSelectorExist(ps, policyType) {
 		switch {
 		case !oldMatch && newMatch:
@@ -323,7 +313,6 @@ func (ns *ns) addOrRemoveToDefaultAllowIPSet(ps *selector, oldObj, newObj *corea
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -599,6 +588,14 @@ func namespaceComment(namespace *ns) string {
 
 func podComment(pod *coreapi.Pod) string {
 	return fmt.Sprintf("namespace: %s, pod: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+}
+
+func (ns *ns) defaultAllowIPSetName(pt policyType) ipset.Name {
+	ipset := ns.ingressDefaultAllowIPSet
+	if pt == egressPolicy {
+		ipset = ns.egressDefaultAllowIPSet
+	}
+	return ipset
 }
 
 func (ns *ns) analyse(obj interface{}) (
