@@ -10,20 +10,13 @@ import (
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
-type ruleType byte
-
-const (
-	ingress ruleType = iota
-	egress
-)
-
 type ruleSpec struct {
-	key      string
-	args     []string
-	ruleType ruleType
+	key        string
+	args       []string
+	policyType policyType
 }
 
-func newRuleSpec(ruleType ruleType, proto *string, srcHost *selectorSpec, dstHost *selectorSpec, dstPort *string) *ruleSpec {
+func newRuleSpec(policyType policyType, proto *string, srcHost *selectorSpec, dstHost *selectorSpec, dstPort *string) *ruleSpec {
 	args := []string{}
 	if proto != nil {
 		args = append(args, "-p", *proto)
@@ -47,9 +40,10 @@ func newRuleSpec(ruleType ruleType, proto *string, srcHost *selectorSpec, dstHos
 	}
 	args = append(args, "-j", "ACCEPT")
 	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
+	// TODO(brb) embed policyType into key
 	key := strings.Join(args, " ")
 
-	return &ruleSpec{key, args, ruleType}
+	return &ruleSpec{key, args, policyType}
 }
 
 type ruleSet struct {
@@ -66,10 +60,7 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
-				chain := IngressChain
-				if spec.ruleType == egress {
-					chain = EgressCustomChain
-				}
+				chain := rulesChainByPolicyType(spec.policyType)
 				common.Log.Infof("deleting rule %v from %q chain", spec.args, chain)
 				if err := rs.ipt.Delete(TableFilter, chain, spec.args...); err != nil {
 					return err
@@ -86,10 +77,7 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
-				chain := IngressChain
-				if spec.ruleType == egress {
-					chain = EgressCustomChain
-				}
+				chain := rulesChainByPolicyType(spec.policyType)
 				common.Log.Infof("adding rule %v to %q chain", spec.args, chain)
 				if err := rs.ipt.Append(TableFilter, chain, spec.args...); err != nil {
 					return err
@@ -101,4 +89,11 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	}
 
 	return nil
+}
+
+func rulesChainByPolicyType(policyType policyType) string {
+	if policyType == egressPolicy {
+		return EgressCustomChain
+	}
+	return IngressChain
 }

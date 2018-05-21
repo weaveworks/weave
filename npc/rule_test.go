@@ -9,7 +9,7 @@ func TestRegressionHandleNil3095(t *testing.T) {
 	// Test for handling nil values
 	// https://github.com/weaveworks/weave/issues/3095
 
-	rs := newRuleSpec(ingress, nil, nil, nil, nil)
+	rs := newRuleSpec(ingressPolicy, nil, nil, nil, nil)
 
 	require.NotEqual(t, rs.key, "")
 
