@@ -12,15 +12,14 @@ import (
 type selectorSpec struct {
 	key         string          // string representation (for hash keying/equality comparison)
 	selector    labels.Selector // k8s Selector object (for matching)
-	dst         bool            // destination selector TODO(brb) not relevant
-	policyTypes []policyType    // TODO(brb) repharse: netpol types (egress, ingress or both) which initiated the target selector
+	policyTypes []policyType    // If non-empty, then selectorSpec is a target selector for given policyTypes.
 
 	ipsetType ipset.Type // type of ipset to provision
 	ipsetName ipset.Name // generated ipset name
 	nsName    string     // Namespace name
 }
 
-func newSelectorSpec(json *metav1.LabelSelector, dst bool, policyType []policyType, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
+func newSelectorSpec(json *metav1.LabelSelector, policyType []policyType, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
 	selector, err := metav1.LabelSelectorAsSelector(json)
 	if err != nil {
 		return nil, err
@@ -29,7 +28,6 @@ func newSelectorSpec(json *metav1.LabelSelector, dst bool, policyType []policyTy
 	return &selectorSpec{
 		key:         key,
 		selector:    selector,
-		dst:         dst,
 		policyTypes: policyType,
 		// We prefix the selector string with the namespace name when generating
 		// the shortname because you can specify the same selector in multiple

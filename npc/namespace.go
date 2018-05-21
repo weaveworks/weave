@@ -46,7 +46,7 @@ type ns struct {
 }
 
 func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
-	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, false, nil, name, ipset.HashIP)
+	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, nil, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
 	}
