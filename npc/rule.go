@@ -39,8 +39,9 @@ func newRuleSpec(policyType policyType, proto *string, srcHost *selectorSpec, ds
 		args = append(args, "--dport", *dstPort)
 	}
 	args = append(args, "-j", "ACCEPT")
-	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
-	// TODO(brb) embed policyType into key
+	// NOTE: if you remove the comment bellow, then embed `policyType` into `key`.
+	// Otherwise, the rule won't be provisioned if it exists for other policy type.
+	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s (%s)", srcComment, dstComment, policyTypeStr(policyType)))
 	key := strings.Join(args, " ")
 
 	return &ruleSpec{key, args, policyType}
