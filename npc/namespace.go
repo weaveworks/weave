@@ -32,8 +32,8 @@ type ns struct {
 	uid     types.UID     // surrogate UID to own allPods selector
 	allPods *selectorSpec // hash:ip ipset of all pod IPs in this namespace
 
-	// stores IP addrs of pods which are not selected by any dst podSelector of
-	// any netpol; used only in non-legacy mode and is used as a dst in
+	// stores IP addrs of pods which are not selected by any target podSelector of
+	// any netpol; used only in non-legacy mode and is used as a target in
 	// the WEAVE-NPC-{INGRESS,EGRESS}-DEFAULT iptables chain.
 	ingressDefaultAllowIPSet ipset.Name
 	egressDefaultAllowIPSet  ipset.Name
@@ -64,7 +64,7 @@ func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset
 		rules:       newRuleSet(ipt),
 		legacy:      legacy}
 
-	ns.podSelectors = newSelectorSet(ips, ns.onNewPodSelector, ns.onNewDstPodSelector, ns.onDestroyDstPodSelector)
+	ns.podSelectors = newSelectorSet(ips, ns.onNewPodSelector, ns.onNewTargetPodSelector, ns.onDestroyTargetPodSelector)
 
 	if !legacy {
 		ingressDefaultAllowIPSet := ipset.Name(IpsetNamePrefix + shortName("ingress-default-allow:"+name))
@@ -110,7 +110,7 @@ func (ns *ns) onNewPodSelector(selector *selector) error {
 	return nil
 }
 
-func (ns *ns) onNewDstPodSelector(selector *selector, policyType policyType) error {
+func (ns *ns) onNewTargetPodSelector(selector *selector, policyType policyType) error {
 	if ns.legacy {
 		return nil
 	}
@@ -130,7 +130,7 @@ func (ns *ns) onNewDstPodSelector(selector *selector, policyType policyType) err
 	return nil
 }
 
-func (ns *ns) onDestroyDstPodSelector(selector *selector, policyType policyType) error {
+func (ns *ns) onDestroyTargetPodSelector(selector *selector, policyType policyType) error {
 	if ns.legacy {
 		return nil
 	}
@@ -148,12 +148,12 @@ func (ns *ns) onDestroyDstPodSelector(selector *selector, policyType policyType)
 	return nil
 }
 
-// Add pod IP addr to default-allow ipset if there are no matching dst selectors
+// Add pod IP addr to default-allow ipset if there are no matching target selectors
 func (ns *ns) addToDefaultAllowIfNoMatching(pod *coreapi.Pod, policyType policyType) error {
 	found := false
 	// TODO(mp) optimize (avoid iterating over selectors) by ref counting IP addrs.
 	for _, s := range ns.podSelectors.entries {
-		if ns.podSelectors.dstSelectorExist(s, policyType) && s.matches(pod.ObjectMeta.Labels) {
+		if ns.podSelectors.targetSelectorExist(s, policyType) && s.matches(pod.ObjectMeta.Labels) {
 			found = true
 			break
 		}
@@ -189,7 +189,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 	if err != nil {
 		return err
 	}
-	// If there are no matching dst selectors, add the pod to default-allow
+	// If there are no matching target selectors, add the pod to default-allow
 	if !ns.legacy {
 		if !foundIngress {
 			if err := ns.ips.AddEntry(obj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, obj.Status.PodIP, podComment(obj)); err != nil {
@@ -301,7 +301,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 
 func (ns *ns) addOrRemoveToDefaultAllowIPSet(ps *selector, oldObj, newObj *coreapi.Pod, oldMatch, newMatch bool, policyType policyType) error {
 	ipset := ns.defaultAllowIPSetName(policyType)
-	if ns.podSelectors.dstSelectorExist(ps, policyType) {
+	if ns.podSelectors.targetSelectorExist(ps, policyType) {
 		switch {
 		case !oldMatch && newMatch:
 			if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ipset, oldObj.Status.PodIP); err != nil {

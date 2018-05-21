@@ -386,7 +386,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 }
 
 // Test case for https://github.com/weaveworks/weave/issues/3222
-func TestNewDstSelector(t *testing.T) {
+func TestNewTargetSelector(t *testing.T) {
 	const (
 		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
 		podIP                        = "10.32.0.10"
@@ -431,7 +431,7 @@ func TestNewDstSelector(t *testing.T) {
 	}
 	controller.AddNetworkPolicy(netpolBar)
 
-	// netpolBar dst selector selects podFoo
+	// netpolBar target selector selects podFoo
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	netpolFoo := &networkingv1.NetworkPolicy{
@@ -453,9 +453,9 @@ func TestNewDstSelector(t *testing.T) {
 	controller.AddNetworkPolicy(netpolFoo)
 
 	controller.DeleteNetworkPolicy(netpolBar)
-	// netpolFoo dst-selects podFoo
+	// netpolFoo target-selects podFoo
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 	controller.DeleteNetworkPolicy(netpolFoo)
-	// No netpol dst-selects podFoo
+	// No netpol target-selects podFoo
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 }
