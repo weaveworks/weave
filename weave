@@ -496,6 +496,10 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86 2>/dev/null || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j DROP 2>/dev/null || true
     run_iptables -X WEAVE-NPC >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
+    run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-NPC-EGRESS 2>/dev/null || true
+    run_iptables -t filter -D INPUT -i $BRIDGE -j WEAVE-NPC-EGRESS 2>/dev/null || true
+    run_iptables -X WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
 
     run_iptables -F WEAVE-EXPOSE >/dev/null 2>&1 || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-EXPOSE 2>/dev/null || true
