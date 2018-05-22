@@ -201,6 +201,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			} else {
 				for _, peer := range egressRule.To {
 					var dstSelector *selectorSpec
+					var dstRuleHost ruleHost
 
 					// NetworkPolicyPeer describes a peer to allow traffic from.
 					// Exactly one of its fields must be specified.
@@ -210,6 +211,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 							return nil, nil, nil, nil, err
 						}
 						addIfNotExist(dstSelector, podSelectors)
+						dstRuleHost = dstSelector
 
 					} else if peer.NamespaceSelector != nil {
 						dstSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, "", ipset.ListSet)
@@ -217,17 +219,19 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 							return nil, nil, nil, nil, err
 						}
 						nsSelectors[dstSelector.key] = dstSelector
+						dstRuleHost = dstSelector
 					} else if peer.IPBlock != nil {
 						ipBlock := newIPBlockSpec(peer.IPBlock)
 						ipBlocks[ipBlock.key] = ipBlock
+						dstRuleHost = ipBlock
 					}
 
 					if allPorts {
-						rule := newRuleSpec(egressPolicy, nil, targetSelector, dstSelector, nil)
+						rule := newRuleSpec(egressPolicy, nil, targetSelector, dstRuleHost, nil)
 						rules[rule.key] = rule
 					} else {
 						withNormalisedProtoAndPort(egressRule.Ports, func(proto, port string) {
-							rule := newRuleSpec(egressPolicy, &proto, targetSelector, dstSelector, &port)
+							rule := newRuleSpec(egressPolicy, &proto, targetSelector, dstRuleHost, &port)
 							rules[rule.key] = rule
 						})
 					}
