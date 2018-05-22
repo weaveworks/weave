@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +37,23 @@ func newSelectorSpec(json *metav1.LabelSelector, policyType []policyType, nsName
 		ipsetName: ipset.Name(IpsetNamePrefix + shortName(nsName+":"+key)),
 		ipsetType: ipsetType,
 		nsName:    nsName}, nil
+}
+
+func (spec *selectorSpec) getRuleSpec(src bool) ([]string, string) {
+	dir := "dst"
+	if src {
+		dir = "src"
+	}
+	rule := []string{"-m", "set", "--match-set", string(spec.ipsetName), dir}
+
+	comment := "anywhere"
+	if spec.nsName != "" {
+		comment = fmt.Sprintf("pods: namespace: %s, selector: %s", spec.nsName, spec.key)
+	} else {
+		comment = fmt.Sprintf("namespaces: selector: %s", spec.key)
+	}
+
+	return rule, comment
 }
 
 type selector struct {
