@@ -56,6 +56,10 @@ func (spec *selectorSpec) getRuleSpec(src bool) ([]string, string) {
 	return rule, comment
 }
 
+func (spec *selectorSpec) isNil() bool {
+	return spec == nil
+}
+
 type selector struct {
 	ips  ipset.Interface
 	spec *selectorSpec

@@ -16,6 +16,8 @@ type ruleHost interface {
 	//
 	// If src=true then the rulespec is for source, otherwise - for destination.
 	getRuleSpec(src bool) ([]string, string)
+	// TODO(brb) Get rid
+	isNil() bool
 }
 
 type ruleSpec struct {
@@ -30,13 +32,13 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 		args = append(args, "-p", *proto)
 	}
 	srcComment := "anywhere"
-	if srcHost != nil {
+	if srcHost != nil && !srcHost.isNil() {
 		rule, comment := srcHost.getRuleSpec(true)
 		args = append(args, rule...)
 		srcComment = comment
 	}
 	dstComment := "anywhere"
-	if dstHost != nil {
+	if dstHost != nil && !dstHost.isNil() {
 		rule, comment := dstHost.getRuleSpec(false)
 		args = append(args, rule...)
 		dstComment = comment

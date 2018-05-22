@@ -48,6 +48,10 @@ func (spec *ipBlockSpec) getRuleSpec(src bool) ([]string, string) {
 	return rule, comment
 }
 
+func (spec *ipBlockSpec) isNil() bool {
+	return spec == nil
+}
+
 type ipBlockSet struct {
 	ips   ipset.Interface
 	users map[string]map[types.UID]struct{}
