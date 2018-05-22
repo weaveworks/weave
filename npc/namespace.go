@@ -40,6 +40,7 @@ type ns struct {
 
 	nsSelectors  *selectorSet
 	podSelectors *selectorSet
+	ipBlocks     *ipBlockSet
 	rules        *ruleSet
 
 	legacy bool
@@ -61,6 +62,7 @@ func newNS(name, nodeName string, legacy bool, ipt iptables.Interface, ips ipset
 		uid:         uuid.NewUUID(),
 		allPods:     allPods,
 		nsSelectors: nsSelectors,
+		ipBlocks:    newIPBlockSet(ips),
 		rules:       newRuleSet(ipt),
 		legacy:      legacy}
 
@@ -342,7 +344,7 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 func (ns *ns) addNetworkPolicy(obj interface{}) error {
 	// Analyse policy, determine which rules and ipsets are required
 
-	uid, rules, nsSelectors, podSelectors, err := ns.analyse(obj)
+	uid, rules, nsSelectors, podSelectors, ipBlocks, err := ns.analyse(obj)
 	if err != nil {
 		return err
 	}
@@ -354,16 +356,19 @@ func (ns *ns) addNetworkPolicy(obj interface{}) error {
 	if err := ns.podSelectors.provision(uid, nil, podSelectors); err != nil {
 		return err
 	}
+	if err := ns.ipBlocks.provision(uid, nil, ipBlocks); err != nil {
+		return err
+	}
 	return ns.rules.provision(uid, nil, rules)
 }
 
 func (ns *ns) updateNetworkPolicy(oldObj, newObj interface{}) error {
 	// Analyse the old and the new policy so we can determine differences
-	oldUID, oldRules, oldNsSelectors, oldPodSelectors, err := ns.analyse(oldObj)
+	oldUID, oldRules, oldNsSelectors, oldPodSelectors, oldIPBlocks, err := ns.analyse(oldObj)
 	if err != nil {
 		return err
 	}
-	newUID, newRules, newNsSelectors, newPodSelectors, err := ns.analyse(newObj)
+	newUID, newRules, newNsSelectors, newPodSelectors, newIPBlocks, err := ns.analyse(newObj)
 	if err != nil {
 		return err
 	}
@@ -381,10 +386,16 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj interface{}) error {
 	if err := ns.podSelectors.deprovision(oldUID, oldPodSelectors, newPodSelectors); err != nil {
 		return err
 	}
+	if err := ns.ipBlocks.deprovision(oldUID, oldIPBlocks, newIPBlocks); err != nil {
+		return err
+	}
 	if err := ns.nsSelectors.provision(oldUID, oldNsSelectors, newNsSelectors); err != nil {
 		return err
 	}
 	if err := ns.podSelectors.provision(oldUID, oldPodSelectors, newPodSelectors); err != nil {
+		return err
+	}
+	if err := ns.ipBlocks.provision(oldUID, oldIPBlocks, newIPBlocks); err != nil {
 		return err
 	}
 	return ns.rules.provision(oldUID, oldRules, newRules)
@@ -392,7 +403,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj interface{}) error {
 
 func (ns *ns) deleteNetworkPolicy(obj interface{}) error {
 	// Analyse network policy to free resources
-	uid, rules, nsSelectors, podSelectors, err := ns.analyse(obj)
+	uid, rules, nsSelectors, podSelectors, ipBlocks, err := ns.analyse(obj)
 	if err != nil {
 		return err
 	}
@@ -406,7 +417,14 @@ func (ns *ns) deleteNetworkPolicy(obj interface{}) error {
 	if err := ns.nsSelectors.deprovision(uid, nsSelectors, nil); err != nil {
 		return err
 	}
-	return ns.podSelectors.deprovision(uid, podSelectors, nil)
+	if err := ns.podSelectors.deprovision(uid, podSelectors, nil); err != nil {
+		return err
+	}
+	if err := ns.ipBlocks.deprovision(uid, ipBlocks, nil); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetName ipset.Name) error {
@@ -602,6 +620,7 @@ func (ns *ns) analyse(obj interface{}) (
 	uid types.UID,
 	rules map[string]*ruleSpec,
 	nsSelectors, podSelectors map[string]*selectorSpec,
+	ipBlocks map[string]*ipBlockSpec,
 	err error) {
 
 	switch p := obj.(type) {
@@ -622,7 +641,7 @@ func (ns *ns) analyse(obj interface{}) (
 			return
 		}
 	} else {
-		rules, nsSelectors, podSelectors, err = ns.analysePolicy(obj.(*networkingv1.NetworkPolicy))
+		rules, nsSelectors, podSelectors, ipBlocks, err = ns.analysePolicy(obj.(*networkingv1.NetworkPolicy))
 		if err != nil {
 			return
 		}

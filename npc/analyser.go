@@ -98,10 +98,12 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	rules map[string]*ruleSpec,
 	nsSelectors, podSelectors map[string]*selectorSpec,
+	ipBlocks map[string]*ipBlockSpec,
 	err error) {
 
 	nsSelectors = make(map[string]*selectorSpec)
 	podSelectors = make(map[string]*selectorSpec)
+	ipBlocks = make(map[string]*ipBlockSpec)
 	rules = make(map[string]*ruleSpec)
 	policyTypes := make([]policyType, 0)
 
@@ -116,7 +118,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	// If empty, matches all pods in a namespace
 	targetSelector, err := newSelectorSpec(&policy.Spec.PodSelector, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// To prevent targetSelector being overwritten by a subsequent selector with
@@ -152,14 +154,14 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					if peer.PodSelector != nil {
 						srcSelector, err = newSelectorSpec(peer.PodSelector, nil, ns.name, ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, err
+							return nil, nil, nil, nil, err
 						}
 						addIfNotExist(srcSelector, podSelectors)
 
 					} else if peer.NamespaceSelector != nil {
 						srcSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, "", ipset.ListSet)
 						if err != nil {
-							return nil, nil, nil, err
+							return nil, nil, nil, nil, err
 						}
 						nsSelectors[srcSelector.key] = srcSelector
 					}
@@ -205,16 +207,19 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					if peer.PodSelector != nil {
 						dstSelector, err = newSelectorSpec(peer.PodSelector, nil, ns.name, ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, err
+							return nil, nil, nil, nil, err
 						}
 						addIfNotExist(dstSelector, podSelectors)
 
 					} else if peer.NamespaceSelector != nil {
 						dstSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, "", ipset.ListSet)
 						if err != nil {
-							return nil, nil, nil, err
+							return nil, nil, nil, nil, err
 						}
 						nsSelectors[dstSelector.key] = dstSelector
+					} else if peer.IPBlock != nil {
+						ipBlock := newIPBlockSpec(peer.IPBlock)
+						ipBlocks[ipBlock.key] = ipBlock
 					}
 
 					if allPorts {
@@ -231,7 +236,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 		}
 	}
 
-	return rules, nsSelectors, podSelectors, nil
+	return rules, nsSelectors, podSelectors, ipBlocks, nil
 }
 
 func addIfNotExist(s *selectorSpec, ss map[string]*selectorSpec) {
