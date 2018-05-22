@@ -157,6 +157,9 @@ The columns are as follows:
    the encryption mode, data transport method, remote peer name and
    nickname for pending and established connections, mtu if known
 
+Specific error messages:
+* `IP allocation was seeded by different peers` - [more details here](/site/ipam/troubleshooting-ipam.md#seeded-different-peers)
+
 ### <a name="weave-status-peers"></a>List Peers
 
 Detailed information on peers can be obtained with `weave status
@@ -329,5 +332,6 @@ and the container image versions as git hashes.
 
 **See Also**
 
+ * [Troubleshooting the Kubernetes Addon](/site/kubernetes/kube-addon/#troubleshooting)
  * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
  * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)

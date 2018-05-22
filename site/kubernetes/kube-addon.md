@@ -307,6 +307,11 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
   pods can talk.
 - If you do set the `--cluster-cidr` option on kube-proxy, make sure
   it matches the `IPALLOC_RANGE` given to Weave Net (see below)
+- IP forwarding must be enabled on each node, in order for pods to
+  access Kubernetes services or other IP addresses on another
+  network. Check this with `sysctl net.ipv4.ip_forward`; the result
+  should be `1`. (Be aware that there can be security implications of
+  enabling IP forwarding)
 
 ## <a name="configuration-options"></a> Changing Configuration Options
 

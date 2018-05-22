@@ -101,6 +101,7 @@ endif
 # The name of the user that this Makefile should produce image artifacts for. Can/should be overridden
 DOCKERHUB_USER?=weaveworks
 # The default version that's chosen when pushing the images. Can/should be overridden
+GIT_REVISION=$(shell git rev-parse HEAD)
 WEAVE_VERSION?=git-$(shell git rev-parse --short=12 HEAD)
 # Docker Store does not allow the "latest" tag.
 NET_PLUGIN_LATEST=latest_release
@@ -270,7 +271,7 @@ endif
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) weave $(WEAVEUTIL_EXE)
 	cp $(WEAVEUTIL_EXE) prog/weaver/weaveutil
 	cp weave prog/weaver/weave
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(SIGPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVER_UPTODATE)
@@ -278,7 +279,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
 # Builds Docker plugin.
@@ -300,15 +301,15 @@ $(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAV
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
 	cp $(KUBEPEERS_EXE) prog/weave-kube/
-	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
 $(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) $(WEAVENPC_EXE) prog/weave-npc/ulogd.conf
-	$(SUDO) docker build -f prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVENPC_IMAGE) prog/weave-npc
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVENPC_IMAGE) prog/weave-npc
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
-	$(SUDO) docker build -t $(WEAVEDB_IMAGE) prog/weavedb
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -t $(WEAVEDB_IMAGE) prog/weavedb
 	touch $@
 
 $(NETWORKTESTER_UPTODATE): test/images/network-tester/Dockerfile $(NETWORKTESTER_EXE)
