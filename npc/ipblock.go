@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -29,22 +30,23 @@ func newIPBlockSpec(ipb *networkingv1.IPBlock) *ipBlockSpec {
 	return spec
 }
 
-//func (ipb ipBlock) GetRuleSpec() (spec *ruleSpec) {
-//	spec = &ruleSpec{
-//		chain: IngressIPBlockChain,
-//	}
-//
-//	if len(ipb.spec.Except) == 0 {
-//		spec.args = append(spec.args, "-s", ipb.spec.CIDR)
-//		spec.comment = fmt.Sprintf("cidr: %s", ipb.spec.CIDR)
-//	} else {
-//		spec.args = append(spec.args, "-s", ipb.spec.CIDR, "-m", "set", "!", "--match-set",
-//			string(ipb.ipsetName), "src")
-//		spec.comment = fmt.Sprintf("cidr: %s except [%s]", ipb.spec.CIDR,
-//			strings.Join(ipb.spec.Except, `,`))
-//	}
-//	return
-//}
+func (spec *ipBlockSpec) getRuleSpec(src bool) ([]string, string) {
+	dir, dirOpt := "dst", "-d"
+	if src {
+		dir, dirOpt = "src", "-s"
+	}
+
+	if spec.key == "" {
+		rule := []string{dirOpt, spec.ipBlock.CIDR}
+		comment := fmt.Sprintf("cidr: %s", spec.ipBlock.CIDR)
+		return rule, comment
+	}
+
+	rule := []string{dirOpt, spec.ipBlock.CIDR,
+		"-m", "set", "!", "--match-set", string(spec.ipsetName), dir}
+	comment := fmt.Sprintf("cidr: %s except [%s]", spec.ipBlock.CIDR, spec.key)
+	return rule, comment
+}
 
 type ipBlockSet struct {
 	ips   ipset.Interface
