@@ -67,3 +67,18 @@ Columns are as follows:
   partition, it may be because the peer has failed and needs to be
   removed administratively - see [Starting, Stopping and Removing
   Peers](/site/tasks/ipam/stop-remove-peers-ipam.md) for more details.
+
+
+### <a name="seeded-different-peers"></a>Seeded by Different Peers
+
+If you see the message: `IP allocation was seeded by different peers`,
+this means that some Weave Net peers were initialized into one cluster
+and some into another cluster; Weave Net cannot operate in this state.
+
+To recover, you need to eliminate the IPAM data from the affected
+nodes and restart.  If you installed via the Kubernetes Addon, this
+data will be in a file under `/var/lib/weave` on the node - delete
+this file and restart the node.
+
+For other installations, run `weave reset` and restart. Any existing
+connections to containers will be lost.
