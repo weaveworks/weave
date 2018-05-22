@@ -22,6 +22,10 @@ The following topics are discussed:
 
 ## <a name="install"></a> Installation
 
+*Before installing Weave Net, you should make sure the following ports are not
+blocked by your firewall: TCP 6783 and UDP 6783/6784.
+For more details, see the [FAQ](/site/faq.md#ports).*
+
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
