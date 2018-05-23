@@ -21,6 +21,8 @@ type ContainerObserver interface {
 	ContainerStarted(ident string)
 	ContainerDied(ident string)
 	ContainerDestroyed(ident string)
+	ContainerConnected(ident string)
+	ContainerDisconnected(ident string)
 }
 
 type Client struct {
@@ -115,6 +117,14 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 					case "destroy":
 						pending.finish(event.ID)
 						ob.ContainerDestroyed(event.ID)
+					case "network:connect":
+						if containerID, ok := event.Actor.Attributes["container"]; ok {
+							ob.ContainerConnected(containerID)
+						}
+					case "network:disconnect":
+						if containerID, ok := event.Actor.Attributes["container"]; ok {
+							ob.ContainerDisconnected(containerID)
+						}
 					}
 				}
 				if time.Since(start) > retryInterval {

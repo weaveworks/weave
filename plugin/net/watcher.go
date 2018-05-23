@@ -62,3 +62,31 @@ func (w *watcher) ContainerDied(id string) {
 }
 
 func (w *watcher) ContainerDestroyed(id string) {}
+
+func (w *watcher) ContainerConnected(id string) {
+	w.driver.debug("ContainerConnected", "%s", id)
+	info, err := w.client.InspectContainer(id)
+	if err != nil {
+		w.driver.warn("ContainerConnected", "error inspecting container %s: %s", id, err)
+		return
+	}
+	// check that it's on our network
+	for _, net := range info.NetworkSettings.Networks {
+		network, err := w.driver.findNetworkInfo(net.NetworkID)
+		if err != nil {
+			w.driver.warn("ContainerConnected", "unable to find network %s info: %s", net.NetworkID, err)
+			continue
+		}
+		if network.isOurs {
+			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
+			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
+				w.driver.warn("ContainerConnected", "unable to register %s with weaveDNS: %s", id, err)
+			}
+			if _, err := weavenet.WithNetNSByPid(info.State.Pid, "configure-arp", weavenet.VethName); err != nil {
+				w.driver.warn("ContainerConnected", "unable to configure interfaces: %s", err)
+			}
+		}
+	}
+}
+
+func (w *watcher) ContainerDisconnected(id string) {}

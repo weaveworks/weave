@@ -232,6 +232,12 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
+	nameserver.ContainerDisconnected("containerid")
+	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
+
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
+	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+
 	nameserver.PeerGone(peername)
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 }
