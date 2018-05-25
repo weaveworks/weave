@@ -225,20 +225,45 @@ run_on $HOST1 "$KUBECTL delete netpol allow-nettest-deny"
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-# allow access for all
+# Create many namespaces to stress namespaceSelector
+for n in 1 2 3 4 5 6 7 8 9 10; do
+    run_on $HOST1 "$KUBECTL create namespace namespace${n}"
+done
+
+# allow access from any namespace
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-nettest-deny
+  name: allow-any-namespace
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+      - namespaceSelector: {}
+EOF
+
+# Should be able to access from the "deny" pod now
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# host should still not be able to reach pods via service virtual IP or NodePort
+# because host is not in a namespace
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+# allow access from anywhere
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-anywhere
   namespace: default
 spec:
   podSelector: {}
   ingress:
     - {}
 EOF
-
-assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # Virtual IP and NodePort should now work
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
