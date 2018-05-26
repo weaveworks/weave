@@ -143,6 +143,9 @@ post_start_actions() {
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
+
+    # Mark network as up
+    /home/weave/kube-peers -set-node-status -node-name="$HOSTNAME"
 }
 
 post_start_actions &

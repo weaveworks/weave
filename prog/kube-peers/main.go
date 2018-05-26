@@ -176,14 +176,16 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 
 func main() {
 	var (
-		justReclaim bool
-		justCheck   bool
-		peerName    string
-		nodeName    string
-		logLevel    string
+		justReclaim       bool
+		justCheck         bool
+		justSetNodeStatus bool
+		peerName          string
+		nodeName          string
+		logLevel          string
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
 	flag.BoolVar(&justCheck, "check-peer-new", false, "return success if peer name is not stored in annotation")
+	flag.BoolVar(&justSetNodeStatus, "set-node-status", false, "set NodeNetworkUnavailable to false")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
@@ -209,6 +211,13 @@ func main() {
 		} else {
 			os.Exit(0)
 		}
+	}
+	if justSetNodeStatus {
+		err := setNodeNetworkUnavailableFalse(c, nodeName)
+		if err != nil {
+			common.Log.Fatalf("[kube-peers] could not set node status: %v", err)
+		}
+		return
 	}
 	peers, err := getKubePeers(c)
 	if err != nil {
