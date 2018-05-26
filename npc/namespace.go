@@ -443,36 +443,41 @@ func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetNam
 	return nil
 }
 
-func bypassRuleIngress(nsIpsetName ipset.Name, namespace string) []string {
-	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace}
+func bypassRules(namespace string, ingress, egress ipset.Name) map[string][][]string {
+	return map[string][][]string{
+		DefaultChain: {
+			{"-m", "set", "--match-set", string(ingress), "dst", "-j", "ACCEPT",
+				"-m", "comment", "--comment", "DefaultAllow ingress isolation for namespace: " + namespace},
+		},
+		EgressDefaultChain: {
+			{"-m", "set", "--match-set", string(egress), "src", "-j", EgressMarkChain,
+				"-m", "comment", "--comment", "DefaultAllow egress isolation for namespace: " + namespace},
+			{"-m", "set", "--match-set", string(egress), "src", "-j", "RETURN",
+				"-m", "comment", "--comment", "DefaultAllow egress isolation for namespace: " + namespace},
+		},
+	}
 }
 
-func bypassRuleEgress(nsIpsetName ipset.Name, namespace string) [][]string {
-	return [][]string{
-		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", EgressMarkChain, "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
-		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", "RETURN", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
-	}
+func bypassRuleLegacy(nsIpsetName ipset.Name, namespace string) []string {
+	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace}
 }
 
 func (ns *ns) ensureBypassRules() error {
 	if ns.legacy {
 		ipset := ns.allPods.ipsetName
 		common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, ipset)
-		if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+		if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRuleLegacy(ipset, ns.name)...); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	ipset := ns.ingressDefaultAllowIPSet
-	common.Log.Debugf("ensuring rule for ingress DefaultAllow in namespace: %s, set %s", ns.name, ipset)
-	if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
-		return err
-	}
-	ipset = ns.egressDefaultAllowIPSet
-	common.Log.Debugf("ensuring rules for egress DefaultAllow in namespace: %s, set %s", ns.name, ipset)
-	for _, rule := range bypassRuleEgress(ipset, ns.name) {
-		if err := ns.ipt.Append(TableFilter, EgressDefaultChain, rule...); err != nil {
-			return err
+	for chain, rules := range bypassRules(ns.name, ns.ingressDefaultAllowIPSet, ns.egressDefaultAllowIPSet) {
+		for _, rule := range rules {
+			common.Log.Debugf("adding rule for DefaultAllow in namespace: %s, chain: %s, %s", ns.name, chain, rule)
+			if err := ns.ipt.Append(TableFilter, chain, rule...); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -483,21 +488,18 @@ func (ns *ns) deleteBypassRules() error {
 	if ns.legacy {
 		ipset := ns.allPods.ipsetName
 		common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, ipset)
-		if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+		if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRuleLegacy(ipset, ns.name)...); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	ipset := ns.ingressDefaultAllowIPSet
-	common.Log.Debugf("removing default ingress rule in namespace: %s, set %s", ns.name, ipset)
-	if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
-		return err
-	}
-	ipset = ns.egressDefaultAllowIPSet
-	common.Log.Debugf("removing default egress rule in namespace: %s, set %s", ns.name, ipset)
-	for _, rule := range bypassRuleEgress(ipset, ns.name) {
-		if err := ns.ipt.Delete(TableFilter, EgressDefaultChain, rule...); err != nil {
-			return err
+	for chain, rules := range bypassRules(ns.name, ns.ingressDefaultAllowIPSet, ns.egressDefaultAllowIPSet) {
+		for _, rule := range rules {
+			common.Log.Debugf("removing rule for DefaultAllow in namespace: %s, chain: %s, %s", ns.name, chain, rule)
+			if err := ns.ipt.Delete(TableFilter, chain, rule...); err != nil {
+				return err
+			}
 		}
 	}
 
