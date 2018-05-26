@@ -10,6 +10,7 @@ const (
 	EgressChain        = "WEAVE-NPC-EGRESS"
 	EgressDefaultChain = "WEAVE-NPC-EGRESS-DEFAULT"
 	EgressCustomChain  = "WEAVE-NPC-EGRESS-CUSTOM"
+	EgressMarkChain    = "WEAVE-NPC-EGRESS-ACCEPT"
 	EgressMark         = "0x40000/0x40000"
 
 	IpsetNamePrefix = "weave-"

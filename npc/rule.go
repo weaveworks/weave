@@ -72,7 +72,7 @@ func (spec *ruleSpec) iptRuleSpecs() [][]string {
 	// egressPolicy
 	ruleMark := make([]string, len(spec.args))
 	copy(ruleMark, spec.args)
-	ruleMark = append(ruleMark, "-j", "MARK", "--set-xmark", EgressMark)
+	ruleMark = append(ruleMark, "-j", EgressMarkChain)
 	ruleReturn := make([]string, len(spec.args))
 	copy(ruleReturn, spec.args)
 	ruleReturn = append(ruleReturn, "-j", "RETURN")

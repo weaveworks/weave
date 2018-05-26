@@ -449,7 +449,7 @@ func bypassRuleIngress(nsIpsetName ipset.Name, namespace string) []string {
 
 func bypassRuleEgress(nsIpsetName ipset.Name, namespace string) [][]string {
 	return [][]string{
-		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", "MARK", "--set-xmark", EgressMark, "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
+		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", EgressMarkChain, "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
 		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", "RETURN", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
 	}
 }

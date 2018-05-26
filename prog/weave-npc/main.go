@@ -57,6 +57,10 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressMarkChain); err != nil {
+		return err
+	}
+
 	if err := ipt.ClearChain(npc.TableFilter, npc.EgressCustomChain); err != nil {
 		return err
 	}
@@ -133,6 +137,11 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
+		"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
 		return err
 	}
 
