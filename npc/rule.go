@@ -46,13 +46,37 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 	if dstPort != nil {
 		args = append(args, "--dport", *dstPort)
 	}
-	args = append(args, "-j", "ACCEPT")
 	// NOTE: if you remove the comment bellow, then embed `policyType` into `key`.
 	// Otherwise, the rule won't be provisioned if it exists for other policy type.
 	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s (%s)", srcComment, dstComment, policyTypeStr(policyType)))
 	key := strings.Join(args, " ")
 
 	return &ruleSpec{key, args, policyType}
+}
+
+func (spec *ruleSpec) iptChain() string {
+	if spec.policyType == egressPolicy {
+		return EgressCustomChain
+	}
+	return IngressChain
+}
+
+func (spec *ruleSpec) iptRuleSpecs() [][]string {
+	if spec.policyType == ingressPolicy {
+		rule := make([]string, len(spec.args))
+		copy(rule, spec.args)
+		rule = append(rule, "-j", "ACCEPT")
+		return [][]string{rule}
+	}
+
+	// egressPolicy
+	ruleMark := make([]string, len(spec.args))
+	copy(ruleMark, spec.args)
+	ruleMark = append(ruleMark, "-j", "MARK", "--set-xmark", EgressMark)
+	ruleReturn := make([]string, len(spec.args))
+	copy(ruleReturn, spec.args)
+	ruleReturn = append(ruleReturn, "-j", "RETURN")
+	return [][]string{ruleMark, ruleReturn}
 }
 
 type ruleSet struct {
@@ -69,11 +93,14 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
-				chain := rulesChainByPolicyType(spec.policyType)
-				common.Log.Infof("deleting rule %v from %q chain", spec.args, chain)
-				if err := rs.ipt.Delete(TableFilter, chain, spec.args...); err != nil {
-					return err
+				chain := spec.iptChain()
+				for _, rule := range spec.iptRuleSpecs() {
+					common.Log.Infof("deleting rule %v from %q chain", rule, chain)
+					if err := rs.ipt.Delete(TableFilter, chain, rule...); err != nil {
+						return err
+					}
 				}
+
 				delete(rs.users, key)
 			}
 		}
@@ -86,10 +113,12 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
-				chain := rulesChainByPolicyType(spec.policyType)
-				common.Log.Infof("adding rule %v to %q chain", spec.args, chain)
-				if err := rs.ipt.Append(TableFilter, chain, spec.args...); err != nil {
-					return err
+				chain := spec.iptChain()
+				for _, rule := range spec.iptRuleSpecs() {
+					common.Log.Infof("adding rule %v to %q chain", rule, chain)
+					if err := rs.ipt.Append(TableFilter, chain, rule...); err != nil {
+						return err
+					}
 				}
 				rs.users[key] = make(map[types.UID]struct{})
 			}
@@ -98,11 +127,4 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	}
 
 	return nil
-}
-
-func rulesChainByPolicyType(policyType policyType) string {
-	if policyType == egressPolicy {
-		return EgressCustomChain
-	}
-	return IngressChain
 }
