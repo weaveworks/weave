@@ -443,32 +443,65 @@ func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetNam
 	return nil
 }
 
-func bypassRule(nsIpsetName ipset.Name, namespace string) []string {
+func bypassRuleIngress(nsIpsetName ipset.Name, namespace string) []string {
 	return []string{"-m", "set", "--match-set", string(nsIpsetName), "dst", "-j", "ACCEPT", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace}
 }
 
-func (ns *ns) ensureBypassRule() error {
-	var ipset ipset.Name
-	if ns.legacy {
-		ipset = ns.allPods.ipsetName
-	} else {
-		ipset = ns.ingressDefaultAllowIPSet
+func bypassRuleEgress(nsIpsetName ipset.Name, namespace string) [][]string {
+	return [][]string{
+		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", "MARK", "--set-xmark", EgressMark, "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
+		{"-m", "set", "--match-set", string(nsIpsetName), "src", "-j", "RETURN", "-m", "comment", "--comment", "DefaultAllow isolation for namespace: " + namespace},
 	}
-
-	common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, ipset)
-	return ns.ipt.Append(TableFilter, DefaultChain, bypassRule(ipset, ns.name)...)
 }
 
-func (ns *ns) deleteBypassRule() error {
-	var ipset ipset.Name
+func (ns *ns) ensureBypassRules() error {
 	if ns.legacy {
-		ipset = ns.allPods.ipsetName
-	} else {
-		ipset = ns.ingressDefaultAllowIPSet
+		ipset := ns.allPods.ipsetName
+		common.Log.Debugf("ensuring rule for DefaultAllow in namespace: %s, set %s", ns.name, ipset)
+		if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+			return err
+		}
 	}
 
-	common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, ipset)
-	return ns.ipt.Delete(TableFilter, DefaultChain, bypassRule(ipset, ns.name)...)
+	ipset := ns.ingressDefaultAllowIPSet
+	common.Log.Debugf("ensuring rule for ingress DefaultAllow in namespace: %s, set %s", ns.name, ipset)
+	if err := ns.ipt.Append(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+		return err
+	}
+	ipset = ns.egressDefaultAllowIPSet
+	common.Log.Debugf("ensuring rules for egress DefaultAllow in namespace: %s, set %s", ns.name, ipset)
+	for _, rule := range bypassRuleEgress(ipset, ns.name) {
+		if err := ns.ipt.Append(TableFilter, EgressDefaultChain, rule...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (ns *ns) deleteBypassRules() error {
+	if ns.legacy {
+		ipset := ns.allPods.ipsetName
+		common.Log.Debugf("removing default rule in namespace: %s, set %s", ns.name, ipset)
+		if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+			return err
+		}
+	}
+
+	ipset := ns.ingressDefaultAllowIPSet
+	common.Log.Debugf("removing default ingress rule in namespace: %s, set %s", ns.name, ipset)
+	if err := ns.ipt.Delete(TableFilter, DefaultChain, bypassRuleIngress(ipset, ns.name)...); err != nil {
+		return err
+	}
+	ipset = ns.egressDefaultAllowIPSet
+	common.Log.Debugf("removing default egress rule in namespace: %s, set %s", ns.name, ipset)
+	for _, rule := range bypassRuleEgress(ipset, ns.name) {
+		if err := ns.ipt.Delete(TableFilter, EgressDefaultChain, rule...); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
@@ -476,7 +509,7 @@ func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 
 	// Insert a rule to bypass policies if namespace is DefaultAllow
 	if !ns.isDefaultDeny(obj) {
-		if err := ns.ensureBypassRule(); err != nil {
+		if err := ns.ensureBypassRules(); err != nil {
 			return err
 		}
 	}
@@ -496,12 +529,12 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 	if oldDefaultDeny != newDefaultDeny {
 		common.Log.Infof("namespace DefaultDeny changed from %t to %t", oldDefaultDeny, newDefaultDeny)
 		if oldDefaultDeny {
-			if err := ns.ensureBypassRule(); err != nil {
+			if err := ns.ensureBypassRules(); err != nil {
 				return err
 			}
 		}
 		if newDefaultDeny {
-			if err := ns.deleteBypassRule(); err != nil {
+			if err := ns.deleteBypassRules(); err != nil {
 				return err
 			}
 		}
@@ -536,7 +569,7 @@ func (ns *ns) deleteNamespace(obj *coreapi.Namespace) error {
 
 	// Remove bypass rule
 	if !ns.isDefaultDeny(obj) {
-		if err := ns.deleteBypassRule(); err != nil {
+		if err := ns.deleteBypassRules(); err != nil {
 			return err
 		}
 	}
