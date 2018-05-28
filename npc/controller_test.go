@@ -511,3 +511,51 @@ func TestNewTargetSelector(t *testing.T) {
 	// No netpol target-selects podFoo
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 }
+
+func TestEgressPolicyWithIPBlock(t *testing.T) {
+	const (
+		fooPodIP        = "10.32.0.10"
+		exceptIPSetName = "weave-LKf)d{$q[dkYlH3Ko6eFcdc7z"
+	)
+
+	m := newMockIPSet()
+	ipt := newMockIPTables()
+	controller := New("foo", false, ipt, &m)
+
+	netpol := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo",
+			Name:      "allow-from-bar-to-foo",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeEgress,
+			},
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "bar"}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{
+						CIDR: "192.168.48.0/24",
+						Except: []string{
+							"192.168.48.1/32",
+							"192.168.48.2/32",
+						},
+					},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpol)
+
+	require.Equal(t, 2, len(m.sets[exceptIPSetName].subSets))
+	require.True(t, m.entryExists(exceptIPSetName, "192.168.48.1/32"))
+	require.True(t, m.entryExists(exceptIPSetName, "192.168.48.2/32"))
+
+	// Each egress rule is represented as two iptables rules (-J MARK and -J RETURN).
+	require.Equal(t, 2, len(ipt.rules[EgressCustomChain]))
+	for rule := range ipt.rules[EgressCustomChain] {
+		require.Contains(t, rule, "-d 192.168.48.0/24 -m set ! --match-set "+exceptIPSetName+" dst")
+	}
+
+}
