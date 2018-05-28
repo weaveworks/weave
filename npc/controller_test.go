@@ -1,7 +1,9 @@
 package npc
 
 import (
+	"fmt"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -103,18 +105,46 @@ func (i *mockIPSet) List(prefix string) ([]ipset.Name, error) {
 }
 
 type mockIPTables struct {
+	rules map[string]map[string]struct{} // chain -> rulespec -> struct{}
+}
+
+func newMockIPTables() *mockIPTables {
+	return &mockIPTables{rules: make(map[string]map[string]struct{})}
 }
 
 func (ipt *mockIPTables) Append(table, chain string, rulespec ...string) error {
+	if table != TableFilter {
+		return fmt.Errorf("invalid table: %q", table)
+	}
+
+	if _, found := ipt.rules[chain]; !found {
+		ipt.rules[chain] = make(map[string]struct{})
+	}
+
+	rule := strings.Join(rulespec, " ")
+	if _, found := ipt.rules[chain][rule]; found {
+		return fmt.Errorf("rule already exists. chain: %q, rule: %q", chain, rule)
+	}
+
+	ipt.rules[chain][rule] = struct{}{}
+
 	return nil
 }
 
 func (ipt *mockIPTables) Delete(table, chain string, rulespec ...string) error {
+	rule := strings.Join(rulespec, " ")
+
+	if _, found := ipt.rules[chain][rule]; !found {
+		return fmt.Errorf("rule does not exist. chain: %q rule: %q", chain, rule)
+	}
+
+	delete(ipt.rules[chain], rule)
+
 	return nil
 }
 
 func (ipt *mockIPTables) Insert(table, chain string, pos int, rulespec ...string) error {
-	return nil
+	return errors.New("Not Implemented")
 }
 
 func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
@@ -168,7 +198,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", false, &mockIPTables{}, &m)
+	controller := New("foo", false, newMockIPTables(), &m)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -184,7 +214,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", false, &mockIPTables{}, &m)
+	controller = New("foo", false, newMockIPTables(), &m)
 
 	controller.AddNetworkPolicy(networkPolicy)
 
@@ -205,7 +235,7 @@ func TestDefaultAllow(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("bar", false, &mockIPTables{}, &m)
+	controller := New("bar", false, newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -333,7 +363,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("qux", false, &mockIPTables{}, &m)
+	controller := New("qux", false, newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -415,7 +445,7 @@ func TestNewTargetSelector(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("baz", false, &mockIPTables{}, &m)
+	controller := New("baz", false, newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
