@@ -198,6 +198,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 func TestDefaultAllow(t *testing.T) {
 	const (
 		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		egressDefaultAllowIPSetName  = "weave-s_+ChJId4Uy_$}G;WdH|~TK)I"
 		fooPodIP                     = "10.32.0.10"
 		barPodIP                     = "10.32.0.11"
 		barPodNewIP                  = "10.32.0.12"
@@ -215,6 +216,7 @@ func TestDefaultAllow(t *testing.T) {
 
 	// Should create an ipset for default-allow
 	require.Contains(t, m.sets, ingressDefaultAllowIPSetName)
+	require.Contains(t, m.sets, egressDefaultAllowIPSetName)
 
 	podFoo := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -227,6 +229,7 @@ func TestDefaultAllow(t *testing.T) {
 
 	// Should add the foo pod to default-allow
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -242,6 +245,7 @@ func TestDefaultAllow(t *testing.T) {
 
 	// Should add the bar pod to default-allow
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
 
 	// Allow access from the bar pod to the foo pod
 	netpol := &networkingv1.NetworkPolicy{
@@ -250,7 +254,10 @@ func TestDefaultAllow(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
-			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			},
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -259,13 +266,20 @@ func TestDefaultAllow(t *testing.T) {
 					},
 				}},
 			}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{CIDR: "192.168.48.0/24"},
+				}},
+			}},
 		},
 	}
 	controller.AddNetworkPolicy(netpol)
 
 	// Should remove the foo pod from default-allow as the netpol selects it
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
 
 	podBarWithNewIP := *podBar
 	podBarWithNewIP.Status.PodIP = barPodNewIP
@@ -273,11 +287,14 @@ func TestDefaultAllow(t *testing.T) {
 
 	// Should update IP addr of the bar pod in default-allow
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodNewIP))
 
 	controller.UpdatePod(&podBarWithNewIP, podBarNoIP)
 	// Should remove the bar pod from default-allow as it does not have any IP addr
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, barPodNewIP))
 
 	podFooWithNewLabel := *podFoo
 	podFooWithNewLabel.ObjectMeta.Labels = map[string]string{"run": "new-foo"}
@@ -285,22 +302,27 @@ func TestDefaultAllow(t *testing.T) {
 
 	// Should bring back the foo pod to default-allow as it does not match dst of any netpol
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.UpdatePod(&podFooWithNewLabel, podFoo)
 	// Should remove from default-allow as it matches the netpol after the update
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNetworkPolicy(netpol)
 	// Should bring back the foo pod to default-allow as no netpol selects it
 	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
 	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNamespace(defaultNamespace)
 	// Should remove default ipset
 	require.NotContains(t, m.sets, ingressDefaultAllowIPSetName)
+	require.NotContains(t, m.sets, egressDefaultAllowIPSetName)
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
