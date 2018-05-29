@@ -492,14 +492,20 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -o $BRIDGE -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
     run_iptables -F WEAVE-NPC >/dev/null 2>&1 || true
-    run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-NPC 2>/dev/null || true
+    run_iptables -t filter -D FORWARD -o $BRIDGE -m comment --comment "NOTE: this must go before '-j KUBE-FORWARD'" -j WEAVE-NPC 2>/dev/null || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86 2>/dev/null || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j DROP 2>/dev/null || true
     run_iptables -X WEAVE-NPC >/dev/null 2>&1 || true
     run_iptables -F WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
-    run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-NPC-EGRESS 2>/dev/null || true
+    run_iptables -t filter -D FORWARD -i $BRIDGE -m comment --comment "NOTE: this must go before '-j KUBE-FORWARD'" -j WEAVE-NPC-EGRESS 2>/dev/null || true
     run_iptables -t filter -D INPUT -i $BRIDGE -j WEAVE-NPC-EGRESS 2>/dev/null || true
     run_iptables -X WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-DEFAULT >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-DEFAULT >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-CUSTOM >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-CUSTOM >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-ACCEPT >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-ACCEPT >/dev/null 2>&1 || true
 
     run_iptables -F WEAVE-EXPOSE >/dev/null 2>&1 || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-EXPOSE 2>/dev/null || true
