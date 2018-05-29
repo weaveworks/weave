@@ -3,9 +3,11 @@ package main
 import (
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	coreapi "k8s.io/api/core/v1"
 	extnapi "k8s.io/api/extensions/v1beta1"
@@ -69,9 +71,9 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.EgressChain); err != nil {
-		return err
-	}
+	// We do not clear npc.EgressChain here because otherwise, in the case of restarting
+	// weave-npc process, all egress traffic is allowed for a short period of time.
+	// The chain is created in createBaseRules.
 
 	return nil
 }
@@ -97,6 +99,11 @@ func resetIPSets(ips ipset.Interface) error {
 	}
 
 	for _, s := range sets {
+		// LocalIPset might be used by WEAVE-NPC-EGRESS chain which we do not
+		// flush, so we cannot destroy it.
+		if s == npc.LocalIpset {
+			continue
+		}
 		common.Log.Debugf("Destroying ipset '%s'", string(s))
 		if err := ips.Destroy(s); err != nil {
 			common.Log.Errorf("Failed to destroy ipset '%s'", string(s))
@@ -145,43 +152,55 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"); err != nil {
-		return err
+	ruleSpecs := [][]string{
+		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
+		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
 	}
 	if allowMcast {
-		if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-			"-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
-			return err
+		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
+	}
+	ruleSpecs = append(ruleSpecs, [][]string{
+		{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
+		{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
+	}...)
+	if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// addChainWithRules creates a chain and appends given rules to it.
+//
+// If the chain exists, but its rules are not the same as the given ones, the
+// function will flush the chain and then will append the rules.
+func addChainWithRules(ipt *iptables.IPTables, table, chain string, rulespecs [][]string) error {
+	// Create the chain ignoring any error because the chain might already exist
+	_ = ipt.NewChain(table, chain)
+
+	currRuleSpecs, err := ipt.List(table, chain)
+	if err != nil {
+		return errors.Wrapf(err, "iptables -S. table: %q, chain: %q", table, chain)
+	}
+
+	// First returned rule is "-N $(chain)", so ignore it
+	currRules := strings.Join(currRuleSpecs[1:], "\n")
+	rules := make([]string, 0)
+	for _, r := range rulespecs {
+		rules = append(rules, strings.Join(r, " "))
+	}
+	reqRules := strings.Join(rules, "\n")
+
+	if currRules == reqRules {
+		return nil
+	}
+
+	for _, r := range rulespecs {
+		if err := ipt.Append(table, chain, r...); err != nil {
+			return errors.Wrapf(err, "iptables -A. table: %q, chain: %q, rule: %s", table, chain, r)
 		}
-	}
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "state", "--state", "NEW",
-		"-j", string(npc.EgressDefaultChain)); err != nil {
-		return err
-	}
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "state", "--state", "NEW",
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "src",
-		"-j", "RETURN"); err != nil {
-		return err
-	}
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "state", "--state", "NEW",
-		"-m", "mark", "!", "--mark", npc.EgressMark,
-		"-j", string(npc.EgressCustomChain)); err != nil {
-		return err
-	}
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "state", "--state", "NEW",
-		"-m", "mark", "!", "--mark", npc.EgressMark,
-		"-j", "NFLOG", "--nflog-group", "86"); err != nil {
-		return err
-	}
-	if err := ipt.Append(npc.TableFilter, npc.EgressChain,
-		"-m", "mark", "!", "--mark", npc.EgressMark,
-		"-j", "DROP"); err != nil {
-		return err
 	}
 
 	return nil
