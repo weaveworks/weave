@@ -139,8 +139,14 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 
 	// If the destination address is not any of the local pods, let it through
-	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+	found, err := ipsetExist(ips, npc.LocalIpset)
+	if err != nil {
 		return err
+	}
+	if !found {
+		if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+			return err
+		}
 	}
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
@@ -204,6 +210,22 @@ func addChainWithRules(ipt *iptables.IPTables, table, chain string, rulespecs []
 	}
 
 	return nil
+}
+
+// Dummy way to check whether a given ipset exists.
+// TODO(brb) Use "ipset -exist create <..>" for our purpose instead (for some reasons
+// creating an ipset with -exist fails).
+func ipsetExist(ips ipset.Interface, name ipset.Name) (bool, error) {
+	sets, err := ips.List(string(name))
+	if err != nil {
+		return false, err
+	}
+	for _, s := range sets {
+		if s == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func root(cmd *cobra.Command, args []string) {
