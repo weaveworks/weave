@@ -216,6 +216,7 @@ type BridgeConfig struct {
 	NoBridgedFastdp  bool
 	AWSVPC           bool
 	NPC              bool
+	LegacyNPC        bool
 	MTU              int
 	Mac              string
 	Port             int
@@ -461,20 +462,20 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 		// Ignore error because chains might already exist
 		// TODO(brb): use constants for WEAVE-NPC* chains
 		_ = ipt.NewChain("filter", "WEAVE-NPC")
-		_ = ipt.NewChain("filter", "WEAVE-NPC-EGRESS")
-
-		// TODO(brb): this rule might slow down packet processing; consider removing at it applies only
-		// to node-local traffic.
-		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", "WEAVE-NPC-EGRESS"); err != nil {
-			return err
+		if !config.LegacyNPC {
+			_ = ipt.NewChain("filter", "WEAVE-NPC-EGRESS")
+			if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", "WEAVE-NPC-EGRESS"); err != nil {
+				return err
+			}
+			fwdRules = append(fwdRules, []string{
+				"-i", config.WeaveBridgeName,
+				"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+				"-j", "WEAVE-NPC-EGRESS"})
 		}
 
 		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
 		fwdRules = append(fwdRules,
 			[][]string{
-				{"-i", config.WeaveBridgeName,
-					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", "WEAVE-NPC-EGRESS"},
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
 					"-j", "WEAVE-NPC"},

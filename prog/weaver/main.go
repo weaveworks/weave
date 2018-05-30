@@ -182,6 +182,7 @@ func main() {
 	mflag.StringVar(&bridgeConfig.WeaveBridgeName, []string{"-weave-bridge"}, "weave", "name of weave bridge")
 	mflag.StringVar(&bridgeConfig.DockerBridgeName, []string{"-docker-bridge"}, "", "name of Docker bridge")
 	mflag.BoolVar(&bridgeConfig.NPC, []string{"-expect-npc"}, false, "set up iptables rules for npc")
+	mflag.BoolVar(&bridgeConfig.LegacyNPC, []string{"-use-legacy-netpol"}, false, "use legacy network policies (pre k8s 1.7 vsn)")
 	mflag.StringVar(&routerName, []string{"-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"-password"}, "", "network password")
