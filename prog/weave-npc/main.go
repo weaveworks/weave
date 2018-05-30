@@ -114,7 +114,7 @@ func resetIPSets(ips ipset.Interface) error {
 	return nil
 }
 
-func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
+func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface, legacy bool) error {
 	// Configure main chain static rules
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
@@ -153,26 +153,28 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
-	if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
-		"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
-		return err
-	}
+	if !legacy {
+		if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
+			"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
+			return err
+		}
 
-	ruleSpecs := [][]string{
-		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
-		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
-	}
-	if allowMcast {
-		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
-	}
-	ruleSpecs = append(ruleSpecs, [][]string{
-		{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
-		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
-		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
-		{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
-	}...)
-	if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
-		return err
+		ruleSpecs := [][]string{
+			{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
+			{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
+		}
+		if allowMcast {
+			ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
+		}
+		ruleSpecs = append(ruleSpecs, [][]string{
+			{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
+			{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
+			{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
+			{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
+		}...)
+		if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -266,7 +268,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
-	handleError(createBaseRules(ipt, ips))
+	handleError(createBaseRules(ipt, ips, legacy))
 
 	npc := npc.New(nodeName, legacy, ipt, ips)
 
