@@ -44,9 +44,9 @@ for host in $HOSTS; do
 done
 
 if [ -n "$COVERAGE" ]; then
-    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof -- --use-legacy-netpol\""
 else
-    WEAVE_ENV_VARS="env:"
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"--use-legacy-netpol\""
 fi
 
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
@@ -178,6 +178,12 @@ assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c
 run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
 denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+if [ -n "$COVERAGE" ]; then
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+else
+    WEAVE_ENV_VARS="env:"
+fi
 
 # Restart weave-net with npc in non-legacy mode
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
