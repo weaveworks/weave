@@ -15,7 +15,7 @@ type Dev struct {
 	CIDRs []*net.IPNet     `json:"CIDRs,omitempty"`
 }
 
-func LinkToNetDev(link netlink.Link) (Dev, error) {
+func linkToNetDev(link netlink.Link) (Dev, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return Dev{}, err
@@ -103,7 +103,7 @@ func GetNetDevsByVethPeerIds(processID int, peerIDs []int) ([]Dev, error) {
 
 		for _, link := range links {
 			if _, found := indexes[link.Attrs().Index]; found {
-				netdev, err := LinkToNetDev(link)
+				netdev, err := linkToNetDev(link)
 				if err != nil {
 					return err
 				}
@@ -124,5 +124,5 @@ func GetBridgeNetDev(bridgeName string) (Dev, error) {
 		return Dev{}, err
 	}
 
-	return LinkToNetDev(link)
+	return linkToNetDev(link)
 }

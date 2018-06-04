@@ -220,14 +220,14 @@ func setupIface(ifaceName, newIfName string) error {
 		return err
 	}
 	// This is only called by AttachContainer which is only called in host pid namespace
-	if err := ConfigureARPCache("/proc", newIfName); err != nil {
+	if err := configureARPCache("/proc", newIfName); err != nil {
 		return err
 	}
 	return ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP")
 }
 
-// ConfigureARP is a helper for the Docker plugin which doesn't set the addresses itself
-func ConfigureArp(prefix, rootPath string) error {
+// configureARP is a helper for the Docker plugin which doesn't set the addresses itself
+func ConfigureARP(prefix, rootPath string) error {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func ConfigureArp(prefix, rootPath string) error {
 	for _, link := range links {
 		ifName := link.Attrs().Name
 		if strings.HasPrefix(ifName, prefix) {
-			ConfigureARPCache(rootPath+"/proc", ifName)
+			configureARPCache(rootPath+"/proc", ifName)
 			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
 				for _, addr := range addrs {
 					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
