@@ -1,6 +1,8 @@
 package ipset
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os/exec"
 	"strings"
@@ -56,7 +58,14 @@ func New(logger *log.Logger) Interface {
 	}
 
 	// Check for comment support
-	testIpsetName := Name("weave-test-comment")
+
+	// To prevent from a race when more than one process check for the support
+	// we append a random nonce to the test ipset name. The final name is
+	// shorter than 31 chars (max ipset name).
+	nonce := make([]byte, 4)
+	rand.Read(nonce)
+	testIpsetName := Name("weave-test-comment" + hex.EncodeToString(nonce))
+
 	// Clear it out if it already exists
 	_ = ips.Destroy(testIpsetName)
 	// Test for comment support
