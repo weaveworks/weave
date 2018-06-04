@@ -247,6 +247,17 @@ EOF
 # Should be able to access from the "deny" pod now
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
+sleep 1
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker logs $($SSH $HOST1 docker ps -a | grep npc | awk '{print $1}' | head -n1) || true"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "sudo iptables-save"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker ps -a"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+
 # host should still not be able to reach pods via service virtual IP or NodePort
 # because host is not in a namespace
 assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
