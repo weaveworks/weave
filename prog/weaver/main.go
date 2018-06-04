@@ -26,6 +26,7 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/plugin"
 	weaveproxy "github.com/weaveworks/weave/proxy"
 	weave "github.com/weaveworks/weave/router"
@@ -221,7 +222,7 @@ func main() {
 	mflag.BoolVar(&pluginConfig.EnableV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
-	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to pods running on this node (Kubernetes only)")
+	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to containers running on this node")
 
 	proxyConfig := newProxyConfig()
 
@@ -306,7 +307,8 @@ func main() {
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
-	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log)
+	ips := ipset.New(common.LogLogger())
+	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
 
@@ -408,7 +410,7 @@ func main() {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
 		} else if bridgeConfig.NoMasqLocal {
-			t = weavenet.NewNoMasqLocalTracker()
+			t = weavenet.NewNoMasqLocalTracker(ips)
 		}
 		if t != nil {
 			Log.Infof("Using %q LocalRangeTracker", t)

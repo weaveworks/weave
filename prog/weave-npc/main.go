@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -57,7 +56,7 @@ func resetIPTables(ipt *iptables.IPTables) error {
 }
 
 func resetIPSets(ips ipset.Interface) error {
-	// Remove ipsets prefixed `weave-` excluding weave-no-masq-local (used by weaver).
+	// Remove ipsets prefixed `weave-` only.
 
 	sets, err := ips.List(npc.IpsetNamePrefix)
 	if err != nil {
@@ -69,9 +68,6 @@ func resetIPSets(ips ipset.Interface) error {
 
 	// Must remove references to ipsets by other ipsets before they're destroyed
 	for _, s := range sets {
-		if s == ipset.Name(net.NoMasqLocalIpset) {
-			continue
-		}
 		common.Log.Debugf("Flushing ipset '%s'", string(s))
 		if err := ips.Flush(s); err != nil {
 			common.Log.Errorf("Failed to flush ipset '%s'", string(s))
@@ -80,9 +76,6 @@ func resetIPSets(ips ipset.Interface) error {
 	}
 
 	for _, s := range sets {
-		if s == ipset.Name(net.NoMasqLocalIpset) {
-			continue
-		}
 		common.Log.Debugf("Destroying ipset '%s'", string(s))
 		if err := ips.Destroy(s); err != nil {
 			common.Log.Errorf("Failed to destroy ipset '%s'", string(s))

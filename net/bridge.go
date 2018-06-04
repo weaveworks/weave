@@ -57,7 +57,7 @@ const (
 	DatapathIfName   = "vethwe-datapath"
 	BridgeIfName     = "vethwe-bridge"
 	PcapIfName       = "vethwe-pcap"
-	NoMasqLocalIpset = ipset.Name("weave-no-masq-local")
+	NoMasqLocalIpset = ipset.Name("weaver-no-masq-local")
 )
 
 type Bridge interface {
@@ -233,7 +233,7 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 	}
 }
 
-func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Bridge, error) {
+func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips ipset.Interface) (Bridge, error) {
 	existingBridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
 	if err != nil {
 		return nil, err
@@ -259,7 +259,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Br
 		break
 	}
 
-	if err := configureIPTables(config); err != nil {
+	if err := configureIPTables(config, ips); err != nil {
 		return bridgeType, errors.Wrap(err, "configuring iptables")
 	}
 
@@ -417,7 +417,7 @@ func (f fastdpImpl) attach(veth *netlink.Veth) error {
 	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
-func configureIPTables(config *BridgeConfig) error {
+func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "creating iptables object")
@@ -475,7 +475,7 @@ func configureIPTables(config *BridgeConfig) error {
 	}
 
 	if !config.NPC {
-		// Create a chain for allowing ingress traffic when the bridge is exposed
+		// Create/Flush a chain for allowing ingress traffic when the bridge is exposed
 		if err := ipt.ClearChain("filter", "WEAVE-EXPOSE"); err != nil {
 			return errors.Wrap(err, "failed to clear/create filter/WEAVE-EXPOSE chain")
 		}
@@ -500,9 +500,11 @@ func configureIPTables(config *BridgeConfig) error {
 		return err
 	}
 
-	// k8s-only: Create the ipset to store CIDRs allocated by IPAM for local pods.
-	// External traffic sent to these CIDRs avoids SNAT'ing so that NodePort
-	// with `"externalTrafficPolicy":"Local"` would receive packets with correct
+	// For the cases where the weave bridge is the default gateway for
+	// containers (e.g. Kubernetes): create the ipset to store CIDRs allocated
+	// by IPAM for local containers. In the case of Kubernetes, external traffic
+	// sent to these CIDRs avoids SNAT'ing so that NodePort with
+	// `"externalTrafficPolicy":"Local"` would receive packets with correct
 	// src IP addr.
 	if config.NoMasqLocal {
 		ips := ipset.New(common.LogLogger())
@@ -510,7 +512,10 @@ func configureIPTables(config *BridgeConfig) error {
 		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
 			return err
 		}
-		if err := ipt.Insert("nat", "WEAVE", 1, "-m", "set", "--match-set", string(NoMasqLocalIpset), "dst", "-j", "RETURN"); err != nil {
+		if err := ipt.Insert("nat", "WEAVE", 1,
+			"-m", "set", "--match-set", string(NoMasqLocalIpset), "dst",
+			"-m", "comment", "--comment", "Prevent SNAT to locally running containers",
+			"-j", "RETURN"); err != nil {
 			return err
 		}
 	}
@@ -523,10 +528,9 @@ type NoMasqLocalTracker struct {
 	owner types.UID
 }
 
-func NewNoMasqLocalTracker() *NoMasqLocalTracker {
+func NewNoMasqLocalTracker(ips ipset.Interface) *NoMasqLocalTracker {
 	return &NoMasqLocalTracker{
-		// TODO(mp) Reuse ipset object as each time calling New creates a test set.
-		ips:   ipset.New(common.LogLogger()),
+		ips:   ips,
 		owner: types.UID(0), // dummy ipset owner
 	}
 }
@@ -536,6 +540,10 @@ func (t *NoMasqLocalTracker) String() string {
 }
 
 func (t *NoMasqLocalTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
+	if !local {
+		return nil
+	}
+
 	prev, curr := tracker.RemoveCommon(
 		address.NewCIDRs(tracker.Merge(prevRanges)),
 		address.NewCIDRs(tracker.Merge(currRanges)))
@@ -601,6 +609,8 @@ func ensureRulesAtTop(table, chain string, rulespecs [][]string, ipt *iptables.I
 
 func reexpose(config *BridgeConfig, log *logrus.Logger) error {
 	// Get existing IP addrs of the weave bridge.
+	// If the bridge hasn't been exposed, then this functions does nothing.
+	//
 	// Ideally, we should consult IPAM for IP addrs allocated to "weave:expose",
 	// but we don't want to introduce dependency on IPAM, as weave should be able
 	// to run w/o IPAM.
