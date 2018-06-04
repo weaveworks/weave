@@ -1,7 +1,6 @@
 package ipset
 
 import (
-	"fmt"
 	"log"
 	"os/exec"
 	"strings"
@@ -74,9 +73,9 @@ func New(logger *log.Logger, maxListSize int) Interface {
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 	args := []string{"create", string(ipsetName), string(ipsetType)}
-	if ipsetType == ListSet && i.maxListSize > 0 {
-		args = append(args, fmt.Sprintf("size %d", i.maxListSize))
-	}
+	//if ipsetType == ListSet && i.maxListSize > 0 {
+	//	args = append(args, fmt.Sprintf("size %d", i.maxListSize))
+	//}
 	if i.enableComments {
 		args = append(args, "comment")
 	}
