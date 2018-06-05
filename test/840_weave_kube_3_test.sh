@@ -177,7 +177,18 @@ assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c
 # Start pod which should not have access to nettest
 run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
 denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
+
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker logs $($SSH $HOST1 docker ps -a | grep npc | awk '{print $1}' | head -n1) || true"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "sudo iptables-save"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker ps -a"
+echo ">>>>>>>>>>>>>>>>>>>>>"
 
 # Restart weave-net with npc in non-legacy mode
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
