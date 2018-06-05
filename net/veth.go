@@ -104,7 +104,10 @@ const (
 )
 
 func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
-	_, err := WithNetNS(netNSPath, "check-iface", ifName)
+	err := WithNetNSByPath(netNSPath, func() error {
+		_, err := netlink.LinkByName(ifName)
+		return err
+	})
 	return err == nil
 }
 
@@ -125,7 +128,9 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
-			if _, err := WithNetNS(netNSPath, "setup-iface", peerName, ifName); err != nil {
+			if err := WithNetNS(ns, func() error {
+				return setupIface(peerName, ifName)
+			}); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
 			return nil
@@ -139,19 +144,16 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 
 	}
 
-	args := []string{ifName, fmt.Sprintf("%t", withMulticastRoute)}
-	for _, cidr := range cidrs {
-		args = append(args, cidr.String())
-	}
-	if _, err := WithNetNS(netNSPath, "setup-iface-addrs", args...); err != nil {
+	if err := WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
+		return setupIfaceAddrs(veth, withMulticastRoute, cidrs)
+	}); err != nil {
 		return fmt.Errorf("error setting up interface addresses: %s", err)
 	}
 	return nil
 }
 
-// SetupIfaceAddrs is the implementation of the 'setup-iface-addrs' call above,
-// running in another process in the container's netns
-func SetupIfaceAddrs(veth netlink.Link, withMulticastRoute bool, cidrs []*net.IPNet) error {
+// setupIfaceAddrs expects to be called in the container's netns
+func setupIfaceAddrs(veth netlink.Link, withMulticastRoute bool, cidrs []*net.IPNet) error {
 	newAddresses, err := AddAddresses(veth, cidrs)
 	if err != nil {
 		return err
@@ -203,9 +205,8 @@ func SetupIfaceAddrs(veth netlink.Link, withMulticastRoute bool, cidrs []*net.IP
 	return nil
 }
 
-// SetupIface is the implementation of the 'setup-iface' call above,
-// running in another process in the container's netns
-func SetupIface(ifaceName, newIfName string) error {
+// setupIface expects to be called in the container's netns
+func setupIface(ifaceName, newIfName string) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return err
@@ -219,14 +220,32 @@ func SetupIface(ifaceName, newIfName string) error {
 		return err
 	}
 	// This is only called by AttachContainer which is only called in host pid namespace
-	if err := ConfigureARPCache("/proc", newIfName); err != nil {
+	if err := configureARPCache("/proc", newIfName); err != nil {
 		return err
 	}
 	return ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP")
 }
 
-// NB: This function can be used only by a process that terminates immediately
-//     after calling the function as it changes netns via WithNetNSLinkUnsafe.
+// configureARP is a helper for the Docker plugin which doesn't set the addresses itself
+func ConfigureARP(prefix, rootPath string) error {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return err
+	}
+	for _, link := range links {
+		ifName := link.Attrs().Name
+		if strings.HasPrefix(ifName, prefix) {
+			configureARPCache(rootPath+"/proc", ifName)
+			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
+				for _, addr := range addrs {
+					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func DetachContainer(netNSPath, id, ifName string, cidrs []*net.IPNet) error {
 	ns, err := netns.GetFromPath(netNSPath)
 	if err != nil {
@@ -239,7 +258,7 @@ func DetachContainer(netNSPath, id, ifName string, cidrs []*net.IPNet) error {
 		return err
 	}
 
-	return WithNetNSLinkUnsafe(ns, ifName, func(veth netlink.Link) error {
+	return WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
 		existingAddrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
 		if err != nil {
 			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)

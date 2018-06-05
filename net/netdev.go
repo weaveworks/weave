@@ -1,11 +1,9 @@
 package net
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
@@ -17,7 +15,7 @@ type Dev struct {
 	CIDRs []*net.IPNet     `json:"CIDRs,omitempty"`
 }
 
-func LinkToNetDev(link netlink.Link) (Dev, error) {
+func linkToNetDev(link netlink.Link) (Dev, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return Dev{}, err
@@ -90,16 +88,30 @@ func GetNetDevsByVethPeerIds(processID int, peerIDs []int) ([]Dev, error) {
 		return nil, nil
 	}
 
+	// convert list of peerIDs into a map for faster lookup
+	indexes := make(map[int]struct{})
+	for _, id := range peerIDs {
+		indexes[id] = struct{}{}
+	}
+
 	var netdevs []Dev
-	peersStr := make([]string, len(peerIDs))
-	for i, id := range peerIDs {
-		peersStr[i] = strconv.Itoa(id)
-	}
-	nds, err := WithNetNSByPid(processID, "list-netdevs", peersStr...)
-	if err != nil {
-		return nil, fmt.Errorf("list-netdevs failed: %s", err)
-	}
-	err = json.Unmarshal(nds, &netdevs)
+	err = WithNetNS(netnsContainer, func() error {
+		links, err := netlink.LinkList()
+		if err != nil {
+			return err
+		}
+
+		for _, link := range links {
+			if _, found := indexes[link.Attrs().Index]; found {
+				netdev, err := linkToNetDev(link)
+				if err != nil {
+					return err
+				}
+				netdevs = append(netdevs, netdev)
+			}
+		}
+		return nil
+	})
 
 	return netdevs, err
 }
@@ -112,5 +124,5 @@ func GetBridgeNetDev(bridgeName string) (Dev, error) {
 		return Dev{}, err
 	}
 
-	return LinkToNetDev(link)
+	return linkToNetDev(link)
 }

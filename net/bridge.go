@@ -275,7 +275,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Br
 		return bridgeType, err
 	}
 
-	if err := ConfigureARPCache(procPath, config.WeaveBridgeName); err != nil {
+	if err := configureARPCache(procPath, config.WeaveBridgeName); err != nil {
 		return bridgeType, errors.Wrapf(err, "configuring ARP cache on bridge %q", config.WeaveBridgeName)
 	}
 

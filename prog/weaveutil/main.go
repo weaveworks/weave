@@ -4,10 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-
-	weavenet "github.com/weaveworks/weave/net"
 )
 
 var commands map[string]func([]string) error
@@ -36,12 +33,6 @@ func init() {
 		"create-volume-container":  createVolumeContainer,
 		"attach-container":         attach,
 		"detach-container":         detach,
-		"configure-arp":            configureARP,
-		"check-iface":              checkIface,
-		"del-iface":                delIface,
-		"setup-iface":              setupIface,
-		"setup-iface-addrs":        setupIfaceAddrs,
-		"list-netdevs":             listNetDevs,
 		"cni-net":                  cniNet,
 		"cni-ipam":                 cniIPAM,
 		"bridge-ip":                bridgeIP,
@@ -55,14 +46,6 @@ func init() {
 }
 
 func main() {
-	// force re-exec of this binary
-	selfPath, err := filepath.EvalSymlinks("/proc/self/exe")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	weavenet.WeaveUtilCmd = selfPath
-
 	// If no args passed, act as CNI plugin based on executable name
 	switch {
 	case len(os.Args) == 1 && strings.HasSuffix(os.Args[0], "weave-ipam"):
