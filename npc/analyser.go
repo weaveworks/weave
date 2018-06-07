@@ -4,96 +4,11 @@ import (
 	"fmt"
 
 	apiv1 "k8s.io/api/core/v1"
-	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/weaveworks/weave/net/ipset"
 )
-
-// analysePolicyLegacy is used to analyse extensions/v1beta1/NetworkPolicy (legacy) and
-// implements pre-1.7 k8s netpol semantics, whilst analysePolicy - networking.k8s.io/v1/NetworkPolicy
-// and 1.7 semantics.
-
-func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
-	rules map[string]*ruleSpec,
-	nsSelectors, podSelectors map[string]*selectorSpec,
-	err error) {
-
-	nsSelectors = make(map[string]*selectorSpec)
-	podSelectors = make(map[string]*selectorSpec)
-	rules = make(map[string]*ruleSpec)
-
-	policyTypes := []policyType{policyTypeIngress}
-	targetSelector, err := newSelectorSpec(&policy.Spec.PodSelector, policyTypes, ns.name, ipset.HashIP)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	podSelectors[targetSelector.key] = targetSelector
-
-	for _, ingressRule := range policy.Spec.Ingress {
-		if ingressRule.Ports != nil && len(ingressRule.Ports) == 0 {
-			// Ports is empty, this rule matches no ports (no traffic matches).
-			continue
-		}
-
-		if ingressRule.From != nil && len(ingressRule.From) == 0 {
-			// From is empty, this rule matches no sources (no traffic matches).
-			continue
-		}
-
-		if ingressRule.From == nil {
-			// From is not provided, this rule matches all sources (traffic not restricted by source).
-			if ingressRule.Ports == nil {
-				// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-				rule := newRuleSpec(policyTypeIngress, nil, nil, targetSelector, nil)
-				rules[rule.key] = rule
-			} else {
-				// Ports is present and contains at least one item, then this rule allows traffic
-				// only if the traffic matches at least one port in the ports list.
-				withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-					rule := newRuleSpec(policyTypeIngress, &proto, nil, targetSelector, &port)
-					rules[rule.key] = rule
-				})
-			}
-		} else {
-			// From is present and contains at least on item, this rule allows traffic only if the
-			// traffic matches at least one item in the from list.
-			for _, peer := range ingressRule.From {
-				var srcSelector *selectorSpec
-				if peer.PodSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.PodSelector, nil, ns.name, ipset.HashIP)
-					if err != nil {
-						return nil, nil, nil, err
-					}
-					podSelectors[srcSelector.key] = srcSelector
-				}
-				if peer.NamespaceSelector != nil {
-					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, "", ipset.ListSet)
-					if err != nil {
-						return nil, nil, nil, err
-					}
-					nsSelectors[srcSelector.key] = srcSelector
-				}
-
-				if ingressRule.Ports == nil {
-					// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-					rule := newRuleSpec(policyTypeIngress, nil, srcSelector, targetSelector, nil)
-					rules[rule.key] = rule
-				} else {
-					// Ports is present and contains at least one item, then this rule allows traffic
-					// only if the traffic matches at least one port in the ports list.
-					withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(policyTypeIngress, &proto, srcSelector, targetSelector, &port)
-						rules[rule.key] = rule
-					})
-				}
-			}
-		}
-	}
-
-	return rules, nsSelectors, podSelectors, nil
-}
 
 func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	rules map[string]*ruleSpec,
@@ -246,12 +161,6 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 func addIfNotExist(s *selectorSpec, ss map[string]*selectorSpec) {
 	if _, ok := ss[s.key]; !ok {
 		ss[s.key] = s
-	}
-}
-
-func withNormalisedProtoAndPortLegacy(npps []extnapi.NetworkPolicyPort, f func(proto, port string)) {
-	for _, npp := range npps {
-		f(proto(npp.Protocol), port(npp.Port))
 	}
 }
 

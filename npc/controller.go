@@ -37,14 +37,11 @@ type controller struct {
 
 	nss         map[string]*ns // ns name -> ns struct
 	nsSelectors *selectorSet   // selector string -> nsSelector
-
-	legacy bool // use legacy network policy semantics (k8s pre-1.7)
 }
 
-func New(nodeName string, legacy bool, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
+func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
 	c := &controller{
 		nodeName: nodeName,
-		legacy:   legacy,
 		ipt:      ipt,
 		ips:      ips,
 		nss:      make(map[string]*ns)}
@@ -71,7 +68,7 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		newNs, err := newNS(name, npc.nodeName, npc.legacy, npc.ipt, npc.ips, npc.nsSelectors)
+		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors)
 		if err != nil {
 			return err
 		}

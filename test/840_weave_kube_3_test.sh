@@ -44,15 +44,14 @@ for host in $HOSTS; do
 done
 
 if [ -n "$COVERAGE" ]; then
-    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof -- --use-legacy-netpol\""
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
 else
-    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"--use-legacy-netpol\""
+    WEAVE_ENV_VARS="env:"
 fi
 
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
@@ -76,10 +75,19 @@ assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
-# Set up a simple network policy so all our test pods can talk to each other
-run_on $HOST1 "$KUBECTL annotate ns default net.beta.kubernetes.io/network-policy='{\"ingress\":{\"isolation\":\"DefaultDeny\"}}'"
+# Set up simple network policies so all our test pods can talk to each other
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+EOF
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: test840
@@ -102,7 +110,7 @@ EOF
 
 # Another policy, this time with no 'from' section, just to check that doesn't cause a crash
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: test840f
@@ -177,23 +185,6 @@ assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c
 # Start pod which should not have access to nettest
 run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
 denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
-assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
-
-if [ -n "$COVERAGE" ]; then
-    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
-else
-    WEAVE_ENV_VARS="env:"
-fi
-
-# Restart weave-net with npc in non-legacy mode
-$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
-sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
-
-assert_raises 'wait_for_x check_all_pods_communicate pods'
-
-# nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # check access via virtual IP

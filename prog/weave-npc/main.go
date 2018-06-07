@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	coreapi "k8s.io/api/core/v1"
-	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +31,6 @@ var (
 	logLevel    string
 	allowMcast  bool
 	nodeName    string
-	legacy      bool
 	maxList     int
 )
 
@@ -114,7 +112,7 @@ func resetIPSets(ips ipset.Interface) error {
 	return nil
 }
 
-func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface, legacy bool) error {
+func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// Configure main chain static rules
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
@@ -153,28 +151,26 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface, legacy bool) e
 		return err
 	}
 
-	if !legacy {
-		if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
-			"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
-			return err
-		}
+	if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
+		"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
+		return err
+	}
 
-		ruleSpecs := [][]string{
-			{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
-			{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
-		}
-		if allowMcast {
-			ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
-		}
-		ruleSpecs = append(ruleSpecs, [][]string{
-			{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
-			{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
-			{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
-			{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
-		}...)
-		if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
-			return err
-		}
+	ruleSpecs := [][]string{
+		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
+		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
+	}
+	if allowMcast {
+		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
+	}
+	ruleSpecs = append(ruleSpecs, [][]string{
+		{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
+		{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
+	}...)
+	if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+		return err
 	}
 
 	return nil
@@ -243,10 +239,6 @@ func root(cmd *cobra.Command, args []string) {
 	}
 	common.Log.Infof("Starting Weaveworks NPC %s; node name %q", version, nodeName)
 
-	if legacy {
-		common.Log.Info("Running in legacy mode (k8s pre-1.7 network policy semantics)")
-	}
-
 	if err := metrics.Start(metricsAddr); err != nil {
 		common.Log.Fatalf("Failed to start metrics: %v", err)
 	}
@@ -268,9 +260,9 @@ func root(cmd *cobra.Command, args []string) {
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
-	handleError(createBaseRules(ipt, ips, legacy))
+	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(nodeName, legacy, ipt, ips)
+	npc := npc.New(nodeName, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -331,11 +323,7 @@ func root(cmd *cobra.Command, args []string) {
 			handleError(npc.UpdateNetworkPolicy(old, new))
 		},
 	}
-	if legacy {
-		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
-	} else {
-		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
-	}
+	npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
 
 	go nsController.Run(wait.NeverStop)
 	go podController.Run(wait.NeverStop)
@@ -356,7 +344,6 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
-	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
 
 	handleError(rootCmd.Execute())

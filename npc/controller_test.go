@@ -198,7 +198,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", false, newMockIPTables(), &m)
+	controller := New("foo", newMockIPTables(), &m)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -214,7 +214,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", false, newMockIPTables(), &m)
+	controller = New("foo", newMockIPTables(), &m)
 
 	controller.AddNetworkPolicy(networkPolicy)
 
@@ -224,7 +224,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	require.Equal(t, true, len(m.sets[selectorIPSetName].subSets[sourceIPSetName]) > 0)
 }
 
-// Tests default-allow ipset behavior when running in non-legacy mode.
+// Tests default-allow ipset behavior
 func TestDefaultAllow(t *testing.T) {
 	const (
 		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
@@ -235,7 +235,7 @@ func TestDefaultAllow(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("bar", false, newMockIPTables(), &m)
+	controller := New("bar", newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -363,7 +363,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("qux", false, newMockIPTables(), &m)
+	controller := New("qux", newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -445,7 +445,7 @@ func TestNewTargetSelector(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("baz", false, newMockIPTables(), &m)
+	controller := New("baz", newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -520,7 +520,7 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 
 	m := newMockIPSet()
 	ipt := newMockIPTables()
-	controller := New("foo", false, ipt, &m)
+	controller := New("foo", ipt, &m)
 
 	netpol := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
