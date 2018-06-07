@@ -2,6 +2,7 @@ package npc
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -16,8 +17,6 @@ type ruleHost interface {
 	//
 	// If src=true then the rulespec is for source, otherwise - for destination.
 	getRuleSpec(src bool) ([]string, string)
-	// TODO(brb) Get rid
-	isNil() bool
 }
 
 type ruleSpec struct {
@@ -32,13 +31,13 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 		args = append(args, "-p", *proto)
 	}
 	srcComment := "anywhere"
-	if srcHost != nil && !srcHost.isNil() {
+	if srcHost != nil && !reflect.ValueOf(srcHost).IsNil() {
 		rule, comment := srcHost.getRuleSpec(true)
 		args = append(args, rule...)
 		srcComment = comment
 	}
 	dstComment := "anywhere"
-	if dstHost != nil && !dstHost.isNil() {
+	if dstHost != nil && !reflect.ValueOf(dstHost).IsNil() {
 		rule, comment := dstHost.getRuleSpec(false)
 		args = append(args, rule...)
 		dstComment = comment
