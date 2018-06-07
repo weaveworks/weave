@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM bash
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl bind-tools
 ADD webserver webserver
 EXPOSE 8080
 ENTRYPOINT ["/webserver"]

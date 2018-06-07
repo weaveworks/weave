@@ -275,6 +275,61 @@ EOF
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
+# allow nettest-deny to access only to 8.8.8.0/24
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-nettest-deny-dns
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: nettest-deny
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 8.8.8.0/24
+        except:
+        - 8.8.8.4/32
+EOF
+
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- dig @8.8.8.4 google.com >/dev/null"
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- dig @8.8.8.8 google.com >/dev/null"
+
+# also, allow nettest-deny to access nettest and kube-system (for kube-dns)
+run_on $HOST1 "$KUBECTL label namespace kube-system name=kube-system"
+run_on $HOST1 "$KUBECTL replace -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-nettest-deny-dns
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: nettest-deny
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 8.8.8.0/24
+        except:
+        - 8.8.8.4/32
+    - podSelector:
+        matchLabels:
+          run: nettest
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+EOF
+
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
 # Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
 # the client source IP addr
 
