@@ -3,12 +3,12 @@ package npc
 type policyType byte
 
 const (
-	ingressPolicy policyType = iota
-	egressPolicy
+	policyTypeIngress policyType = iota
+	policyTypeEgress
 )
 
 func policyTypeStr(policyType policyType) string {
-	if policyType == egressPolicy {
+	if policyType == policyTypeEgress {
 		return "egress"
 	}
 	return "ingress"

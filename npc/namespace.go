@@ -288,10 +288,10 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 			}
 
 			if !ns.legacy {
-				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, ingressPolicy); err != nil {
+				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, policyTypeIngress); err != nil {
 					return err
 				}
-				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, egressPolicy); err != nil {
+				if err := ns.addOrRemoveToDefaultAllowIPSet(ps, oldObj, newObj, oldMatch, newMatch, policyTypeEgress); err != nil {
 					return err
 				}
 			}
@@ -645,7 +645,7 @@ func podComment(pod *coreapi.Pod) string {
 
 func (ns *ns) defaultAllowIPSetName(pt policyType) ipset.Name {
 	ipset := ns.ingressDefaultAllowIPSet
-	if pt == egressPolicy {
+	if pt == policyTypeEgress {
 		ipset = ns.egressDefaultAllowIPSet
 	}
 	return ipset

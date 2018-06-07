@@ -114,10 +114,10 @@ func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string,
 	foundEgress := false
 	for _, s := range ss.entries {
 		if s.matches(labelMap) {
-			if ss.targetSelectorExist(s, ingressPolicy) {
+			if ss.targetSelectorExist(s, policyTypeIngress) {
 				foundIngress = true
 			}
-			if ss.targetSelectorExist(s, egressPolicy) {
+			if ss.targetSelectorExist(s, policyTypeEgress) {
 				foundEgress = true
 			}
 			if err := s.addEntry(user, entry, comment); err != nil {

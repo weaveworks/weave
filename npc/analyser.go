@@ -24,7 +24,7 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 	podSelectors = make(map[string]*selectorSpec)
 	rules = make(map[string]*ruleSpec)
 
-	policyTypes := []policyType{ingressPolicy}
+	policyTypes := []policyType{policyTypeIngress}
 	targetSelector, err := newSelectorSpec(&policy.Spec.PodSelector, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
 		return nil, nil, nil, err
@@ -46,13 +46,13 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 			// From is not provided, this rule matches all sources (traffic not restricted by source).
 			if ingressRule.Ports == nil {
 				// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-				rule := newRuleSpec(ingressPolicy, nil, nil, targetSelector, nil)
+				rule := newRuleSpec(policyTypeIngress, nil, nil, targetSelector, nil)
 				rules[rule.key] = rule
 			} else {
 				// Ports is present and contains at least one item, then this rule allows traffic
 				// only if the traffic matches at least one port in the ports list.
 				withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-					rule := newRuleSpec(ingressPolicy, &proto, nil, targetSelector, &port)
+					rule := newRuleSpec(policyTypeIngress, &proto, nil, targetSelector, &port)
 					rules[rule.key] = rule
 				})
 			}
@@ -78,13 +78,13 @@ func (ns *ns) analysePolicyLegacy(policy *extnapi.NetworkPolicy) (
 
 				if ingressRule.Ports == nil {
 					// Ports is not provided, this rule matches all ports (traffic not restricted by port).
-					rule := newRuleSpec(ingressPolicy, nil, srcSelector, targetSelector, nil)
+					rule := newRuleSpec(policyTypeIngress, nil, srcSelector, targetSelector, nil)
 					rules[rule.key] = rule
 				} else {
 					// Ports is present and contains at least one item, then this rule allows traffic
 					// only if the traffic matches at least one port in the ports list.
 					withNormalisedProtoAndPortLegacy(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(ingressPolicy, &proto, srcSelector, targetSelector, &port)
+						rule := newRuleSpec(policyTypeIngress, &proto, srcSelector, targetSelector, &port)
 						rules[rule.key] = rule
 					})
 				}
@@ -109,10 +109,10 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 	for _, pt := range policy.Spec.PolicyTypes {
 		if pt == networkingv1.PolicyTypeIngress {
-			policyTypes = append(policyTypes, ingressPolicy)
+			policyTypes = append(policyTypes, policyTypeIngress)
 		}
 		if pt == networkingv1.PolicyTypeEgress {
-			policyTypes = append(policyTypes, egressPolicy)
+			policyTypes = append(policyTypes, policyTypeEgress)
 		}
 	}
 	// If empty, matches all pods in a namespace
@@ -137,11 +137,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 			if allSources {
 				if allPorts {
-					rule := newRuleSpec(ingressPolicy, nil, nil, targetSelector, nil)
+					rule := newRuleSpec(policyTypeIngress, nil, nil, targetSelector, nil)
 					rules[rule.key] = rule
 				} else {
 					withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(ingressPolicy, &proto, nil, targetSelector, &port)
+						rule := newRuleSpec(policyTypeIngress, &proto, nil, targetSelector, &port)
 						rules[rule.key] = rule
 					})
 				}
@@ -167,11 +167,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					}
 
 					if allPorts {
-						rule := newRuleSpec(ingressPolicy, nil, srcSelector, targetSelector, nil)
+						rule := newRuleSpec(policyTypeIngress, nil, srcSelector, targetSelector, nil)
 						rules[rule.key] = rule
 					} else {
 						withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-							rule := newRuleSpec(ingressPolicy, &proto, srcSelector, targetSelector, &port)
+							rule := newRuleSpec(policyTypeIngress, &proto, srcSelector, targetSelector, &port)
 							rules[rule.key] = rule
 						})
 					}
@@ -190,11 +190,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 			if allDestinations {
 				if allPorts {
-					rule := newRuleSpec(egressPolicy, nil, targetSelector, nil, nil)
+					rule := newRuleSpec(policyTypeEgress, nil, targetSelector, nil, nil)
 					rules[rule.key] = rule
 				} else {
 					withNormalisedProtoAndPort(egressRule.Ports, func(proto, port string) {
-						rule := newRuleSpec(egressPolicy, &proto, targetSelector, nil, &port)
+						rule := newRuleSpec(policyTypeEgress, &proto, targetSelector, nil, &port)
 						rules[rule.key] = rule
 					})
 				}
@@ -227,11 +227,11 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					}
 
 					if allPorts {
-						rule := newRuleSpec(egressPolicy, nil, targetSelector, dstRuleHost, nil)
+						rule := newRuleSpec(policyTypeEgress, nil, targetSelector, dstRuleHost, nil)
 						rules[rule.key] = rule
 					} else {
 						withNormalisedProtoAndPort(egressRule.Ports, func(proto, port string) {
-							rule := newRuleSpec(egressPolicy, &proto, targetSelector, dstRuleHost, &port)
+							rule := newRuleSpec(policyTypeEgress, &proto, targetSelector, dstRuleHost, &port)
 							rules[rule.key] = rule
 						})
 					}

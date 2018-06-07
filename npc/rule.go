@@ -55,21 +55,21 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 }
 
 func (spec *ruleSpec) iptChain() string {
-	if spec.policyType == egressPolicy {
+	if spec.policyType == policyTypeEgress {
 		return EgressCustomChain
 	}
 	return IngressChain
 }
 
 func (spec *ruleSpec) iptRuleSpecs() [][]string {
-	if spec.policyType == ingressPolicy {
+	if spec.policyType == policyTypeIngress {
 		rule := make([]string, len(spec.args))
 		copy(rule, spec.args)
 		rule = append(rule, "-j", "ACCEPT")
 		return [][]string{rule}
 	}
 
-	// egressPolicy
+	// policyTypeEgress
 	ruleMark := make([]string, len(spec.args))
 	copy(ruleMark, spec.args)
 	ruleMark = append(ruleMark, "-j", EgressMarkChain)
