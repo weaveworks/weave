@@ -85,7 +85,7 @@ router_bridge_opts() {
 }
 
 if [ -z "$KUBE_PEERS" ]; then
-    if ! KUBE_PEERS=$(/home/weave/kube-peers) || [ -z "$KUBE_PEERS" ]; then
+    if ! KUBE_PEERS=$(/home/weave/kube-utils) || [ -z "$KUBE_PEERS" ]; then
         echo Failed to get peers >&2
         exit 1
     fi
@@ -110,7 +110,7 @@ fi
 if [ -f ${DB_PREFIX}data.db ]; then
     if /usr/bin/weaveutil get-db-flag "$DB_PREFIX" peer-reclaim >/dev/null ; then
         # If this peer name is not stored in the list then we were removed by another peer.
-        if /home/weave/kube-peers -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
+        if /home/weave/kube-utils -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
             # In order to avoid a CRDT clash, clean up
             echo "Peer not in list; removing persisted data" >&2
             rm -f ${DB_PREFIX}data.db
@@ -144,10 +144,13 @@ post_start_actions() {
     /home/weave/weave --local setup-cni
 
     # Attempt to run the reclaim process, but don't halt the script if it fails
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
+    /home/weave/kube-utils -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
+
+    # Mark network as up
+    /home/weave/kube-utils -set-node-status -node-name="$HOSTNAME"
 }
 
 post_start_actions &
