@@ -17,6 +17,7 @@ import (
 	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
+	"github.com/weaveworks/weave/npc"
 )
 
 /* This code implements three possible configurations to connect
@@ -459,23 +460,22 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	if config.NPC {
 		// Steer traffic via the NPC.
 		// Ignore error because chains might already exist
-		// TODO(brb): use constants for WEAVE-NPC* chains
-		_ = ipt.NewChain("filter", "WEAVE-NPC")
-		_ = ipt.NewChain("filter", "WEAVE-NPC-EGRESS")
-		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", "WEAVE-NPC-EGRESS"); err != nil {
+		_ = ipt.NewChain("filter", npc.MainChain)
+		_ = ipt.NewChain("filter", npc.EgressChain)
+		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
 			return err
 		}
 		fwdRules = append(fwdRules, []string{
 			"-i", config.WeaveBridgeName,
 			"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-			"-j", "WEAVE-NPC-EGRESS"})
+			"-j", npc.EgressChain})
 
 		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
 		fwdRules = append(fwdRules,
 			[][]string{
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", "WEAVE-NPC"},
+					"-j", npc.MainChain},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)
