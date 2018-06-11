@@ -119,6 +119,10 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		}
 		// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
 		for _, peer := range peerMap {
+			if peer.PeerName == myPeerName { // Don't remove myself.
+				common.Log.Warnln("[kube-peers] not removing myself", peer)
+				continue
+			}
 			common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peer)
 			okToRemove := false
 			// 3. Check if there is an existing annotation with key X
