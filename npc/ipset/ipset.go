@@ -75,7 +75,7 @@ func New(logger *log.Logger, maxListSize int) Interface {
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 	args := []string{"create", string(ipsetName), string(ipsetType)}
 	if ipsetType == ListSet && i.maxListSize > 0 {
-		args = append(args, fmt.Sprintf("size %d", i.maxListSize))
+		args = append(args, "size", fmt.Sprintf("%d", i.maxListSize))
 	}
 	if i.enableComments {
 		args = append(args, "comment")
