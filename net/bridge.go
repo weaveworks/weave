@@ -459,20 +459,23 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 
 	if config.NPC {
 		// Steer traffic via the NPC.
+
 		// Ignore error because chains might already exist
 		_ = ipt.NewChain("filter", npc.MainChain)
 		_ = ipt.NewChain("filter", npc.EgressChain)
+
+		// Steer egress traffic destined to local node.
 		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
 			return err
 		}
-		fwdRules = append(fwdRules, []string{
-			"-i", config.WeaveBridgeName,
-			"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-			"-j", npc.EgressChain})
-
-		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
 		fwdRules = append(fwdRules,
 			[][]string{
+				// Might include ingress traffic which is fine as long as we do not
+				// ACCEPT in WEAVE-NPC-EGRESS chain
+				{"-i", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", npc.EgressChain},
+				// The following rules are for ingress NPC processing
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
 					"-j", npc.MainChain},
