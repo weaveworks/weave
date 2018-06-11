@@ -3,6 +3,7 @@ package ipset
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"os/exec"
 	"strings"
@@ -43,6 +44,7 @@ type entryKey struct {
 type ipset struct {
 	*log.Logger
 	enableComments bool
+	maxListSize    int
 	// List of users per ipset entry. User is either a namespace or a pod.
 	// There might be multiple users for the same ipset & entry pair because
 	// events from k8s API server might be out of order causing duplicate IPs:
@@ -50,10 +52,11 @@ type ipset struct {
 	users map[entryKey]map[types.UID]struct{}
 }
 
-func New(logger *log.Logger) Interface {
+func New(logger *log.Logger, maxListSize int) Interface {
 	ips := &ipset{
 		Logger:         logger,
 		enableComments: true,
+		maxListSize:    maxListSize,
 		users:          make(map[entryKey]map[types.UID]struct{}),
 	}
 
@@ -81,6 +84,9 @@ func New(logger *log.Logger) Interface {
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 	args := []string{"create", string(ipsetName), string(ipsetType)}
+	if ipsetType == ListSet && i.maxListSize > 0 {
+		args = append(args, "size", fmt.Sprintf("%d", i.maxListSize))
+	}
 	if i.enableComments {
 		args = append(args, "comment")
 	}

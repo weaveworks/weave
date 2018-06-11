@@ -507,7 +507,7 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	// `"externalTrafficPolicy":"Local"` would receive packets with correct
 	// src IP addr.
 	if config.NoMasqLocal {
-		ips := ipset.New(common.LogLogger())
+		ips := ipset.New(common.LogLogger(), 0)
 		_ = ips.Destroy(NoMasqLocalIpset)
 		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
 			return err

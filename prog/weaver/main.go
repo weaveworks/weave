@@ -307,7 +307,7 @@ func main() {
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
-	ips := ipset.New(common.LogLogger())
+	ips := ipset.New(common.LogLogger(), 0)
 	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
