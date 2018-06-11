@@ -44,14 +44,14 @@ for host in $HOSTS; do
 done
 
 if [ -n "$COVERAGE" ]; then
-    COVERAGE_ARGS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
 else
-    COVERAGE_ARGS="env:"
+    WEAVE_ENV_VARS="env:"
 fi
 
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
     -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
@@ -63,7 +63,7 @@ check_connections() {
 
 assert_raises 'wait_for_x check_connections "connections to establish"'
 
-# Check we can ping between the Weave bridg IPs on each host
+# Check we can ping between the Weave bridge IPs on each host
 HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
 HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
 HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
@@ -182,7 +182,7 @@ assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 ht
 # Restart weave-net with npc in non-legacy mode
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
@@ -243,6 +243,26 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http
 # Virtual IP and NodePort should now work
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+# Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
+# the client source IP addr
+
+CLIENT_IP_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
+
+WEAVE_ENV_VARS="${WEAVE_ENV_VARS}\\n                - name: NO_MASQ_LOCAL\\n                  value: \"1\""
+$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+
+sleep 5
+
+run_on $HOST1 "$KUBECTL patch svc netvirt -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
+
+CLIENT_IP_NO_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
+
+assert_raises "[ $CLIENT_IP_NO_MASQ != $CLIENT_IP_MASQ ]"
+assert_raises "[ $HOST1IP == $CLIENT_IP_NO_MASQ ]"
 
 tear_down_kubeadm
 

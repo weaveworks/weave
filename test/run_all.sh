@@ -23,4 +23,4 @@ if [ -n "$CIRCLECI" -o -n "$PARALLEL" ]; then
     RUNNER_ARGS="$RUNNER_ARGS -parallel"
 fi
 
-HOSTS="$HOSTS" "${DIR}/../tools/runner/runner" -timeout=300 $RUNNER_ARGS $TESTS
+HOSTS="$HOSTS" "${DIR}/../tools/runner/runner" -timeout=360 $RUNNER_ARGS $TESTS

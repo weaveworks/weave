@@ -13,6 +13,8 @@
 // Visit /status to see pass/running/fail determination. (literally, it will
 // return one of those words.)
 //
+// Visit /client_ip to see the source IP addr of the request.
+//
 // /write is used by other network test servers to register connectivity.
 package main
 
@@ -76,6 +78,20 @@ func (s *State) serveStatus(w http.ResponseWriter, r *http.Request) {
 	// Logf can't be called while holding the lock, so defer using a goroutine
 	go s.Logf("Declaring failure for %q with %d sent and %d received and %d peers", *dnsName, len(s.Sent), len(s.Received), *peerCount)
 	fmt.Fprintf(w, "fail")
+}
+
+// serveClientIP returns the client source IP addr.
+func (s *State) serveClientIP(w http.ResponseWriter, r *http.Request) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		go s.Logf("Warning: unable to parse remote addr: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	fmt.Fprintf(w, host)
 }
 
 // serveRead writes our json encoded state
@@ -186,6 +202,7 @@ func main() {
 	http.HandleFunc("/read", state.serveRead)
 	http.HandleFunc("/write", state.serveWrite)
 	http.HandleFunc("/status", state.serveStatus)
+	http.HandleFunc("/client_ip", state.serveClientIP)
 
 	go log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *port), nil))
 

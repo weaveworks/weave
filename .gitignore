@@ -68,6 +68,7 @@ test/tls/tls
 test/tls/*.pem
 test/coverage
 test/coverage.*
+test/images/network-tester/webserver
 *qemu-*-static
 terraform.tfstate
 terraform.tfstate.backup

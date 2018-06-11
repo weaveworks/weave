@@ -26,6 +26,7 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/plugin"
 	weaveproxy "github.com/weaveworks/weave/proxy"
 	weave "github.com/weaveworks/weave/router"
@@ -221,6 +222,7 @@ func main() {
 	mflag.BoolVar(&pluginConfig.EnableV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
+	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to containers running on this node")
 
 	proxyConfig := newProxyConfig()
 
@@ -305,7 +307,8 @@ func main() {
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
-	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log)
+	ips := ipset.New(common.LogLogger())
+	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
 
@@ -335,6 +338,9 @@ func main() {
 	}
 	if bridgeConfig.AWSVPC && !ipamConfig.Enabled() {
 		Log.Fatalf("--awsvpc mode requires IPAM enabled")
+	}
+	if bridgeConfig.AWSVPC && bridgeConfig.NoMasqLocal {
+		Log.Fatalf("--awsvpc mode is not compatible with the --no-masq-local option")
 	}
 
 	db, err := db.NewBoltDB(dbPrefix)
@@ -395,17 +401,19 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
-		trackerName   string
 	)
 	if ipamConfig.Enabled() {
 		var t tracker.LocalRangeTracker
 		if bridgeConfig.AWSVPC {
-			Log.Infoln("Creating AWSVPC LocalRangeTracker")
 			t, err = tracker.NewAWSVPCTracker(bridgeConfig.WeaveBridgeName)
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
-			trackerName = "awsvpc"
+		} else if bridgeConfig.NoMasqLocal {
+			t = weavenet.NewNoMasqLocalTracker(ips)
+		}
+		if t != nil {
+			Log.Infof("Using %q LocalRangeTracker", t)
 		}
 
 		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
@@ -453,7 +461,7 @@ func main() {
 	if httpAddr != "" {
 		muxRouter := mux.NewRouter()
 		if allocator != nil {
-			allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
+			allocator.HandleHTTP(muxRouter, defaultSubnet, dockerCli)
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)

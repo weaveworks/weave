@@ -18,8 +18,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
-	"github.com/weaveworks/weave/npc/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
 	"github.com/weaveworks/weave/npc/ulogd"
 )
@@ -56,7 +56,7 @@ func resetIPTables(ipt *iptables.IPTables) error {
 }
 
 func resetIPSets(ips ipset.Interface) error {
-	// Remove ipsets prefixed `weave-` only
+	// Remove ipsets prefixed `weave-` only.
 
 	sets, err := ips.List(npc.IpsetNamePrefix)
 	if err != nil {
