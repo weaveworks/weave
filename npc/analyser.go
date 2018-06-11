@@ -38,8 +38,8 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 	// To prevent targetSelector being overwritten by a subsequent selector with
 	// the same key, addIfNotExist MUST be used when adding to podSelectors.
-	// Otherwise, targetSelector' "dst" property might be lost resulting in
-	// an invalid content of the "default-allow" ipset.
+	// Otherwise, policyTypes of the selector might be lost resulting in
+	// an invalid content in any "default-allow" ipset.
 	addIfNotExist(targetSelector, podSelectors)
 
 	// If ingress is empty then this NetworkPolicy does not allow any ingress traffic
@@ -118,7 +118,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					var dstSelector *selectorSpec
 					var dstRuleHost ruleHost
 
-					// NetworkPolicyPeer describes a peer to allow traffic from.
+					// NetworkPolicyPeer describes a peer to allow traffic to.
 					// Exactly one of its fields must be specified.
 					if peer.PodSelector != nil {
 						dstSelector, err = newSelectorSpec(peer.PodSelector, nil, ns.name, ipset.HashIP)
