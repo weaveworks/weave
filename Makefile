@@ -109,7 +109,7 @@ NET_PLUGIN_LATEST=latest_release
 # Paths to all relevant binaries that should be compiled
 WEAVER_EXE=prog/weaver/weaver
 SIGPROXY_EXE=prog/sigproxy/sigproxy
-KUBEPEERS_EXE=prog/kube-peers/kube-peers
+KUBEUTILS_EXE=prog/kube-utils/kube-utils
 WEAVENPC_EXE=prog/weave-npc/weave-npc
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
@@ -122,7 +122,7 @@ TEST_TLS_EXE=test/tls/tls
 NETWORKTESTER_EXE=test/images/network-tester/webserver
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(NETWORKTESTER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(NETWORKTESTER_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
@@ -180,7 +180,7 @@ $(WEAVER_EXE): api/*.go plugin/*.go plugin/*/*
 $(WEAVER_EXE):  proxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go plugin/net/*.go plugin/ipam/*.go db/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(KUBEPEERS_EXE): prog/kube-peers/*.go
+$(KUBEUTILS_EXE): prog/kube-utils/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(RUNNER_EXE): tools/runner/*.go
@@ -217,7 +217,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
+$(WEAVEUTIL_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
@@ -299,8 +299,8 @@ $(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAV
 	$(SUDO) docker plugin create $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST) prog/net-plugin
 	touch $@
 
-$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
-	cp $(KUBEPEERS_EXE) prog/weave-kube/
+$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEUTILS_EXE) $(WEAVER_UPTODATE)
+	cp $(KUBEUTILS_EXE) prog/weave-kube/
 	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
