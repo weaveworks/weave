@@ -97,7 +97,7 @@ func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peer
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
 func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName string) error {
-	for {
+	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
 		if err := cml.Init(); err != nil {
 			return err
 		}
@@ -119,6 +119,10 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		}
 		// 2. Loop for each X in the first set and not in the second - we wish to remove X from our data structures
 		for _, peer := range peerMap {
+			if peer.PeerName == myPeerName { // Don't remove myself.
+				common.Log.Warnln("[kube-peers] not removing myself", peer)
+				continue
+			}
 			common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peer)
 			okToRemove := false
 			// 3. Check if there is an existing annotation with key X
@@ -144,6 +148,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 				if err != nil {
 					return err
 				}
+				loopsWhenNothingChanged = 0
 				cml.LoopUpdate(func() error {
 					// 7aa.   Remove any annotations Z* that have contents X
 					if err := cml.RemoveAnnotationsWithValue(peer.PeerName); err != nil {
@@ -168,6 +173,7 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		}
 
 		// 9. Go back to step 1 until there is no difference between the two sets
+		// (or we hit the counter that says we've been round the loop 3 times and nothing happened)
 	}
 	// Question: Should we narrow step 2 by checking against Weave Net IPAM?
 	// i.e. If peer X owns any address space and is marked unreachable, we want to rmpeer X
