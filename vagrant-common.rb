@@ -1,4 +1,4 @@
-VAGRANT_IMAGE = 'bento/ubuntu-16.04'
+VAGRANT_IMAGE = 'bento/ubuntu-18.04'
 VAGRANTFILE_API_VERSION = '2'
 
 def get_dependencies_version_from_file_and_env()
