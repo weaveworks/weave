@@ -27,7 +27,7 @@ fi
 function teardown_kubernetes_cluster {
     greyly echo "Tearing down kubernetes cluster"
     for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+        run_on $host "sudo kubeadm reset --force && sudo rm -r -f /opt/cni/bin/*weave*"
     done
 }
 

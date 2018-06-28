@@ -4,7 +4,7 @@
 
 tear_down_kubeadm() {
     for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+        run_on $host "sudo kubeadm reset --force && sudo rm -r -f /opt/cni/bin/*weave*"
         # Remove the rule to ensure that api-server is not accessible while kube-proxy
         # is not ready. Otherwise, we have a race between "-j KUBE-FORWARD" and "-j WEAVE-NPC"
         # which makes the NodePort isolation test case to fail.
