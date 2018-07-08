@@ -10,6 +10,7 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+	"github.com/weaveworks/weave/common"
 )
 
 // create and attach a veth to the Weave bridge
@@ -119,11 +120,15 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 	defer ns.Close()
 
 	if !interfaceExistsInNamespace(netNSPath, ifName) {
-		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
+		shortIfLength := 4
+
+		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+getShortIfName(ifName, shortIfLength)+"pl")
 		if len(id) > maxIDLen {
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
-		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
+		name, peerName := vethPrefix+getShortIfName(ifName, shortIfLength)+"pl"+id, vethPrefix+getShortIfName(ifName, shortIfLength)+"pg"+id
+
+		common.Log.Infof(`Creating new veth pair: %s - %s`, name, peerName)
 		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
@@ -319,4 +324,16 @@ func subnets(addrs []netlink.Addr) map[string]struct{} {
 		subnets[subnet(addr.IPNet)] = struct{}{}
 	}
 	return subnets
+}
+
+// getShortIfName produces a shortened version of "ifName", no longer than "ifLength". Useful
+// if you want to embed this interface name in another interface, like a veth, and keep it short.
+func getShortIfName(ifName string, ifLength int) string {
+	var shortIfName string
+	if len(ifName) >= ifLength {
+		shortIfName = ifName[len(ifName)-ifLength:]
+	} else {
+		shortIfName = ifName
+	}
+	return shortIfName
 }
