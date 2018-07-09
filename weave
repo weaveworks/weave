@@ -707,10 +707,10 @@ upgrade_cni_plugin() {
 
     # Create two symlinks to the plugin, as it has different
     # behaviour depending on its name:
-    if [ "$(readlink -f $1/weave-net)" != "$CNI_PLUGIN_NAME" ]; then
+    if [ "$(readlink -f $1/weave-net)" != "$1/$CNI_PLUGIN_NAME" ]; then
         upgrade_cni_plugin_symlink $1 weave-net
     fi
-    if [ "$(readlink -f $1/weave-ipam)" != "$CNI_PLUGIN_NAME" ]; then
+    if [ "$(readlink -f $1/weave-ipam)" != "$1/$CNI_PLUGIN_NAME" ]; then
         upgrade_cni_plugin_symlink $1 weave-ipam
     fi
 }
