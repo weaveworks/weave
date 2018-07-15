@@ -136,7 +136,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 						nsSelectors[dstSelector.key] = dstSelector
 						dstRuleHost = dstSelector
 					} else if peer.IPBlock != nil {
-						ipBlock := newIPBlockSpec(peer.IPBlock)
+						ipBlock := newIPBlockSpec(peer.IPBlock, ns.name)
 						ipBlocks[ipBlock.key] = ipBlock
 						dstRuleHost = ipBlock
 					}

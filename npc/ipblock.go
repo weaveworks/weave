@@ -16,15 +16,16 @@ type ipBlockSpec struct {
 	key       string
 	ipsetName ipset.Name // ipset for storing excepted CIDRs
 	ipBlock   *networkingv1.IPBlock
+	nsName    string // Namespace name
 }
 
-func newIPBlockSpec(ipb *networkingv1.IPBlock) *ipBlockSpec {
-	spec := &ipBlockSpec{ipBlock: ipb}
+func newIPBlockSpec(ipb *networkingv1.IPBlock, nsName string) *ipBlockSpec {
+	spec := &ipBlockSpec{ipBlock: ipb, nsName: nsName}
 
 	if len(ipb.Except) > 0 {
 		sort.Strings(ipb.Except)
 		spec.key = strings.Join(ipb.Except, " ")
-		spec.ipsetName = ipset.Name(IpsetNamePrefix + shortName("ipblock-except:"+spec.key))
+		spec.ipsetName = ipset.Name(IpsetNamePrefix + shortName(nsName+":"+"ipblock-except:"+spec.key))
 	}
 
 	return spec

@@ -514,15 +514,16 @@ func TestNewTargetSelector(t *testing.T) {
 
 func TestEgressPolicyWithIPBlock(t *testing.T) {
 	const (
-		fooPodIP        = "10.32.0.10"
-		exceptIPSetName = "weave-LKf)d{$q[dkYlH3Ko6eFcdc7z"
+		fooPodIP                    = "10.32.0.10"
+		exceptIPSetName             = "weave-j:W$5om!$8JS})buYAD7q^#sX"
+		exceptIPSetNameInNonDefault = "weave-|*P{aL2C@#N/1IZ!IvQItv_pt"
 	)
 
 	m := newMockIPSet()
 	ipt := newMockIPTables()
 	controller := New("foo", ipt, &m)
 
-	netpol := &networkingv1.NetworkPolicy{
+	netpolFoo := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "netpol-foo",
 			Name:      "allow-from-bar-to-foo",
@@ -546,7 +547,8 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 			}},
 		},
 	}
-	controller.AddNetworkPolicy(netpol)
+	err := controller.AddNetworkPolicy(netpolFoo)
+	require.NoError(t, err)
 
 	require.Equal(t, 2, len(m.sets[exceptIPSetName].subSets))
 	require.True(t, m.entryExists(exceptIPSetName, "192.168.48.1/32"))
@@ -558,4 +560,35 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 		require.Contains(t, rule, "-d 192.168.48.0/24 -m set ! --match-set "+exceptIPSetName+" dst")
 	}
 
+	// Check that we create a new ipset for the ipBlock bellow. An ipset with the
+	// same content already exists (created by netpolFoo), but we need to create
+	// a new one, as netpolBar is in a different namespace and weave-npc does
+	// object refcounting only within namespace boundaries.
+	netpolBar := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo-bar",
+			Name:      "allow-from-bar-to-foo-in-non-default",
+			Namespace: "non-default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeEgress,
+			},
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "bar"}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{
+						CIDR: "192.168.48.0/24",
+						Except: []string{
+							"192.168.48.1/32",
+							"192.168.48.2/32",
+						},
+					},
+				}},
+			}},
+		},
+	}
+	err = controller.AddNetworkPolicy(netpolBar)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(m.sets[exceptIPSetNameInNonDefault].subSets))
 }
