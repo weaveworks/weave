@@ -117,6 +117,16 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 	defer ns.Close()
 
+	hostNs, err := netns.Get()
+	if err != nil {
+		return fmt.Errorf("error accessing host network namespace: %s", err)
+	}
+	defer hostNs.Close()
+
+	if ns.Equal(hostNs) {
+		return fmt.Errorf("can not specify host network namespace as network namespace to which container should be added")
+	}
+
 	id := args.ContainerID
 	if len(id) < 5 {
 		data := make([]byte, 5)
