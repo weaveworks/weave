@@ -7,17 +7,17 @@ search_type: Documentation
 The following topics are discussed:
 
 * [Installation](#install)
- * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
- * [Upgrading the Daemon Sets](#daemon-sets)
- * [CPU and Memory Requirements](#resources)
- * [Pod Eviction](#eviction)
+   * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
+   * [Upgrading the Daemon Sets](#daemon-sets)
+   * [CPU and Memory Requirements](#resources)
+   * [Pod Eviction](#eviction)
 * [Features](#features)
- * [Pod Network](#pod-network)
- * [Network Policy](#npc)
+   * [Pod Network](#pod-network)
+   * [Network Policy](#npc)
 * [Troubleshooting](#troubleshooting)
- * [Reading the logs](#logs)
- * [Troubleshooting Blocked Connections](#blocked-connections)
- * [Things to watch out for](#key-points)
+   * [Reading the logs](#logs)
+   * [Troubleshooting Blocked Connections](#blocked-connections)
+   * [Things to watch out for](#key-points)
 * [Changing Configuration Options](#configuration-options)
 
 
