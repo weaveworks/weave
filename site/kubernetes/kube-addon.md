@@ -7,7 +7,6 @@ search_type: Documentation
 The following topics are discussed:
 
 * [Installation](#install)
-   * [Upgrading Kubernetes to version 1.6](#kube-1.6-upgrade)
    * [Upgrading the Daemon Sets](#daemon-sets)
    * [CPU and Memory Requirements](#resources)
    * [Pod Eviction](#eviction)
@@ -60,37 +59,12 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-## <a name="kube-1.6-upgrade"></a> Upgrading Kubernetes to version 1.6
-
-In version 1.6, Kubernetes has increased security, so we need to
-create a special service account to run Weave Net. This is done in
-the file `weave-daemonset-k8s-1.6.yaml` attached to the [Weave Net
-release](https://github.com/weaveworks/weave/releases/latest).
-
-Also, the
-[toleration](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/taint-toleration-dedicated.md)
-required to let Weave Net run on master nodes has moved from an
-annotation to a field on the DaemonSet spec object.
-
-If you have edited the Weave Net DaemonSet from a previous release,
-you will need to re-make your changes against the new version.
-
 ### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 
-For Kubernetes 1.6 and above the DaemonSet definition specifies
-[Rolling Updates](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/),
+The DaemonSet definition specifies [Rolling
+Updates](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/),
 so when you apply a new version Kubernetes will automatically restart
 the Weave Net pods one by one.
-
-Kubernetes v1.5 and below does not support rolling upgrades of daemon sets,
-and so you will need to perform the procedure manually:
-
-* Apply the updated addon manifest `kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"`
-* Kill each Weave Net pod with `kubectl delete` and then wait for it to reboot before moving on to the next pod.
-
-**Note:** In versions prior to Weave Net 2.0, deleting all Weave Net pods at the same time
-  will result in them losing track of IP address range ownership, possibly leading to
-  duplicate IP addresses if you then start a new copy of Weave Net.
 
 ## <a name="resources"></a>CPU and Memory Requirements
 
