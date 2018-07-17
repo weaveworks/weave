@@ -15,6 +15,7 @@ The following topics are discussed:
  * [Pod Network](#pod-network)
  * [Network Policy](#npc)
 * [Troubleshooting](#troubleshooting)
+ * [Reading the logs](#logs)
  * [Troubleshooting Blocked Connections](#blocked-connections)
  * [Things to watch out for](#key-points)
 * [Changing Configuration Options](#configuration-options)
@@ -186,12 +187,46 @@ definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpoli
 
 ## <a name="troubleshooting"></a> Troubleshooting
 
+The first thing to check is whether Weave Net is up and
+running. The `kubectl apply` command you used to install it only
+_requests_ that it be downloaded and started; if anything goes wrong
+at startup, those details will only be visible in the [logs](#logs) of
+the container(s).
+
+To check what is running:
+
+```
+$ kubectl get pods -n kube-system -l name=weave-net
+NAME              READY  STATUS   RESTARTS  AGE
+weave-net-1jkl6   2/2    Running  0         1d
+weave-net-bskbv   2/2    Running  0         1d
+weave-net-m4x1b   2/2    Running  0         1d
+```
+
+You should see one line for each node in your cluster; each line
+should have STATUS "Running", and READY should be 2 out of 2. If you
+see a STATUS like "Error" or "CrashLoopBackoff", look in the logs of
+the container with that status.
+
+### <a name="logs"></a> Reading the logs
+
+Pick one of the pods from the list output by `kubectl get pods` and
+ask for the logs like this:
+
+```
+$ kubectl logs -n kube-system weave-net-1jkl6 weave
+```
+
+For easier viewing, pipe the output into a file , especially if
+it is long.
+
 Many Kubernetes network issues occur at a higher level than Weave Net.
 The [Kubernetes Service Debugging Guide]
 (https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
 has a detailed step-by-step guide.
 
-The status of Weave Net can be checked by running its CLI commands. This can be done in various ways:
+Once it is up and running, the status of Weave Net can be checked by
+running its CLI commands. This can be done in various ways:
 
 1\. [Install the `weave` script](/site/installing-weave.md) and run:
 
