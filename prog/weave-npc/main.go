@@ -158,7 +158,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	// Egress rules:
 	//
-	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j RETURN
+	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j ACCEPT
 	// -A WEAVE-NPC-EGRESS -m set ! --match-set weave-local-pods src -j RETURN
 	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
@@ -179,7 +179,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// check both chains).
 
 	ruleSpecs := [][]string{
-		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
+		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
 		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
 	}
 	if allowMcast {
