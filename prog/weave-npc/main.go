@@ -156,6 +156,28 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		return err
 	}
 
+	// Egress rules:
+	//
+	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j RETURN
+	// -A WEAVE-NPC-EGRESS -m set ! --match-set weave-local-pods src -j RETURN
+	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j WEAVE-NPC-EGRESS-CUSTOM
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j NFLOG --nflog-group 86
+	// -A WEAVE-NPC-EGRESS -m mark ! --mark 0x40000/0x40000 -j DROP
+	//
+	// -A WEAVE-NPC-EGRESS-CUSTOM <rulespec> -j MARK --set-xmark 0x40000/0x40000
+	// -A WEAVE-NPC-EGRESS-CUSTOM <rulespec> -j RETURN
+	//
+	// -A WEAVE-NPC-EGRESS-DEFAULT <rulespec> -j MARK --set-xmark 0x40000/0x40000
+	// -A WEAVE-NPC-EGRESS-DEFAULT <rulespec> -j RETURN
+	//
+	// For each rule we create two (mark and return). We cannot just accept
+	// a packet if it matches any rule, as a packet might need to traverse
+	// the ingress npc as well which happens later in the chain (in some cases
+	// we cannot detect whether packet is ingress or egress, so we need to
+	// check both chains).
+
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "RETURN"},
 		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
