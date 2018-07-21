@@ -31,7 +31,6 @@ Install Weave Net from the command line on its own or if you are using Docker, K
 * [Integrating Kubernetes and Mesos via the CNI Plugin](https://www.weave.works/docs/net/latest/kubernetes/)
 * [Integrating Kubernetes via the Addon](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/)
      * [Installation](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#install)
-     * [Upgrading Kubernetes to version 1.6](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#kube-1.6-upgrade)
      * [Upgrading the Daemon Sets](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#daemon-sets)
      * [CPU and Memory Requirements](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#resources)
      * [Pod Eviction](https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#eviction)
