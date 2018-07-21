@@ -1,9 +1,50 @@
 package net
 
 import (
+	"strings"
+
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 )
+
+// AddChainWithRules creates a chain and appends given rules to it.
+//
+// If the chain exists, but its rules are not the same as the given ones, the
+// function will flush the chain and then will append the rules.
+func AddChainWithRules(ipt *iptables.IPTables, table, chain string, rulespecs [][]string) error {
+	if err := ensureChains(ipt, table, chain); err != nil {
+		return err
+	}
+
+	currRuleSpecs, err := ipt.List(table, chain)
+	if err != nil {
+		return errors.Wrapf(err, "iptables -S. table: %q, chain: %q", table, chain)
+	}
+
+	// First returned rule is "-N $(chain)", so ignore it
+	currRules := strings.Join(currRuleSpecs[1:], "\n")
+	rules := make([]string, 0)
+	for _, r := range rulespecs {
+		rules = append(rules, strings.Join(r, " "))
+	}
+	reqRules := strings.Join(rules, "\n")
+
+	if currRules == reqRules {
+		return nil
+	}
+
+	if err := ipt.ClearChain(table, chain); err != nil {
+		return err
+	}
+
+	for _, r := range rulespecs {
+		if err := ipt.Append(table, chain, r...); err != nil {
+			return errors.Wrapf(err, "iptables -A. table: %q, chain: %q, rule: %s", table, chain, r)
+		}
+	}
+
+	return nil
+}
 
 // ensureChains creates given chains if they do not exist.
 func ensureChains(ipt *iptables.IPTables, table string, chains ...string) error {

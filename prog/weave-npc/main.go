@@ -3,11 +3,9 @@ package main
 import (
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -19,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -191,42 +190,8 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
 		{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
 	}...)
-	if err := addChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+	if err := net.AddChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// addChainWithRules creates a chain and appends given rules to it.
-//
-// If the chain exists, but its rules are not the same as the given ones, the
-// function will flush the chain and then will append the rules.
-func addChainWithRules(ipt *iptables.IPTables, table, chain string, rulespecs [][]string) error {
-	// Create the chain ignoring any error because the chain might already exist
-	_ = ipt.NewChain(table, chain)
-
-	currRuleSpecs, err := ipt.List(table, chain)
-	if err != nil {
-		return errors.Wrapf(err, "iptables -S. table: %q, chain: %q", table, chain)
-	}
-
-	// First returned rule is "-N $(chain)", so ignore it
-	currRules := strings.Join(currRuleSpecs[1:], "\n")
-	rules := make([]string, 0)
-	for _, r := range rulespecs {
-		rules = append(rules, strings.Join(r, " "))
-	}
-	reqRules := strings.Join(rules, "\n")
-
-	if currRules == reqRules {
-		return nil
-	}
-
-	for _, r := range rulespecs {
-		if err := ipt.Append(table, chain, r...); err != nil {
-			return errors.Wrapf(err, "iptables -A. table: %q, chain: %q, rule: %s", table, chain, r)
-		}
 	}
 
 	return nil
