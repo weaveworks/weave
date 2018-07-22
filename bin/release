@@ -92,6 +92,7 @@ build() {
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.6.yaml
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.7.yaml
+    sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.8.yaml
     make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER
 
     if make tests; then
@@ -181,6 +182,13 @@ draft() {
         --name "weave-daemonset-k8s-1.7.yaml" \
         --file "./prog/weave-kube/weave-daemonset-k8s-1.7.yaml"
 
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "weave-daemonset-k8s-1.8.yaml" \
+        --file "./prog/weave-kube/weave-daemonset-k8s-1.8.yaml"
+    
     echo "** Draft $TYPE $RELEASE_NAME $VERSION created at"
     echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
 }
@@ -288,6 +296,13 @@ publish() {
             --tag latest_release \
             --name "weave-daemonset-k8s-1.7.yaml" \
             --file "./prog/weave-kube/weave-daemonset-k8s-1.7.yaml"
+
+        github-release upload \
+            --user $GITHUB_USER \
+            --repo weave \
+            --tag latest_release \
+            --name "weave-daemonset-k8s-1.8.yaml" \
+            --file "./prog/weave-kube/weave-daemonset-k8s-1.8.yaml"
 
         echo "** Release $RELEASE_NAME $VERSION published at"
         echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
