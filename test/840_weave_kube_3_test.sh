@@ -52,7 +52,6 @@ fi
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
@@ -76,10 +75,19 @@ assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
 assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
 
-# Set up a simple network policy so all our test pods can talk to each other
-run_on $HOST1 "$KUBECTL annotate ns default net.beta.kubernetes.io/network-policy='{\"ingress\":{\"isolation\":\"DefaultDeny\"}}'"
+# Set up simple network policies so all our test pods can talk to each other
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+EOF
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: test840
@@ -102,7 +110,7 @@ EOF
 
 # Another policy, this time with no 'from' section, just to check that doesn't cause a crash
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: test840f
@@ -177,17 +185,6 @@ assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c
 # Start pod which should not have access to nettest
 run_on $HOST1 "$KUBECTL run nettest-deny --labels=\"access=deny,run=nettest-deny\" --image-pull-policy=Never --image=$IMAGE --replicas=1 --command -- sleep 3600"
 denyPodName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest-deny -o go-template='{{(index .items 0).metadata.name}}'")
-assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
-
-# Restart weave-net with npc in non-legacy mode
-$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
-sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
-
-assert_raises 'wait_for_x check_all_pods_communicate pods'
-
-# nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # check access via virtual IP
@@ -268,6 +265,61 @@ EOF
 # Virtual IP and NodePort should now work
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+# allow nettest-deny to access only to 8.8.8.0/24
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-nettest-deny-dns
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: nettest-deny
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 8.8.8.0/24
+        except:
+        - 8.8.8.4/32
+EOF
+
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- dig @8.8.8.4 google.com >/dev/null"
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- dig @8.8.8.8 google.com >/dev/null"
+
+# also, allow nettest-deny to access nettest and kube-system (for kube-dns)
+run_on $HOST1 "$KUBECTL label namespace kube-system name=kube-system"
+run_on $HOST1 "$KUBECTL replace -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-nettest-deny-dns
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: nettest-deny
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 8.8.8.0/24
+        except:
+        - 8.8.8.4/32
+    - podSelector:
+        matchLabels:
+          run: nettest
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+EOF
+
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
 # the client source IP addr

@@ -17,6 +17,7 @@ import (
 	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
+	"github.com/weaveworks/weave/npc"
 )
 
 /* This code implements three possible configurations to connect
@@ -457,14 +458,27 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	}
 
 	if config.NPC {
-		// Steer traffic via the NPC
-		_ = ipt.NewChain("filter", "WEAVE-NPC") // ignore error because it might already exist
-		// If WEAVE-NPC chain doesn't exist then creating a rule in the chain will fail
+		// Steer traffic via the NPC.
+
+		if err = ensureChains(ipt, "filter", npc.MainChain, npc.EgressChain); err != nil {
+			return err
+		}
+
+		// Steer egress traffic destined to local node.
+		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
+			return err
+		}
 		fwdRules = append(fwdRules,
 			[][]string{
+				// Might include ingress traffic which is fine as long as we do not
+				// ACCEPT in WEAVE-NPC-EGRESS chain
+				{"-i", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", npc.EgressChain},
+				// The following rules are for ingress NPC processing
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", "WEAVE-NPC"},
+					"-j", npc.MainChain},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)
@@ -568,43 +582,6 @@ func linkSetUpByName(linkName string) error {
 		return errors.Wrapf(err, "setting link up on %q", linkName)
 	}
 	return netlink.LinkSetUp(link)
-}
-
-// ensureRulesAtTop ensures the presence of given iptables rules.
-//
-// If any rule from the list is missing, the function deletes all given
-// rules and re-inserts them at the top of the chain to ensure the order of the rules.
-func ensureRulesAtTop(table, chain string, rulespecs [][]string, ipt *iptables.IPTables) error {
-	allFound := true
-
-	for _, rs := range rulespecs {
-		found, err := ipt.Exists(table, chain, rs...)
-		if err != nil {
-			return errors.Wrapf(err, "ipt.Exists(%s, %s, %s)", table, chain, rs)
-		}
-		if !found {
-			allFound = false
-			break
-		}
-	}
-
-	// All rules exist, do nothing.
-	if allFound {
-		return nil
-	}
-
-	for pos, rs := range rulespecs {
-		// If any is missing, then delete all, as we need to preserve the order of
-		// given rules. Ignore errors, as rule might not exist.
-		if !allFound {
-			ipt.Delete(table, chain, rs...)
-		}
-		if err := ipt.Insert(table, chain, pos+1, rs...); err != nil {
-			return errors.Wrapf(err, "ipt.Append(%s, %s, %s)", table, chain, rs)
-		}
-	}
-
-	return nil
 }
 
 func reexpose(config *BridgeConfig, log *logrus.Logger) error {

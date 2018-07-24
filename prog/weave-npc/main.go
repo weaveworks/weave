@@ -8,7 +8,6 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/spf13/cobra"
 	coreapi "k8s.io/api/core/v1"
-	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -30,7 +30,6 @@ var (
 	logLevel    string
 	allowMcast  bool
 	nodeName    string
-	legacy      bool
 	maxList     int
 )
 
@@ -53,7 +52,27 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	return ipt.ClearChain(npc.TableFilter, npc.MainChain)
+	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressMarkChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressCustomChain); err != nil {
+		return err
+	}
+
+	if err := ipt.ClearChain(npc.TableFilter, npc.EgressDefaultChain); err != nil {
+		return err
+	}
+
+	// We do not clear npc.EgressChain here because otherwise, in the case of restarting
+	// weave-npc process, all egress traffic is allowed for a short period of time.
+	// The chain is created in createBaseRules.
+
+	return nil
 }
 
 func resetIPSets(ips ipset.Interface) error {
@@ -77,6 +96,11 @@ func resetIPSets(ips ipset.Interface) error {
 	}
 
 	for _, s := range sets {
+		// LocalIPset might be used by WEAVE-NPC-EGRESS chain which we do not
+		// flush, so we cannot destroy it.
+		if s == npc.LocalIpset {
+			continue
+		}
 		common.Log.Debugf("Destroying ipset '%s'", string(s))
 		if err := ips.Destroy(s); err != nil {
 			common.Log.Errorf("Failed to destroy ipset '%s'", string(s))
@@ -112,11 +136,81 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 
 	// If the destination address is not any of the local pods, let it through
-	if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+	found, err := ipsetExist(ips, npc.LocalIpset)
+	if err != nil {
 		return err
 	}
-	return ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT")
+	if !found {
+		if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
+			return err
+		}
+	}
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
+		"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
+		return err
+	}
+
+	// Egress rules:
+	//
+	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j ACCEPT
+	// -A WEAVE-NPC-EGRESS -m set ! --match-set weave-local-pods src -j RETURN
+	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j WEAVE-NPC-EGRESS-CUSTOM
+	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j NFLOG --nflog-group 86
+	// -A WEAVE-NPC-EGRESS -m mark ! --mark 0x40000/0x40000 -j DROP
+	//
+	// -A WEAVE-NPC-EGRESS-CUSTOM <rulespec> -j MARK --set-xmark 0x40000/0x40000
+	// -A WEAVE-NPC-EGRESS-CUSTOM <rulespec> -j RETURN
+	//
+	// -A WEAVE-NPC-EGRESS-DEFAULT <rulespec> -j MARK --set-xmark 0x40000/0x40000
+	// -A WEAVE-NPC-EGRESS-DEFAULT <rulespec> -j RETURN
+	//
+	// For each rule we create two (mark and return). We cannot just accept
+	// a packet if it matches any rule, as a packet might need to traverse
+	// the ingress npc as well which happens later in the chain (in some cases
+	// we cannot detect whether packet is ingress or egress, so we need to
+	// check both chains).
+
+	ruleSpecs := [][]string{
+		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
+		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
+	}
+	if allowMcast {
+		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
+	}
+	ruleSpecs = append(ruleSpecs, [][]string{
+		{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
+		{"-m", "mark", "!", "--mark", npc.EgressMark, "-j", "DROP"},
+	}...)
+	if err := net.AddChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Dummy way to check whether a given ipset exists.
+// TODO(brb) Use "ipset -exist create <..>" for our purpose instead (for some reasons
+// creating an ipset with -exist fails).
+func ipsetExist(ips ipset.Interface, name ipset.Name) (bool, error) {
+	sets, err := ips.List(string(name))
+	if err != nil {
+		return false, err
+	}
+	for _, s := range sets {
+		if s == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func root(cmd *cobra.Command, args []string) {
@@ -131,10 +225,6 @@ func root(cmd *cobra.Command, args []string) {
 		common.Log.Fatalf("Must set node name via --node-name or $HOSTNAME")
 	}
 	common.Log.Infof("Starting Weaveworks NPC %s; node name %q", version, nodeName)
-
-	if legacy {
-		common.Log.Info("Running in legacy mode (k8s pre-1.7 network policy semantics)")
-	}
 
 	if err := metrics.Start(metricsAddr); err != nil {
 		common.Log.Fatalf("Failed to start metrics: %v", err)
@@ -159,7 +249,7 @@ func root(cmd *cobra.Command, args []string) {
 	handleError(resetIPSets(ips))
 	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(nodeName, legacy, ipt, ips)
+	npc := npc.New(nodeName, ipt, ips)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
@@ -220,11 +310,7 @@ func root(cmd *cobra.Command, args []string) {
 			handleError(npc.UpdateNetworkPolicy(old, new))
 		},
 	}
-	if legacy {
-		npController = makeController(client.Extensions().RESTClient(), "networkpolicies", &extnapi.NetworkPolicy{}, npHandlers)
-	} else {
-		npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
-	}
+	npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
 
 	go nsController.Run(wait.NeverStop)
 	go podController.Run(wait.NeverStop)
@@ -245,7 +331,6 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
-	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
 
 	handleError(rootCmd.Execute())
