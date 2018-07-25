@@ -1,3 +1,48 @@
+## Release 2.4.0
+
+This release introduces a support for Kubernetes Egress Network Policy (#2624, #3313)
+and adds a mechanism for preserving the client source IP address to enable
+`externalTrafficPolicy: Local` on Kubernetes (#2924, #3298).
+
+### Bug fixes
+
+* Increase the ipset list size which prevents weave-npc from crashing on older
+  kernels when more than eight Kubernetes Namespaces are used (#3289, #3305).
+* Avoid a possible livelock when reclaiming IP address space in weave-kube (#3317).
+* Ensure `xtables.lock` is mounted as a file so that kube-proxy can take the lock
+  if it has started after Weave Net (#3351, #3353).
+* Upgrade the CNI plugin symlinks only if the plugin has changed (#3337, #3345).
+
+### Other improvements
+
+* Manipulate the Kubernetes node status `NetworkUnavailable` so that Pods can be
+  scheduled on nodes when the GCE cloud provider is in use (#3249, #3307, #3332, #3334).
+* Refrain from creating a subprocess for configuring a network interface in
+  a container network namespace (#3291).
+* Protect against handling the CNI plugin request with the host namespace which
+  prevents Weave Net from misconfiguring the host network (#3206, #3346).
+* Weave Net can be run on minikube VM (#3124).
+* Add `org.opencontainers.image.*` labels to Dockerfiles to improve association
+  of the container images with git revisions (#3299).
+* Improve the error message when running `weave reset` on Kubernetes (#3319).
+
+### Build and Testing
+
+* Use `dep` instead of `git submodules` for managing external packages (#3268).
+* Fix usage of `manifest-tool` in Makefile (#3320).
+* Update Kubernetes to 1.11 for the integration tests (#3340).
+
+### External Contributors
+
+Thanks to the following contributors:
+
+* @kitt1987
+* @louismunro
+* @Nodraak
+* @stevenjohnstone
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/73?closed=1)
+
 ## Release 2.3.0
 
 ### Security fixes
