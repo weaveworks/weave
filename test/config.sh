@@ -337,7 +337,7 @@ start_suite() {
 # Common postconditions to assert on each host, after each test:
 assert_common_postconditions() {
     # Ensure we do not generate any defunct (a.k.a. zombie) process:
-    assert "run_on $1 ps aux | grep -c '[d]efunct'" "0"
+    assert "run_on $1 ps aux | grep '[d]efunct'" ""
 }
 
 end_suite() {
