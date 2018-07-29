@@ -246,6 +246,7 @@ endif
 # It also makes sure the multiarch hooks are reqistered in the kernel so the QEMU emulation works
 $(BUILD_UPTODATE): build/*
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
+	$(SUDO) docker tag $(BUILD_IMAGE) $(BUILD_IMAGE):$(shell tools/image-tag)
 	$(SUDO) docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	touch $@
 
