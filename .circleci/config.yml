@@ -36,18 +36,17 @@ jobs:
   smoke-tests:
     machine:
       image: circleci/classic:201709-01
+    working_directory: /home/circleci/src/github.com/weaveworks/weave
     environment:
-      GOPATH: /home/circleci
       SRCDIR: /home/circleci/src/github.com/weaveworks/weave
       CIRCLE_ARTIFACTS: /tmp/artifacts
     parallelism: 2
     steps:
       - checkout
       - run: mkdir $CIRCLE_ARTIFACTS
-      # copy source dir and submodule update --init
-      - run: bin/circle-dependencies-post-sources
+      - run: git submodule update --init
       - attach_workspace:
-          at: /home/circleci/src/github.com/weaveworks/weave
+          at: .
       # kick off creation of test VMs
       - run:
           command: bin/provision_test_vms.sh

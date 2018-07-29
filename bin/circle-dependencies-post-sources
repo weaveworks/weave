@@ -1,7 +1,0 @@
-#!/bin/bash
-
-set -e
-
-mkdir -p "$(dirname "$SRCDIR")" && cp -r "$(pwd)/" "$SRCDIR"
-cd "$SRCDIR"
-git submodule update --init
