@@ -50,6 +50,8 @@ RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt
 
 # Install common Go tools
 RUN go get \
+    github.com/weaveworks/build-tools/cover \
+    github.com/mattn/goveralls \
 	github.com/golang/lint/golint \
 	github.com/fzipp/gocyclo \
 	github.com/fatih/hclfmt \
