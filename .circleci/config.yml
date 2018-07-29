@@ -52,13 +52,9 @@ jobs:
       - attach_workspace:
           at: .
       # kick off creation of test VMs
-      - run:
-          command: bin/provision_test_vms.sh
-          background: true
+      - run: bin/provision_test_vms.sh
       # when VMs are ready, copy built software to them
-      - run:
-          command: bin/circle-test-pre
-          background: true
+      - run: bin/circle-test-pre
       - run:
           command: bin/circle-test-smoke
           no_output_timeout: 360s
