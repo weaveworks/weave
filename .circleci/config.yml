@@ -1,6 +1,39 @@
 version: 2
+defaults: &defaults
+  docker:
+    - image: weaveworks/weavebuild:circle20-50a4e941
+  working_directory: /go/src/github.com/weaveworks/weave
+
 jobs:
+  lint:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - run: make DEBUG=1 BUILD_IN_CONTAINER=false lint
+
+  unit-test:
+    <<: *defaults
+    parallelism: 2
+    steps:
+      - checkout
+      - run: COVERDIR=test/coverage make BUILD_IN_CONTAINER=false tests
+
   build:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: git submodule update --init
+      - run: make COVERAGE=true BUILD_IN_CONTAINER=false SUDO= exes all
+      - persist_to_workspace:
+          root: .
+          paths:
+          - weave.tar.gz
+          - tools/runner/runner
+          - test/tls/tls
+
+  smoke-tests:
     machine:
       image: circleci/classic:201709-01
     environment:
@@ -13,23 +46,16 @@ jobs:
       - run: mkdir $CIRCLE_ARTIFACTS
       # copy source dir and submodule update --init
       - run: bin/circle-dependencies-post-sources
-      - restore_cache:
-          key: v1-cache-{{ checksum "build/Dockerfile" }}-{{ checksum "build/build.sh" }}
+      - attach_workspace:
+          at: /home/circleci/src/github.com/weaveworks/weave
       # kick off creation of test VMs
       - run:
           command: bin/provision_test_vms.sh
           background: true
-      # create build image and make all
-      - run: bin/circle-dependencies-post
-      - save_cache:
-          key: v1-cache-{{ checksum "build/Dockerfile" }}-{{ checksum "build/build.sh" }}
-          paths:
-            - "~/docker"
       # when VMs are ready, copy built software to them
       - run:
           command: bin/circle-test-pre
           background: true
-      - run: bin/circle-test-unit
       - run:
           command: bin/circle-test-smoke
           no_output_timeout: 360s
@@ -44,8 +70,29 @@ jobs:
           command: $SRCDIR/bin/circle-teardown-pre
       - store_artifacts:
           path: /tmp/artifacts
+
+  deploy:
+    <<: *defaults
+    steps:
+      - setup_remote_docker
+      # Rebuild without coverage and push to dockerhub
+      - deploy: bin/circle-deploy-master
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - lint
+      - unit-test
+      - build
+      - smoke-tests:
+          requires:
+            - lint
+            - unit-test
+            - build
       - deploy:
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              bin/circle-deploy-master
-            fi
+          requires:
+            - smoke-tests
+          filters:
+            branches:
+              only: master

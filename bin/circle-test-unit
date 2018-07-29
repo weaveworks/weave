@@ -1,7 +1,0 @@
-#!/bin/bash
-
-set -e
-
-cd $SRCDIR
-make DEBUG=1 lint
-COVERDIR=test/coverage make RM= tests
