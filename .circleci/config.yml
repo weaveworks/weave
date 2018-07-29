@@ -1,7 +1,7 @@
 version: 2
 defaults: &defaults
   docker:
-    - image: weaveworks/weavebuild:circle20-50a4e941
+    - image: weaveworks/weavebuild:circle20-2e6504d3
   working_directory: /go/src/github.com/weaveworks/weave
 
 jobs:
@@ -18,6 +18,10 @@ jobs:
     steps:
       - checkout
       - run: COVERDIR=test/coverage make BUILD_IN_CONTAINER=false tests
+      - persist_to_workspace:
+          root: .
+          paths:
+          - test/coverage
 
   build:
     <<: *defaults
@@ -62,11 +66,25 @@ jobs:
       - run:
           command: bin/circle-destroy-vms
           background: true
-      - deploy:
-          command: cd $SRCDIR/test; ./gen_coverage_reports.sh
-      # run goveralls; copy coverage reports to artifacts dir
-      - deploy:
-          command: $SRCDIR/bin/circle-teardown-pre
+      - persist_to_workspace:
+          root: .
+          paths:
+          - test/coverage
+      - store_artifacts:
+          path: /tmp/artifacts
+
+  gen-coverage:
+    <<: *defaults
+    environment:
+      CIRCLE_ARTIFACTS: /tmp/artifacts
+    steps:
+      - checkout
+      - run: mkdir $CIRCLE_ARTIFACTS
+      - attach_workspace:
+          at: .
+      - run: cd test; ./gen_coverage_reports.sh
+      - run: goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=test/profile.cov -service=circleci
+      - run: cp test/coverage.* $CIRCLE_ARTIFACTS
       - store_artifacts:
           path: /tmp/artifacts
 
@@ -89,6 +107,10 @@ workflows:
             - lint
             - unit-test
             - build
+      - gen-coverage:
+          requires:
+            - unit-test
+            - smoke-tests
       - deploy:
           requires:
             - smoke-tests
