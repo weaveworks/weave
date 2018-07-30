@@ -214,6 +214,8 @@ spec:
               access: deny
 EOF
 
+sleep 1
+
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # remove the access for nettest-deny
