@@ -729,9 +729,20 @@ upgrade_cni_plugin() {
 create_cni_config() {
     cat >"$1" <<EOF
 {
+    "cniVersion": "0.3.0",
     "name": "weave",
-    "type": "weave-net",
-    "hairpinMode": $2
+    "plugins": [
+        {
+            "name": "weave",
+            "type": "weave-net",
+            "hairpinMode": $2
+        },
+        {
+            "type": "portmap",
+            "capabilities": {"portMappings": true},
+            "snat": true
+        }
+    ]
 }
 EOF
 }
@@ -742,8 +753,13 @@ setup_cni() {
     if install_cni_plugin $CNI_PLUGIN_DIR ; then
         upgrade_cni_plugin $CNI_PLUGIN_DIR
     fi
-    if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf $HAIRPIN_MODE
+
+    # Weave will use .conflist for versions > 2.4.0. So in case of upgrade of old
+    # clusters with Weave version <= 2.4.0 remove existing 10-weave.conf
+    rm -f $HOST_ROOT/etc/cni/net.d/10-weave.conf
+
+    if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conflist ] ; then
+        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conflist $HAIRPIN_MODE
     fi
 }
 

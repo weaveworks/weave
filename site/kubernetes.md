@@ -30,6 +30,8 @@ Then run:
 
     weave setup
 
+Weave net depends on the *portmap* [standard](https://github.com/containernetworking/plugins) CNI plugin to support *hostport* functionality. Please ensure that *portmap* CNI plugin is installed in `/opt/cni/bin` directory.
+
 #### Launching Weave Net
 
 To create a network that spans multiple hosts, the Weave peers must be connected to each other.  
@@ -45,7 +47,7 @@ for a discussion on peer connections.
 
 All CNI plugins are configured by a JSON file in the directory
 `/etc/cni/net.d/`.  `weave setup` installs a minimal configuration
-file named `10-weave.conf`, which you can alter to suit your needs.
+file named `10-weave.conflist`, which you can alter to suit your needs.
 
 See the [CNI Spec](https://github.com/appc/cni/blob/master/SPEC.md#network-configuration)
 for details on the format and contents of this file.

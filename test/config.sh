@@ -329,7 +329,7 @@ start_suite() {
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
         rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
         weave_on $host reset 2>/dev/null
-        run_on $host sudo rm -f /opt/cni/bin/weave-plugin-latest /opt/cni/bin/weave-net /opt/cni/bin/weave-ipam /etc/cni/net.d/10-weave.conf
+        run_on $host sudo rm -f /opt/cni/bin/weave-plugin-latest /opt/cni/bin/weave-net /opt/cni/bin/weave-ipam /etc/cni/net.d/10-weave.conflist
     done
     whitely echo "$@"
 }
