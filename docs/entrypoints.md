@@ -35,21 +35,21 @@ weave-kube is an image with the weave binaries and a wrapper script installed. I
 
 1. Setting up the weave network
 2. Connecting to peers
-3. Copy the weave CNI-compatible binary plugin `weaveutil` to `/opt/cni/bin/weave-net` and weave config in `/etc/cni/net.d/10-weave.conf`
+3. Copy the weave CNI-compatible binary plugin `weaveutil` to `/opt/cni/bin/weave-net` and weave config in `/etc/cni/net.d/10-weave.conflist`
 4. Running the weave network policy controller (weave-npc) to implement kubernetes' `NetworkPolicy`
 
 Once installation is complete, each network-relevant change in a container leads `kubelet` to:
 
 1. Set certain environment variables to configure the CNI plugin, mostly related to the container ID
 2. Launch `/opt/cni/bin/weave-net`
-3. Pass the CNI config - the contents of `/etc/cni/net.d/10-weave.conf` to `weave-net`
+3. Pass the CNI config - the contents of `/etc/cni/net.d/10-weave.conflist` to `weave-net`
 
 Thus, when each container is changed, and `kubelet` calls weave as a CNI plugin, it really just is launching `weaveutil` as `weave-net`.
 
 The installation and setup of all of the above - and therefore the entrypoint to the weave-kube image - is the script `prog/weave-kube/launch.sh`. `launch.sh` does the following:
 
 1. Read configuration variables from the environment. When the documentation for `weave-kube` describes configuring the weave network by changing the environment variables in the daemonset in the `.yml` file, `launch.sh` reads these environment variables.
-2. Set up the config file at `/etc/cni/net.d/10-weave.conf`
+2. Set up the config file at `/etc/cni/net.d/10-weave.conflist`
 3. Run the `weave` initialization script
 4. Run `weaver` with the correct configuration passed as command-line options
 
@@ -66,5 +66,5 @@ To add new options to how weave should run with each invocation, you would do th
     * have `prog/weave-kube/launch.sh` read it as an environment variable and set inside
     * set a default for the environment variable in `prog/weave-kube/weave-daemonset-k8s-1.6.yaml` and `weave-daemonset.yaml`
     * if it should be set via `weaver` globally on its one-time initialization invocation, pass it on in `launch.sh`
-    * if it needs to be set via `weaveutil` on each invocation of `weave-net`, have `launch.sh` save it as an option in the CNI config file `/etc/cni/net.d/10-weave.conf` and then have the CNI code in `plugin/net/cni.go` in `weaveutil` read it and use where appropriate
+    * if it needs to be set via `weaveutil` on each invocation of `weave-net`, have `launch.sh` save it as an option in the CNI config file `/etc/cni/net.d/10-weave.conflist` and then have the CNI code in `plugin/net/cni.go` in `weaveutil` read it and use where appropriate
 7. Document it!
