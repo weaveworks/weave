@@ -152,7 +152,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 
 func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []*types.Route) error {
 	var err error
-	if routes == nil { // If config says nothing about routes, add a default one
+	if routes == nil || len(routes) == 0 { // If config says nothing about routes, add a default one
 		if !ipnet.Contains(gw) {
 			// The bridge IP is not on the same subnet; add a specific route to it
 			gw32 := &net.IPNet{IP: gw, Mask: mask32}
