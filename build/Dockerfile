@@ -89,7 +89,7 @@ RUN curl -sSL http://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.ta
 		&& make clean; done
 
 # Install Docker
-RUN curl -fsSL get.docker.com | VERSION=18.06.0-ce /bin/sh
+RUN curl -fsSL https://get.docker.com | VERSION=18.06.0-ce /bin/sh
 
 COPY build.sh /
 ENTRYPOINT ["sh", "/build.sh"]
