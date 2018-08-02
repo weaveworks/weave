@@ -50,6 +50,8 @@ RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt
 
 # Install common Go tools
 RUN go get \
+    github.com/weaveworks/build-tools/cover \
+    github.com/mattn/goveralls \
 	github.com/golang/lint/golint \
 	github.com/fzipp/gocyclo \
 	github.com/fatih/hclfmt \
@@ -85,6 +87,9 @@ RUN curl -sSL http://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.ta
 		&& ln -sf libpcap.so.${VER} /usr/local/lib/libpcap.so.${MAJOR_VER} \
 		&& ln -sf libpcap.so.${MAJOR_VER} /usr/local/lib/libpcap.so \
 		&& make clean; done
+
+# Install Docker
+RUN curl -fsSL https://get.docker.com | VERSION=18.06.0-ce /bin/sh
 
 COPY build.sh /
 ENTRYPOINT ["sh", "/build.sh"]

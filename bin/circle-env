@@ -1,0 +1,11 @@
+# Set environment variables here because CircleCI can't expand $FOO in 'env' section
+
+export PATH="$PATH:$HOME/.local/bin:/opt/google-cloud-sdk/bin"
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+# Base name of VMs for integration tests:
+export NAME=test-$CIRCLE_BUILD_NUM-$CIRCLE_NODE_INDEX
+export TEST_VMS_PROV_AND_CONF_LOCK_FILE=$CIRCLE_ARTIFACTS/test_vms_provisioned_and_configured.txt
+export TEST_VMS_READY_LOCK_FILE=$CIRCLE_ARTIFACTS/test_vms_ready.txt
+# Google Cloud Platorm images for integration tests:
+export USE_IMAGE=1
+export DISK_NAME_PREFIX=test-$CIRCLE_BUILD_NUM-0
