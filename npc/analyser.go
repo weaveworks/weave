@@ -63,6 +63,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			} else {
 				for _, peer := range ingressRule.From {
 					var srcSelector *selectorSpec
+					var srcRuleHost ruleHost
 
 					// NetworkPolicyPeer describes a peer to allow traffic from.
 					// Exactly one of its fields must be specified.
@@ -72,17 +73,22 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 							return nil, nil, nil, nil, err
 						}
 						addIfNotExist(srcSelector, podSelectors)
-
+						srcRuleHost = srcSelector
 					} else if peer.NamespaceSelector != nil {
 						srcSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, "", ipset.ListSet)
 						if err != nil {
 							return nil, nil, nil, nil, err
 						}
 						nsSelectors[srcSelector.key] = srcSelector
+						srcRuleHost = srcSelector
+					} else if peer.IPBlock != nil {
+						ipBlock := newIPBlockSpec(peer.IPBlock, ns.name)
+						ipBlocks[ipBlock.key] = ipBlock
+						srcRuleHost = ipBlock
 					}
 
 					if allPorts {
-						rule := newRuleSpec(policyTypeIngress, nil, srcSelector, targetSelector, nil)
+						rule := newRuleSpec(policyTypeIngress, nil, srcRuleHost, targetSelector, nil)
 						rules[rule.key] = rule
 					} else {
 						withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
