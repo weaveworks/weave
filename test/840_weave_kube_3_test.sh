@@ -215,7 +215,7 @@ spec:
 EOF
 
 # Allow some time for the policy change to take effect
-sleep 1
+sleep 2
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
@@ -223,7 +223,7 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http
 run_on $HOST1 "$KUBECTL delete netpol allow-nettest-deny"
 
 # Allow some time for the policy change to take effect
-sleep 1
+sleep 2
 
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
