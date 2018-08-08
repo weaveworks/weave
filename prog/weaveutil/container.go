@@ -89,7 +89,7 @@ func containerFQDN(args []string) error {
 	return nil
 }
 
-func runContainer(args []string) error {
+func parseContainerArgs(args []string) docker.CreateContainerOptions {
 	env := []string{}
 	labels := map[string]string{}
 	name := ""
@@ -166,19 +166,25 @@ func runContainer(args []string) error {
 	image := args[0]
 	cmds := args[1:]
 
+	config := docker.Config{Image: image, Env: env, Cmd: cmds, Labels: labels}
+	hostConfig := docker.HostConfig{NetworkMode: net, PidMode: pid, Privileged: privileged, RestartPolicy: restart, Binds: volumes, VolumesFrom: volumesFrom}
+	return docker.CreateContainerOptions{Name: name, Config: &config, HostConfig: &hostConfig}
+}
+
+func runContainer(args []string) error {
+	containerOptions := parseContainerArgs(args)
+
 	c, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
 
-	config := docker.Config{Image: image, Env: env, Cmd: cmds, Labels: labels}
-	hostConfig := docker.HostConfig{NetworkMode: net, PidMode: pid, Privileged: privileged, RestartPolicy: restart, Binds: volumes, VolumesFrom: volumesFrom}
-	container, err := c.CreateContainer(docker.CreateContainerOptions{Name: name, Config: &config, HostConfig: &hostConfig})
+	container, err := c.CreateContainer(containerOptions)
 	if err != nil {
 		return fmt.Errorf("unable to create container: %s", err)
 	}
 
-	err = c.StartContainer(container.ID, &hostConfig)
+	err = c.StartContainer(container.ID, containerOptions.HostConfig)
 	if err != nil {
 		return fmt.Errorf("unable to start container: %s", err)
 	}
