@@ -91,6 +91,7 @@ func containerFQDN(args []string) error {
 
 func runContainer(args []string) error {
 	env := []string{}
+	labels := map[string]string{}
 	name := ""
 	net := ""
 	pid := ""
@@ -108,6 +109,10 @@ func runContainer(args []string) error {
 			} else {
 				env = append(env, args[i+1])
 			}
+			args = append(args[:i], args[i+2:]...)
+		case "-l", "--label":
+			key, value := parseLabel(args[i+1])
+			labels[key] = value
 			args = append(args[:i], args[i+2:]...)
 		case "--name":
 			name = args[i+1]
@@ -166,7 +171,7 @@ func runContainer(args []string) error {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
 
-	config := docker.Config{Image: image, Env: env, Cmd: cmds}
+	config := docker.Config{Image: image, Env: env, Cmd: cmds, Labels: labels}
 	hostConfig := docker.HostConfig{NetworkMode: net, PidMode: pid, Privileged: privileged, RestartPolicy: restart, Binds: volumes, VolumesFrom: volumesFrom}
 	container, err := c.CreateContainer(docker.CreateContainerOptions{Name: name, Config: &config, HostConfig: &hostConfig})
 	if err != nil {
@@ -180,6 +185,14 @@ func runContainer(args []string) error {
 
 	fmt.Print(container.ID)
 	return nil
+}
+
+func parseLabel(s string) (key, value string) {
+	pos := strings.Index(s, "=")
+	if pos == -1 { // no value - set it to blank
+		return s, ""
+	}
+	return s[:pos], s[pos+1:]
 }
 
 func listContainers(args []string) error {
