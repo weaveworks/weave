@@ -48,8 +48,6 @@ To disable this check, run the following before launching Weave Net:
 
 ### Guides for Specific Platforms
 
-CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreos/) for an example of installing Weave using cloud-config.
-
 Amazon ECS users see [here](https://www.weave.works/docs/scope/latest/ami/)
 for the latest Weave AMIs.
 
