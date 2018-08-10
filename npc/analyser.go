@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -55,7 +54,8 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			if !allPorts {
 				for _, npProtocolPort := range ingressRule.Ports {
 					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
-						return nil, nil, nil, nil, errors.New("named ports in network policies in not support yet. Rejecting network policy from further processing")
+						return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+							"Rejecting network policy: %s with named port: %s from further processing ", policy.Name, port(npProtocolPort.Port))
 					}
 				}
 			}
@@ -115,7 +115,8 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			if !allPorts {
 				for _, npProtocolPort := range egressRule.Ports {
 					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
-						return nil, nil, nil, nil, errors.New("named ports in network policies in not support yet. Rejecting network policy from further processing")
+						return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+							"Rejecting network policy: %s with named port: %s from further processing ", policy.Name, port(npProtocolPort.Port))
 					}
 				}
 			}
