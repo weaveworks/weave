@@ -2,7 +2,7 @@
 
 set -e
 
-docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+docker login -u $DOCKER_USER -p $DOCKER_PASS
 cd $SRCDIR
 make clean-bin
 # CircleCI doesn't let us install the qemu module to do ARM docker builds
