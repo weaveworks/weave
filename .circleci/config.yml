@@ -87,9 +87,11 @@ jobs:
   deploy:
     <<: *defaults
     steps:
+      - checkout
       - setup_remote_docker
       # Rebuild without coverage and push to dockerhub
-      - deploy: bin/circle-deploy-master
+      - deploy:
+          command: bin/circle-deploy-master
 
 workflows:
   version: 2
