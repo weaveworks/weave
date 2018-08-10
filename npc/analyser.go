@@ -1,7 +1,9 @@
 package npc
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 
 	apiv1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -50,6 +52,13 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			// If From is empty or missing, this rule matches all sources
 			allSources := ingressRule.From == nil || len(ingressRule.From) == 0
 
+			if !allPorts {
+				for _, npProtocolPort := range ingressRule.Ports {
+					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
+						return nil, nil, nil, nil, errors.New("named ports in network policies in not support yet. Rejecting network policy from further processing")
+					}
+				}
+			}
 			if allSources {
 				if allPorts {
 					rule := newRuleSpec(policyTypeIngress, nil, nil, targetSelector, nil)
@@ -103,6 +112,13 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			// If To is empty or missing, this rule matches all destinations
 			allDestinations := egressRule.To == nil || len(egressRule.To) == 0
 
+			if !allPorts {
+				for _, npProtocolPort := range egressRule.Ports {
+					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
+						return nil, nil, nil, nil, errors.New("named ports in network policies in not support yet. Rejecting network policy from further processing")
+					}
+				}
+			}
 			if allDestinations {
 				if allPorts {
 					rule := newRuleSpec(policyTypeEgress, nil, targetSelector, nil, nil)
