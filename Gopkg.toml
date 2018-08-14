@@ -24,6 +24,11 @@
   branch = "master"
   name = "github.com/docker/distribution"
 
+# v8.0.0 removes juju/ratelimit licensed under LGPL3
+[[constraint]]
+  name = "k8s.io/client-go"
+  revision = "v8.0.0"
+
 [prune]
   go-tests = true
   unused-packages = true

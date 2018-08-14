@@ -28,7 +28,7 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllowedFlexVolume = map[string]string{
-	"":       "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
+	"":       "AllowedFlexVolume represents a single Flexvolume that is allowed to be used. Deprecated: use AllowedFlexVolume from policy API Group instead.",
 	"driver": "driver is the name of the Flexvolume driver.",
 }
 
@@ -37,8 +37,9 @@ func (AllowedFlexVolume) SwaggerDoc() map[string]string {
 }
 
 var map_AllowedHostPath = map[string]string{
-	"":           "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+	"":           "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined. Deprecated: use AllowedHostPath from policy API Group instead.",
 	"pathPrefix": "pathPrefix is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
+	"readOnly":   "when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.",
 }
 
 func (AllowedHostPath) SwaggerDoc() map[string]string {
@@ -229,7 +230,7 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_FSGroupStrategyOptions = map[string]string{
-	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use FSGroupStrategyOptions from policy API Group instead.",
 	"rule":   "rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
 	"ranges": "ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end. Required for MustRunAs.",
 }
@@ -258,7 +259,7 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 }
 
 var map_HostPortRange = map[string]string{
-	"":    "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+	"":    "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined. Deprecated: use HostPortRange from policy API Group instead.",
 	"min": "min is the start of the range, inclusive.",
 	"max": "max is the end of the range, inclusive.",
 }
@@ -268,7 +269,7 @@ func (HostPortRange) SwaggerDoc() map[string]string {
 }
 
 var map_IDRange = map[string]string{
-	"":    "IDRange provides a min/max of an allowed range of IDs.",
+	"":    "IDRange provides a min/max of an allowed range of IDs. Deprecated: use IDRange from policy API Group instead.",
 	"min": "min is the start of the range, inclusive.",
 	"max": "max is the end of the range, inclusive.",
 }
@@ -439,7 +440,7 @@ func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicy = map[string]string{
-	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated: use PodSecurityPolicy from policy API Group instead.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "spec defines the policy enforced.",
 }
@@ -449,7 +450,7 @@ func (PodSecurityPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicyList = map[string]string{
-	"":         "PodSecurityPolicyList is a list of PodSecurityPolicy objects.",
+	"":         "PodSecurityPolicyList is a list of PodSecurityPolicy objects. Deprecated: use PodSecurityPolicyList from policy API Group instead.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"items":    "items is a list of schema objects.",
 }
@@ -459,7 +460,7 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySpec = map[string]string{
-	"":                                "PodSecurityPolicySpec defines the policy enforced.",
+	"":                                "PodSecurityPolicySpec defines the policy enforced. Deprecated: use PodSecurityPolicySpec from policy API Group instead.",
 	"privileged":                      "privileged determines if a pod can request to be run as privileged.",
 	"defaultAddCapabilities":          "defaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the allowedCapabilities list.",
 	"requiredDropCapabilities":        "requiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
@@ -478,6 +479,8 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"allowPrivilegeEscalation":        "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
 	"allowedHostPaths":                "allowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.",
 	"allowedFlexVolumes":              "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
+	"allowedUnsafeSysctls":            "allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed. Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.\n\nExamples: e.g. \"foo/*\" allows \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" allows \"foo.bar\", \"foo.baz\", etc.",
+	"forbiddenSysctls":                "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -581,7 +584,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 }
 
 var map_RunAsUserStrategyOptions = map[string]string{
-	"":       "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"":       "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsUserStrategyOptions from policy API Group instead.",
 	"rule":   "rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
 	"ranges": "ranges are the allowed ranges of uids that may be used. If you would like to force a single uid then supply a single range with the same start and end. Required for MustRunAs.",
 }
@@ -591,7 +594,7 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_SELinuxStrategyOptions = map[string]string{
-	"":               "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"":               "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use SELinuxStrategyOptions from policy API Group instead.",
 	"rule":           "rule is the strategy that will dictate the allowable labels that may be set.",
 	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
 }
@@ -632,7 +635,7 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 }
 
 var map_SupplementalGroupsStrategyOptions = map[string]string{
-	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.",
 	"rule":   "rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
 	"ranges": "ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end. Required for MustRunAs.",
 }
