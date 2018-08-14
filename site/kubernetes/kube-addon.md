@@ -154,7 +154,7 @@ labels. For more information on configuring network policies in
 Kubernetes see the
 [walkthrough](https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/)
 and the [NetworkPolicy API object
-definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpolicy-v1-networking)
+definition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#networkpolicy-v1-networking-k8s-io)
 
 **Note:** as of version 1.9 of Weave Net, the Network Policy
   Controller allows all multicast traffic. Since a single multicast
@@ -162,6 +162,11 @@ definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpoli
   isolate them individually.  You can turn this behaviour off (block
   all multicast traffic) by adding `--allow-mcast=false` as an
   argument to `weave-npc` in the YAML configuration.
+
+**Note:** Since ingress traffic is masqueraded, it makes sense to use
+`ipBlock` selector in an ingress rule only when limiting access to a Service
+annotated with `externalTrafficPolicy=Local` or between Pods when `podIP` is used
+to access a Pod.
 
 ## <a name="troubleshooting"></a> Troubleshooting
 
