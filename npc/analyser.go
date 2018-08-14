@@ -2,7 +2,6 @@ package npc
 
 import (
 	"fmt"
-	"strconv"
 
 	apiv1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -52,11 +51,9 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			allSources := ingressRule.From == nil || len(ingressRule.From) == 0
 
 			if !allPorts {
-				for _, npProtocolPort := range ingressRule.Ports {
-					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
-						return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
-							"Rejecting network policy: %s with named port: %s from further processing ", policy.Name, port(npProtocolPort.Port))
-					}
+				if err = checkForNamedPorts(ingressRule.Ports); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
 				}
 			}
 			if allSources {
@@ -113,11 +110,9 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			allDestinations := egressRule.To == nil || len(egressRule.To) == 0
 
 			if !allPorts {
-				for _, npProtocolPort := range egressRule.Ports {
-					if _, err := strconv.Atoi(port(npProtocolPort.Port)); err != nil {
-						return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
-							"Rejecting network policy: %s with named port: %s from further processing ", policy.Name, port(npProtocolPort.Port))
-					}
+				if err = checkForNamedPorts(egressRule.Ports); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
 				}
 			}
 			if allDestinations {
@@ -211,4 +206,13 @@ func port(p *intstr.IntOrString) string {
 	}
 
 	return port
+}
+
+func checkForNamedPorts(ports []networkingv1.NetworkPolicyPort) error {
+	for _, npProtocolPort := range ports {
+		if npProtocolPort.Port != nil && npProtocolPort.Port.Type == intstr.String {
+			return fmt.Errorf("named port %s in network policy", port(npProtocolPort.Port))
+		}
+	}
+	return nil
 }
