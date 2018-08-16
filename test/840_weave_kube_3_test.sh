@@ -255,6 +255,27 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http
 assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
 assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
+# allow access only from weave bridge IP of host1 to test ipBlock
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-via-weave-bridge-of-host1
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+      - ipBlock:
+          cidr: $HOST1EXPIP/32
+EOF
+
+sleep 2
+
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+
+run_on $HOST1 "$KUBECTL delete netpol allow-via-weave-bridge-of-host1"
+
 # allow access from anywhere
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
