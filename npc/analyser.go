@@ -50,6 +50,12 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			// If From is empty or missing, this rule matches all sources
 			allSources := ingressRule.From == nil || len(ingressRule.From) == 0
 
+			if !allPorts {
+				if err = checkForNamedPorts(ingressRule.Ports); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
+				}
+			}
 			if allSources {
 				if allPorts {
 					rule := newRuleSpec(policyTypeIngress, nil, nil, targetSelector, nil)
@@ -109,6 +115,12 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 			// If To is empty or missing, this rule matches all destinations
 			allDestinations := egressRule.To == nil || len(egressRule.To) == 0
 
+			if !allPorts {
+				if err = checkForNamedPorts(egressRule.Ports); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
+				}
+			}
 			if allDestinations {
 				if allPorts {
 					rule := newRuleSpec(policyTypeEgress, nil, targetSelector, nil, nil)
@@ -200,4 +212,13 @@ func port(p *intstr.IntOrString) string {
 	}
 
 	return port
+}
+
+func checkForNamedPorts(ports []networkingv1.NetworkPolicyPort) error {
+	for _, npProtocolPort := range ports {
+		if npProtocolPort.Port != nil && npProtocolPort.Port.Type == intstr.String {
+			return fmt.Errorf("named port %s in network policy", port(npProtocolPort.Port))
+		}
+	}
+	return nil
 }
