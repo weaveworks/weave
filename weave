@@ -53,6 +53,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--hostname-replacement <replacement>]
                     [--rewrite-inspect]
                     [--log-level=debug|info|warning|error]
+                    [--token <weave-cloud-service-token>]
                     <peer> ...
 
 weave prime
