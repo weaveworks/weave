@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -280,6 +281,10 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 	}
 
 	if err := linkSetUpByName(config.WeaveBridgeName); err != nil {
+		return bridgeType, err
+	}
+
+	if err := monitorInterface(config.WeaveBridgeName, log); err != nil {
 		return bridgeType, err
 	}
 
@@ -607,5 +612,29 @@ func reexpose(config *BridgeConfig, log *logrus.Logger) error {
 		}
 	}
 
+	return nil
+}
+
+func monitorInterface(ifaceName string, log *logrus.Logger) error {
+	_, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return fmt.Errorf("Unable to find link %q: %s", ifaceName, err)
+	}
+
+	updatesChannel := make(chan netlink.LinkUpdate)
+	if err := netlink.LinkSubscribe(updatesChannel, nil); err != nil {
+		return errors.Wrapf(err, "error monitoring link %q for UP/DOWN notifications", ifaceName)
+	}
+
+	go func() {
+		for {
+			select {
+			case update := <-updatesChannel:
+				if update.Link.Attrs().Name == ifaceName && update.IfInfomsg.Flags&syscall.IFF_UP == 0 {
+					log.Errorf("Interface %q which needs to be in UP state for Weave functioning is found to be in DOWN state", ifaceName)
+				}
+			}
+		}
+	}()
 	return nil
 }
