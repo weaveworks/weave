@@ -142,6 +142,7 @@ type overlaySwitchForwarder struct {
 	alreadyEstablished bool
 	establishedChan    chan struct{}
 	errorChan          chan error
+	healthChan         chan bool
 }
 
 // A subsidiary forwarder
@@ -154,6 +155,9 @@ type subForwarder struct {
 
 	// closed to tell the forwarder monitor goroutine to stop
 	stopChan chan<- struct{}
+
+	// set to true to skip this forwarder in chooseBest()
+	onHold bool
 }
 
 // An event from a subsidiary forwarder
@@ -166,6 +170,9 @@ type subForwarderEvent struct {
 
 	// is this an error event?
 	err error
+
+	// event to indicate if forwarder is in healthy state to be considered for best forwarded
+	healthy bool
 }
 
 func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
@@ -239,6 +246,7 @@ func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams)
 
 func monitorForwarder(index int, eventsChan chan<- subForwarderEvent, stopChan <-chan struct{}, fwd OverlayForwarder) {
 	establishedChan := fwd.EstablishedChannel()
+	healthChan := fwd.HealthChannel()
 loop:
 	for {
 		e := subForwarderEvent{index: index}
@@ -247,6 +255,9 @@ loop:
 		case <-establishedChan:
 			e.established = true
 			establishedChan = nil
+
+		case healthy := <-healthChan:
+			e.healthy = healthy
 
 		case err := <-fwd.ErrorChannel():
 			e.err = err
@@ -282,6 +293,8 @@ loop:
 				fwd.established(e.index)
 			case e.err != nil:
 				fwd.error(e.index, e.err)
+			default:
+				fwd.healthCheck(e.index, e.healthy)
 			}
 		}
 	}
@@ -318,6 +331,21 @@ func (fwd *overlaySwitchForwarder) error(index int, err error) {
 	fwd.chooseBest()
 }
 
+func (fwd *overlaySwitchForwarder) healthCheck(index int, healthy bool) {
+	fwd.lock.Lock()
+	defer fwd.lock.Unlock()
+
+	if healthy == true && fwd.forwarders[index].onHold {
+		fwd.forwarders[index].onHold = false
+		fwd.chooseBest()
+	}
+
+	if healthy == false && !fwd.forwarders[index].onHold {
+		fwd.forwarders[index].onHold = true
+		fwd.chooseBest()
+	}
+}
+
 func (fwd *overlaySwitchForwarder) stopFrom(index int) {
 	for index < len(fwd.forwarders) {
 		subFwd := &fwd.forwarders[index]
@@ -337,7 +365,7 @@ func (fwd *overlaySwitchForwarder) chooseBest() {
 
 	for i := range fwd.forwarders {
 		subFwd := &fwd.forwarders[i]
-		if subFwd.fwd == nil {
+		if subFwd.fwd == nil || subFwd.onHold {
 			continue
 		}
 
@@ -413,6 +441,10 @@ func (fwd *overlaySwitchForwarder) EstablishedChannel() <-chan struct{} {
 
 func (fwd *overlaySwitchForwarder) ErrorChannel() <-chan error {
 	return fwd.errorChan
+}
+
+func (fwd *overlaySwitchForwarder) HealthChannel() <-chan bool {
+	return fwd.healthChan
 }
 
 func (fwd *overlaySwitchForwarder) Stop() {

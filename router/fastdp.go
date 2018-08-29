@@ -582,9 +582,11 @@ type fastDatapathForwarder struct {
 	ackedHeartbeat    bool
 	stopChan          chan struct{}
 	stopped           bool
+	healthy           bool
 
 	establishedChan chan struct{}
 	errorChan       chan error
+	healthChan      chan bool
 }
 
 func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
@@ -622,6 +624,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 		connUID:        params.ConnUID,
 		vxlanVportID:   vxlanVportID,
 		sessionKey:     params.SessionKey,
+		healthy:        true,
 
 		remoteAddr:        remoteAddr,
 		heartbeatInterval: FastHeartbeat,
@@ -629,6 +632,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 
 		establishedChan: make(chan struct{}),
 		errorChan:       make(chan error, 1),
+		healthChan:      make(chan bool),
 	}
 
 	return fwd, nil
@@ -699,9 +703,12 @@ func (fwd *fastDatapathForwarder) ErrorChannel() <-chan error {
 	return fwd.errorChan
 }
 
+func (fwd *fastDatapathForwarder) HealthChannel() <-chan bool {
+	return fwd.healthChan
+}
+
 func (fwd *fastDatapathForwarder) doHeartbeats() {
 	var err error
-
 	for err == nil {
 		select {
 		case <-fwd.heartbeatTimer.C:
@@ -711,7 +718,12 @@ func (fwd *fastDatapathForwarder) doHeartbeats() {
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
 
 		case <-fwd.heartbeatTimeout.C:
-			err = fmt.Errorf("timed out waiting for vxlan heartbeat")
+			fwd.healthChan <- false
+			if fwd.healthy {
+				fwd.healthy = false
+			} else {
+				err = fmt.Errorf("timed out waiting for vxlan heartbeat")
+			}
 
 		case <-fwd.stopChan:
 			return
@@ -808,6 +820,10 @@ func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender 
 	// heartbeatTimeout
 	if fwd.heartbeatTimeout != nil {
 		fwd.heartbeatTimeout.Reset(HeartbeatTimeout)
+		if !fwd.healthy {
+			fwd.healthy = true
+			fwd.healthChan <- true
+		}
 	}
 }
 
