@@ -713,12 +713,18 @@ func (fwd *fastDatapathForwarder) doHeartbeats() {
 		select {
 		case <-fwd.heartbeatTimer.C:
 			if fwd.confirmed {
+				log.Debug(fwd.logPrefix(), "sending Heartbeat to peer")
 				fwd.sendHeartbeat()
 			}
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
 
 		case <-fwd.heartbeatTimeout.C:
+			log.Debug(fwd.logPrefix(), "missed Heartbeat from peer, marking fastdp forwarder as un-healthy")
+
+			// treat missed heartbeat as transient error. Indicate to overlay forwarder
+			// that Forwarder is un-healthy so it can pick next best forwarder
 			fwd.healthChan <- false
+
 			if fwd.healthy {
 				fwd.healthy = false
 			} else {
@@ -756,7 +762,6 @@ func (fwd *fastDatapathForwarder) handleError(err error) {
 
 func (fwd *fastDatapathForwarder) sendHeartbeat() {
 	fwd.lock.RLock()
-	log.Debug(fwd.logPrefix(), "sendHeartbeat")
 
 	// the heartbeat payload consists of the 64-bit connection uid
 	// followed by the 16-bit packet size.
@@ -813,7 +818,10 @@ func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender 
 
 	if !fwd.ackedHeartbeat {
 		fwd.ackedHeartbeat = true
+		log.Debug(fwd.logPrefix(), "Ack Heartbeat from peer")
 		fwd.handleError(fwd.sendControlMsg(FastDatapathHeartbeatAck, nil))
+	} else {
+		log.Debug(fwd.logPrefix(), "Got Heartbeat Ack from peer")
 	}
 
 	// we can receive a heartbeat before Confirm() has set up
@@ -821,6 +829,9 @@ func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender 
 	if fwd.heartbeatTimeout != nil {
 		fwd.heartbeatTimeout.Reset(HeartbeatTimeout)
 		if !fwd.healthy {
+			// If fastdp was marked as unhealthy earlier due to missed heartbeat then indicate to
+			// overlay forwarder that Forwarder is healthy now so it can pick next best forwarder
+			log.Debug(fwd.logPrefix(), "got Heartbeat from peer, marking fastdp forwarder as healthy")
 			fwd.healthy = true
 			fwd.healthChan <- true
 		}
