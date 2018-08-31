@@ -36,6 +36,9 @@ coverage.html
 # Sed backup files
 *.bak
 
+# JetBrains/GoLand/IntelliJ project file
+.idea
+
 # Project specific
 prog/weaver/weaver
 prog/weavedns/weavedns
