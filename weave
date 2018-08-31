@@ -430,7 +430,7 @@ EOF
 }
 
 expose_ip() {
-    [ -z $WITHOUT_MASQUERADE ] || skipNAT="/true"
+    [ -z $WITHOUT_MASQUERADE ] || skipNAT="?skipNAT=true"
     ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
     for CIDR in $ALL_CIDRS ; do
         call_weave "POST" "/expose/$CIDR$skipNAT"
