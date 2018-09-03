@@ -627,12 +627,9 @@ func monitorInterface(ifaceName string, log *logrus.Logger) error {
 	}
 
 	go func() {
-		for {
-			select {
-			case update := <-updatesChannel:
-				if update.Link.Attrs().Name == ifaceName && update.IfInfomsg.Flags&syscall.IFF_UP == 0 {
-					log.Errorf("Interface %q which needs to be in UP state for Weave functioning is found to be in DOWN state", ifaceName)
-				}
+		for update := range updatesChannel {
+			if update.Link.Attrs().Name == ifaceName && update.IfInfomsg.Flags&syscall.IFF_UP == 0 {
+				log.Errorf("Interface %q which needs to be in UP state for Weave functioning is found to be in DOWN state", ifaceName)
 			}
 		}
 	}()
