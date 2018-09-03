@@ -198,7 +198,7 @@ $ kubectl logs -n kube-system weave-net-1jkl6 weave
 For easier viewing, pipe the output into a file , especially if
 it is long.
 
-By default log level is set to `info`. If you wish to see more detailed logs you can set the desired log level for the `-log-level` flag through the `EXTRA_ARGS` environment variable for the `weave` and `weave-npc` containers in the weave-net daemon set. Add environment variable as below.
+By default log level of `weave` container is set to `info` level. If you wish to see more detailed logs you can set the desired log level for the `-log-level` flag through the `EXTRA_ARGS` environment variable for the `weave` container in the weave-net daemon set. Add environment variable as below.
 
 ```yaml
       containers:
