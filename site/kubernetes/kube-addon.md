@@ -49,6 +49,11 @@ recommend your master node has at least two CPU cores.
 > [kubeadm](http://kubernetes.io/docs/getting-started-guides/kubeadm/).
 >
 > Alternatively, you can [configure CNI yourself](http://kubernetes.io/docs/admin/network-plugins/#cni)
+>
+> Weave net depends on the *portmap* [standard](https://github.com/containernetworking/plugins) CNI plugin
+> to support *hostport* functionality. Please ensure that *portmap* CNI plugin is installed 
+> (either by cluster installers like kubeadm or manually if you have configured CNI yourself) in `/opt/cni/bin` directory.
+
 
 **Note:** If using the [Weave CNI
 Plugin](/site/kubernetes.md) from a prior full install of Weave Net with your
