@@ -3,6 +3,7 @@ package nameserver
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -87,6 +88,11 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 
 func (d *DNSServer) HandleHTTP(router *mux.Router) {
 	router.Methods("GET").Path("/dns-address").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, d.address)
+		host, _, err := net.SplitHostPort(d.address)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error in DNS address %q: %v", d.address, err), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, host)
 	})
 }
