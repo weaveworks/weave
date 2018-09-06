@@ -25,7 +25,7 @@ type nodeInfo struct {
 }
 
 // return the IP addresses of all nodes in the cluster
-func getKubePeers(c *kubernetes.Clientset) ([]nodeInfo, error) {
+func getKubePeers(c *kubernetes.Clientset, includeWithNoIPAddr bool) ([]nodeInfo, error) {
 	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -51,6 +51,8 @@ func getKubePeers(c *kubernetes.Clientset) ([]nodeInfo, error) {
 			addresses = append(addresses, nodeInfo{name: peer.Name, addr: internalIP})
 		} else if externalIP != "" {
 			addresses = append(addresses, nodeInfo{name: peer.Name, addr: externalIP})
+		} else if includeWithNoIPAddr {
+			addresses = append(addresses, nodeInfo{name: peer.Name, addr: ""})
 		}
 	}
 	return addresses, nil
@@ -225,7 +227,7 @@ func main() {
 		}
 		return
 	}
-	peers, err := getKubePeers(c)
+	peers, err := getKubePeers(c, justReclaim)
 	if err != nil {
 		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
 	}
