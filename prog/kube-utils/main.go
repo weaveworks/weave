@@ -58,44 +58,6 @@ func getKubePeers(c *kubernetes.Clientset, includeWithNoIPAddr bool) ([]nodeInfo
 	return addresses, nil
 }
 
-const (
-	configMapName      = "weave-net"
-	configMapNamespace = "kube-system"
-)
-
-// update the list of all peers that have gone through this code path
-func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
-	var list *peerList
-	err := cml.LoopUpdate(func() error {
-		var err error
-		list, err = cml.GetPeerList()
-		if err != nil {
-			return err
-		}
-		if !list.contains(peerName) {
-			list.add(peerName, name)
-			err = cml.UpdatePeerList(*list)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return list, err
-}
-
-func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName string) (bool, error) {
-	if err := cml.Init(); err != nil {
-		return false, err
-	}
-	list, err := cml.GetPeerList()
-	if err != nil {
-		return false, err
-	}
-	common.Log.Debugf("[kube-peers] Checking peer %q against list %v", peerName, list)
-	return list.contains(peerName), nil
-}
-
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
 func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName, myNodeName string) error {
