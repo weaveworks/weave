@@ -71,7 +71,7 @@ func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
 }
 
 // update the list of all peers that have gone through this code path
-func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName, name string) (*peerList, error) {
+func addMyselfToPeerList(cml *configMapAnnotations, c kubernetes.Interface, peerName, name string) (*peerList, error) {
 	var list *peerList
 	err := cml.LoopUpdate(func() error {
 		var err error
@@ -91,7 +91,7 @@ func addMyselfToPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, pee
 	return list, err
 }
 
-func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peerName string) (bool, error) {
+func checkIamInPeerList(cml *configMapAnnotations, c kubernetes.Interface, peerName string) (bool, error) {
 	if err := cml.Init(); err != nil {
 		return false, err
 	}

@@ -26,11 +26,11 @@ type configMapAnnotations struct {
 	cm            *v1.ConfigMap
 }
 
-func newConfigMapAnnotations(ns string, configMapName string, clientset *kubernetes.Clientset) *configMapAnnotations {
+func newConfigMapAnnotations(ns string, configMapName string, c kubernetes.Interface) *configMapAnnotations {
 	return &configMapAnnotations{
 		Namespace:     ns,
 		ConfigMapName: configMapName,
-		Client:        clientset.CoreV1(),
+		Client:        c.CoreV1(),
 	}
 }
 

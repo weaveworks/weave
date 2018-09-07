@@ -25,7 +25,7 @@ type nodeInfo struct {
 }
 
 // return the IP addresses of all nodes in the cluster
-func getKubePeers(c *kubernetes.Clientset, includeWithNoIPAddr bool) ([]nodeInfo, error) {
+func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo, error) {
 	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
