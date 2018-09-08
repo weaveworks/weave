@@ -58,9 +58,13 @@ func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo,
 	return addresses, nil
 }
 
+type weaveClient interface {
+	RmPeer(peerName string) (string, error)
+}
+
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
-func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName, myNodeName string) error {
+func reclaimRemovedPeers(weave weaveClient, cml *configMapAnnotations, nodes []nodeInfo, myPeerName, myNodeName string) error {
 	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
 		if err := cml.Init(); err != nil {
 			return err
