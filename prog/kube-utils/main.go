@@ -104,7 +104,7 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 				common.Log.Warnln("[kube-peers] not removing myself", peer)
 				continue
 			}
-			changed, err := reclaimPeer(weave, cml, storedPeerList, peer.PeerName, myPeerName)
+			changed, err := reclaimPeer(weave, cml, peer.PeerName, myPeerName)
 			if err != nil {
 				return err
 			}
@@ -119,7 +119,7 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 	return nil
 }
 
-func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *peerList, peerName string, myPeerName string) (bool, error) {
+func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, myPeerName string) (bool, error) {
 	common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peerName)
 	okToRemove := false
 	// 3. Check if there is an existing annotation with key X
@@ -153,6 +153,10 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 			return err
 		}
 		// 7a.    Remove X from peerList
+		storedPeerList, err := cml.GetPeerList()
+		if err != nil {
+			return err
+		}
 		storedPeerList.remove(peerName)
 		if err := cml.UpdatePeerList(*storedPeerList); err != nil {
 			return err
