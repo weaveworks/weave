@@ -104,61 +104,73 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 				common.Log.Warnln("[kube-peers] not removing myself", peer)
 				continue
 			}
-			common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peer)
-			okToRemove := false
-			// 3. Check if there is an existing annotation with key X
-			if existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peer.PeerName); found {
-				common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation)
-				// 4.   If annotation already contains my identity, ok;
-				if existingAnnotation == myPeerName {
-					okToRemove = true
-				}
-			} else {
-				// 5.   If non-existent, write an annotation with key X and contents "my identity"
-				common.Log.Debugln("[kube-peers] Noting I plan to remove ", peer.PeerName)
-				if err := cml.UpdateAnnotation(KubePeersPrefix+peer.PeerName, myPeerName); err == nil {
-					okToRemove = true
-				} else {
-					common.Log.Debugln("[kube-peers] error from UpdateAnnotation: ", err)
-				}
+			changed, err := reclaimPeer(weave, cml, storedPeerList, peer.PeerName, myPeerName)
+			if err != nil {
+				return err
 			}
-			if okToRemove {
-				// 6.   If step 4 or 5 succeeded, rmpeer X
-				result, err := weave.RmPeer(peer.PeerName)
-				common.Log.Infof("[kube-peers] rmpeer of %s: %s", peer.PeerName, result)
-				if err != nil {
-					return err
-				}
+			if changed {
 				loopsWhenNothingChanged = 0
-				cml.LoopUpdate(func() error {
-					// 7aa.   Remove any annotations Z* that have contents X
-					if err := cml.RemoveAnnotationsWithValue(peer.PeerName); err != nil {
-						return err
-					}
-					// 7a.    Remove X from peerList
-					storedPeerList.remove(peer.PeerName)
-					if err := cml.UpdatePeerList(*storedPeerList); err != nil {
-						return err
-					}
-					// 7b.    Remove annotation with key X
-					return cml.RemoveAnnotation(KubePeersPrefix + peer.PeerName)
-				})
 			}
-			// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
-
-			// Step 3-5 is to protect against two simultaneous rmpeers of X
-			// Step 4 is to pick up again after a restart between step 5 and step 7b
-			// If the peer doing the reclaim disappears between steps 5 and 7a, then someone will clean it up in step 7aa
-			// If peer doing the reclaim disappears forever between 7a and 7b then we get a dangling annotation
-			// This should be sufficiently rare that we don't care.
 		}
 
 		// 9. Go back to step 1 until there is no difference between the two sets
 		// (or we hit the counter that says we've been round the loop 3 times and nothing happened)
 	}
+	return nil
+}
+
+func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *peerList, peerName string, myPeerName string) (bool, error) {
+	common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peerName)
+	okToRemove := false
+	// 3. Check if there is an existing annotation with key X
+	if existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peerName); found {
+		common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation)
+		// 4.   If annotation already contains my identity, ok;
+		if existingAnnotation == myPeerName {
+			okToRemove = true
+		}
+	} else {
+		// 5.   If non-existent, write an annotation with key X and contents "my identity"
+		common.Log.Debugln("[kube-peers] Noting I plan to remove ", peerName)
+		if err := cml.UpdateAnnotation(KubePeersPrefix+peerName, myPeerName); err == nil {
+			okToRemove = true
+		} else {
+			common.Log.Errorln("[kube-peers] error from UpdateAnnotation: ", err)
+		}
+	}
+	if !okToRemove {
+		return false, nil
+	}
+	// 6.   If step 4 or 5 succeeded, rmpeer X
+	result, err := weave.RmPeer(peerName)
+	common.Log.Infof("[kube-peers] rmpeer of %s: %s", peerName, result)
+	if err != nil {
+		return false, err
+	}
+	cml.LoopUpdate(func() error {
+		// 7aa.   Remove any annotations Z* that have contents X
+		if err := cml.RemoveAnnotationsWithValue(peerName); err != nil {
+			return err
+		}
+		// 7a.    Remove X from peerList
+		storedPeerList.remove(peerName)
+		if err := cml.UpdatePeerList(*storedPeerList); err != nil {
+			return err
+		}
+		// 7b.    Remove annotation with key X
+		return cml.RemoveAnnotation(KubePeersPrefix + peerName)
+	})
+	// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
+
+	// Step 3-5 is to protect against two simultaneous rmpeers of X
+	// Step 4 is to pick up again after a restart between step 5 and step 7b
+	// If the peer doing the reclaim disappears between steps 5 and 7a, then someone will clean it up in step 7aa
+	// If peer doing the reclaim disappears forever between 7a and 7b then we get a dangling annotation
+	// This should be sufficiently rare that we don't care.
+
 	// Question: Should we narrow step 2 by checking against Weave Net IPAM?
 	// i.e. If peer X owns any address space and is marked unreachable, we want to rmpeer X
-	return nil
+	return true, nil
 }
 
 func main() {
