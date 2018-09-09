@@ -64,7 +64,7 @@ type weaveClient interface {
 
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
-func reclaimRemovedPeers(weave weaveClient, cml *configMapAnnotations, nodes []nodeInfo, myPeerName, myNodeName string) error {
+func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *configMapAnnotations, myPeerName, myNodeName string) error {
 	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
 		if err := cml.Init(); err != nil {
 			return err
@@ -74,6 +74,7 @@ func reclaimRemovedPeers(weave weaveClient, cml *configMapAnnotations, nodes []n
 		if err != nil {
 			return err
 		}
+		nodes, err := getKubePeers(kube, true)
 		nodeSet := make(map[string]struct{}, len(nodes))
 		for _, node := range nodes {
 			nodeSet[node.name] = struct{}{}
@@ -205,7 +206,6 @@ func main() {
 		}
 		return
 	}
-	peers, err := getKubePeers(c, justReclaim)
 	if err != nil {
 		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
 	}
@@ -219,12 +219,13 @@ func main() {
 		common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
-		err = reclaimRemovedPeers(weave, cml, peers, peerName, nodeName)
+		err = reclaimRemovedPeers(c, weave, cml, peerName, nodeName)
 		if err != nil {
 			common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 		}
 		return
 	}
+	peers, err := getKubePeers(c, false)
 	for _, node := range peers {
 		fmt.Println(node.addr)
 	}
