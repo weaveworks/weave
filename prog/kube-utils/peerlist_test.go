@@ -131,19 +131,17 @@ func TestPeerListFuzz(t *testing.T) {
 
 		// remove from Kubernetes first, then from test state
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
-		err := cml.Init()
-		require.NoError(t, err)
+		require.NoError(t, cml.Init())
 		storedPeerList, err := cml.GetPeerList()
 		require.NoError(t, err)
 		found := storedPeerList.contains(peerName(i))
-		require.Equal(t, true, found, "peer %d not found in stored list", i)
-		if !found {
-			return
-		}
-		storedPeerList.remove(peerName(i))
-		err = cml.UpdatePeerList(*storedPeerList)
+		require.True(t, found, "peer %d not found in stored list", i)
+
+		_, err = reclaimPeer(mockWeave{}, cml, peerName(i), fmt.Sprintf("deleter-%d", i))
 		require.NoError(t, err)
 
+		storedPeerList, err = cml.GetPeerList()
+		require.NoError(t, err)
 		stateLock.Lock()
 		delete(nodeMap, i)
 		for pos = 0; pos < len(nodes); pos++ {
@@ -174,4 +172,10 @@ func TestPeerListFuzz(t *testing.T) {
 	storedPeerList, err := cml.GetPeerList()
 	require.NoError(t, err)
 	require.Equal(t, len(storedPeerList.Peers), len(nodes))
+}
+
+type mockWeave struct{}
+
+func (mockWeave) RmPeer(peerName string) (string, error) {
+	return "", nil
 }
