@@ -69,7 +69,7 @@ weave attach        [--without-dns] [--rewrite-hosts] [--no-multicast-route]
                       [<addr> ...] <container_id>
       detach        [<addr> ...] <container_id>
 
-weave expose        [<addr> ...] [-h <fqdn>]
+weave expose        [<addr> ...] [-h <fqdn>] [--without-masquerade]
       hide          [<addr> ...]
 
 weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
@@ -430,9 +430,10 @@ EOF
 }
 
 expose_ip() {
+    [ -z $WITHOUT_MASQUERADE ] || skipNAT="?skipNAT=true"
     ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
     for CIDR in $ALL_CIDRS ; do
-        call_weave "POST" "/expose/$CIDR"
+        call_weave "POST" "/expose/$CIDR$skipNAT"
 
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
@@ -1491,14 +1492,25 @@ case "$COMMAND" in
         dig @$DOCKER_BRIDGE_IP +short $1
         ;;
     expose)
+        WITHOUT_MASQUERADE=
+        FQDN=
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        if [ $# -eq 0 ] ; then
-            FQDN=""
-        else
-            [ $# -eq 2 -a "$1" = "-h" ] || usage
-            FQDN="$2"
-        fi
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -h)
+                    [ -z $FQDN ] && FQDN=$2 && shift || usage
+                    ;;
+                --without-masquerade)
+                    WITHOUT_MASQUERADE=1
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+            shift
+        done
+        [ $# -eq 0 ] || usage
         expose_ip
         show_addrs $ALL_CIDRS
         ;;

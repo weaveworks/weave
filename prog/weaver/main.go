@@ -513,7 +513,7 @@ func exposeForAWSVPC(alloc *ipam.Allocator, subnet address.CIDR, bridgeName stri
 	addr, err := alloc.Allocate("weave:expose", subnet, false, func() bool { return false })
 	checkFatal(err)
 	cidr := address.MakeCIDR(subnet, addr)
-	err = weavenet.Expose(bridgeName, cidr.IPNet(), true, false)
+	err = weavenet.Expose(bridgeName, cidr.IPNet(), true, false, false)
 	checkFatal(err)
 	Log.Printf("Bridge %q exposed on address %v", bridgeName, cidr)
 	ready()

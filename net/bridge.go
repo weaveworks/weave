@@ -607,7 +607,7 @@ func reexpose(config *BridgeConfig, log *logrus.Logger) error {
 
 	for _, addr := range addrs {
 		log.Infof("Re-exposing %s on bridge %q", addr.IPNet, config.WeaveBridgeName)
-		if err := Expose(config.WeaveBridgeName, addr.IPNet, config.AWSVPC, config.NPC); err != nil {
+		if err := Expose(config.WeaveBridgeName, addr.IPNet, config.AWSVPC, config.NPC, false); err != nil {
 			return errors.Wrapf(err, "unable to re-expose %s on bridge: %q", addr.IPNet, config.WeaveBridgeName)
 		}
 	}

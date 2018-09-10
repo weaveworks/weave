@@ -18,7 +18,8 @@ import (
 // * "ipAddr" - IP addr to be assigned to the bridge.
 // * "removeDefaultRoute" - whether to remove a default route installed by the kernel (used only in the AWSVPC mode).
 // * "npc" - whether is Weave NPC running.
-func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool) error {
+// * "skipNAT" - whether to skip adding iptables NAT rules
+func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool, skipNAT bool) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "iptables.New")
@@ -29,8 +30,10 @@ func Expose(bridgeName string, ipAddr *net.IPNet, removeDefaultRoute, npc bool) 
 		return errors.Wrap(err, "addBridgeIPAddr")
 	}
 
-	if err := exposeNAT(ipt, cidr); err != nil {
-		return errors.Wrap(err, "exposeNAT")
+	if !skipNAT {
+		if err := exposeNAT(ipt, cidr); err != nil {
+			return errors.Wrap(err, "exposeNAT")
+		}
 	}
 
 	if !npc {
