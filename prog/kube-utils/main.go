@@ -98,7 +98,7 @@ func checkIamInPeerList(cml *configMapAnnotations, c *kubernetes.Clientset, peer
 
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
-func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName string) error {
+func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, nodes []nodeInfo, myPeerName, myNodeName string) error {
 	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
 		if err := cml.Init(); err != nil {
 			return err
@@ -108,13 +108,25 @@ func reclaimRemovedPeers(weave *weaveapi.Client, cml *configMapAnnotations, node
 		if err != nil {
 			return err
 		}
+		nodeSet := make(map[string]struct{}, len(nodes))
+		for _, node := range nodes {
+			nodeSet[node.name] = struct{}{}
+		}
 		peerMap := make(map[string]peerInfo, len(storedPeerList.Peers))
 		for _, peer := range storedPeerList.Peers {
-			peerMap[peer.NodeName] = peer
+			peerMap[peer.PeerName] = peer
 		}
-		for _, node := range nodes {
-			delete(peerMap, node.name)
+		// remove entries from the peer map that are current nodes
+		for key, peer := range peerMap {
+			if _, found := nodeSet[peer.NodeName]; found {
+				// unless they have a duplicate of my NodeName but are not me
+				if peer.NodeName == myNodeName && peer.PeerName != myPeerName {
+					continue
+				}
+				delete(peerMap, key)
+			}
 		}
+		// so the remainder is everything we want to clean up
 		common.Log.Debugln("[kube-peers] Nodes that have disappeared:", peerMap)
 		if len(peerMap) == 0 {
 			break
@@ -241,7 +253,7 @@ func main() {
 		common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 
 		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
-		err = reclaimRemovedPeers(weave, cml, peers, peerName)
+		err = reclaimRemovedPeers(weave, cml, peers, peerName, nodeName)
 		if err != nil {
 			common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 		}
