@@ -10,7 +10,7 @@ import (
 )
 
 // based on k8s.io/kubernetes/pkg/controller/nodeipam/ipam/adapter.go
-func setNodeNetworkUnavailableFalse(c *kubernetes.Clientset, nodeName string) error {
+func setNodeNetworkUnavailableFalse(c kubernetes.Interface, nodeName string) error {
 	condition := v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,
