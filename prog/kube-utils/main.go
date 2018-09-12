@@ -58,6 +58,7 @@ func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo,
 	return addresses, nil
 }
 
+// (minimal, incomplete) interface so weaver can be mocked for testing.
 type weaveClient interface {
 	RmPeer(peerName string) (string, error)
 }
@@ -119,7 +120,12 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 	return nil
 }
 
-func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, myPeerName string) (bool, error) {
+// Attempt to reclaim the IP addresses owned by peerName, using the
+// Kubernetes api-server as a point of consensus so that only one peer
+// actions the reclaim.
+// Return a bool to show whether we attempted to change anything,
+// and an error if something went wrong.
+func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, myPeerName string) (changed bool, err error) {
 	common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peerName)
 	okToRemove := false
 	// 3. Check if there is an existing annotation with key X
@@ -147,7 +153,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 	if err != nil {
 		return false, err
 	}
-	cml.LoopUpdate(func() error {
+	err = cml.LoopUpdate(func() error {
 		// 7aa.   Remove any annotations Z* that have contents X
 		if err := cml.RemoveAnnotationsWithValue(peerName); err != nil {
 			return err
@@ -174,7 +180,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 
 	// Question: Should we narrow step 2 by checking against Weave Net IPAM?
 	// i.e. If peer X owns any address space and is marked unreachable, we want to rmpeer X
-	return true, nil
+	return true, err
 }
 
 func main() {
