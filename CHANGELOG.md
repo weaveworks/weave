@@ -1,3 +1,26 @@
+## Release 2.4.1
+
+This release fixes several bugs causing inconsistencies in IPAM for
+Kubernetes users whose clusters scale up and down over time.
+
+### Bug fixes
+
+* Nodes unable to connect after Kubernetes addon erroneously reclaimed
+  node without any IP addresses #3392, #3393
+* Kubernetes addon could have run out of free IP addresses after nodes
+  are deleted #3384, #3400
+* Kubernetes addon had reduced free IP addresses due to not reclaiming
+  IP addresses when node name is re-used #3397
+
+### Other improvements
+
+* Support `--label` in `WEAVE_DOCKER_ARGS` when starting Weave #3370,#3371
+* Add missing `--token` argument in help for `weave launch` #3226, #3379
+* Print defunct processes after smoke-tests #3362
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/75?closed=1)
+
+
 ## Release 2.4.0
 
 This release introduces a support for Kubernetes Egress Network Policy (#2624, #3313)
