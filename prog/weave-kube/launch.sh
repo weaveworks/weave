@@ -151,6 +151,8 @@ post_start_actions() {
 
     # Mark network as up
     /home/weave/kube-utils -set-node-status -node-name="$HOSTNAME"
+
+    /home/weave/kube-utils -run-reclaim-daemon -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug&
 }
 
 post_start_actions &
