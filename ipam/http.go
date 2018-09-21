@@ -199,6 +199,10 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 	})
 
 	router.Methods("GET").Path("/ipinfo/tracker").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, alloc.tracker.String())
+		tracker := ""
+		if alloc.tracker != nil {
+			tracker = alloc.tracker.String()
+		}
+		fmt.Fprintf(w, tracker)
 	})
 }
