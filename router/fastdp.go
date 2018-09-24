@@ -583,10 +583,10 @@ type fastDatapathForwarder struct {
 	stopChan          chan struct{}
 	stopped           bool
 	healthy           bool
-
-	establishedChan chan struct{}
-	errorChan       chan error
-	healthChan      chan bool
+	established       bool
+	establishedChan   chan struct{}
+	errorChan         chan error
+	healthChan        chan bool
 }
 
 func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
@@ -725,6 +725,15 @@ func (fwd *fastDatapathForwarder) doHeartbeats() {
 			// that Forwarder is un-healthy so it can pick next best forwarder
 			fwd.healthChan <- false
 
+			// switch from fast-heartbeat to slow-heartbeat to avoid aggressive heartbeats
+			// when there is no estbalished session with peer yet
+			if fwd.heartbeatInterval != SlowHeartbeat {
+				fwd.heartbeatInterval = SlowHeartbeat
+				if fwd.heartbeatTimer != nil {
+					fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
+				}
+			}
+
 			if fwd.healthy {
 				fwd.healthy = false
 			} else {
@@ -860,8 +869,12 @@ func (fwd *fastDatapathForwarder) Attrs() map[string]interface{} {
 func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 	log.Debug(fwd.logPrefix(), "handleHeartbeatAck")
 
-	if fwd.heartbeatInterval != SlowHeartbeat {
+	if !fwd.established {
 		close(fwd.establishedChan)
+		fwd.established = true
+	}
+
+	if fwd.heartbeatInterval != SlowHeartbeat {
 		fwd.heartbeatInterval = SlowHeartbeat
 		if fwd.heartbeatTimer != nil {
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)

@@ -172,7 +172,7 @@ type subForwarderEvent struct {
 	err error
 
 	// event to indicate if forwarder is in healthy state to be considered for best forwarded
-	healthy bool
+	healthy *bool
 }
 
 func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
@@ -246,7 +246,6 @@ func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams)
 
 func monitorForwarder(index int, eventsChan chan<- subForwarderEvent, stopChan <-chan struct{}, fwd OverlayForwarder) {
 	establishedChan := fwd.EstablishedChannel()
-	healthChan := fwd.HealthChannel()
 loop:
 	for {
 		e := subForwarderEvent{index: index}
@@ -256,8 +255,8 @@ loop:
 			e.established = true
 			establishedChan = nil
 
-		case healthy := <-healthChan:
-			e.healthy = healthy
+		case healthy := <-fwd.HealthChannel():
+			e.healthy = &healthy
 
 		case err := <-fwd.ErrorChannel():
 			e.err = err
@@ -293,8 +292,8 @@ loop:
 				fwd.established(e.index)
 			case e.err != nil:
 				fwd.error(e.index, e.err)
-			default:
-				fwd.healthCheck(e.index, e.healthy)
+			case e.healthy != nil:
+				fwd.healthCheck(e.index, *e.healthy)
 			}
 		}
 	}
