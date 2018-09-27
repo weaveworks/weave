@@ -105,7 +105,7 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 				common.Log.Warnln("[kube-peers] not removing myself", peer)
 				continue
 			}
-			changed, err := reclaimPeer(weave, cml, peer.PeerName, myPeerName)
+			changed, err := reclaimPeer(weave, cml, storedPeerList, peer.PeerName, myPeerName)
 			if err != nil {
 				return err
 			}
@@ -125,17 +125,32 @@ func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *conf
 // actions the reclaim.
 // Return a bool to show whether we attempted to change anything,
 // and an error if something went wrong.
-func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, myPeerName string) (changed bool, err error) {
+func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *peerList, peerName string, myPeerName string) (changed bool, err error) {
 	common.Log.Debugln("[kube-peers] Preparing to remove disappeared peer", peerName)
 	okToRemove := false
+	nonExistentPeer := false
+
 	// 3. Check if there is an existing annotation with key X
-	if existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peerName); found {
+	existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peerName)
+	if found {
 		common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation)
 		// 4.   If annotation already contains my identity, ok;
 		if existingAnnotation == myPeerName {
 			okToRemove = true
+		} else {
+			// handle an edge case where peer claimed to own the action to reclaim but no longer
+			// exists hence lock persists foever
+			peerExists := false
+			for _, peer := range storedPeerList.Peers {
+				if existingAnnotation == peer.PeerName {
+					peerExists = true
+					break
+				}
+			}
+			nonExistentPeer = !peerExists
 		}
-	} else {
+	}
+	if !found || nonExistentPeer {
 		// 5.   If non-existent, write an annotation with key X and contents "my identity"
 		common.Log.Debugln("[kube-peers] Noting I plan to remove ", peerName)
 		if err := cml.UpdateAnnotation(KubePeersPrefix+peerName, myPeerName); err == nil {
