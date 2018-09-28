@@ -110,12 +110,11 @@ items:
                       fieldPath: spec.nodeName
               image: 'weaveworks/weave-kube:latest'
               imagePullPolicy: Always
-              livenessProbe:
+              readinessProbe:
                 httpGet:
                   host: 127.0.0.1
                   path: /status
                   port: 6784
-                initialDelaySeconds: 30
               resources:
                 requests:
                   cpu: 10m
