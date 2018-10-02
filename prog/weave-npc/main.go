@@ -125,6 +125,12 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		}
 	}
 
+	// If the destination address is not any of the local pods, let it through
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "physdev", "--physdev-out=vethwe-bridge", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
 		return err
@@ -132,21 +138,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
-		return err
-	}
-
-	// If the destination address is not any of the local pods, let it through
-	found, err := ipsetExist(ips, npc.LocalIpset)
-	if err != nil {
-		return err
-	}
-	if !found {
-		if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
-			return err
-		}
-	}
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
@@ -158,7 +149,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// Egress rules:
 	//
 	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j ACCEPT
-	// -A WEAVE-NPC-EGRESS -m set ! --match-set weave-local-pods src -j RETURN
+	// -A WEAVE-NPC-EGRESS -m physdev --physdev-in=vethwe-bridge -j RETURN
 	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j WEAVE-NPC-EGRESS-CUSTOM
@@ -179,7 +170,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
-		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
+		{"-m", "physdev", "--physdev-in=vethwe-bridge", "-j", "RETURN"},
 	}
 	if allowMcast {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
