@@ -140,14 +140,10 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 		} else {
 			// handle an edge case where peer claimed to own the action to reclaim but no longer
 			// exists hence lock persists foever
-			peerExists := false
-			for _, peer := range storedPeerList.Peers {
-				if existingAnnotation == peer.PeerName {
-					peerExists = true
-					break
-				}
+			if !storedPeerList.contains(existingAnnotation) {
+				nonExistentPeer = true
+				common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation, " has a non-existent peer so owning the reclaim action")
 			}
-			nonExistentPeer = !peerExists
 		}
 	}
 	if !found || nonExistentPeer {
