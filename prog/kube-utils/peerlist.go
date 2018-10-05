@@ -26,7 +26,7 @@ type peerInfo struct {
 	NodeName string // Kubernetes node name
 }
 
-func (pl peerList) contains(peerName string) bool {
+func (pl *peerList) contains(peerName string) bool {
 	for _, peer := range pl.Peers {
 		if peer.PeerName == peerName {
 			return true
