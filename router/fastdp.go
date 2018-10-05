@@ -736,8 +736,6 @@ func (fwd *fastDatapathForwarder) doHeartbeats() {
 
 			if fwd.healthy {
 				fwd.healthy = false
-			} else {
-				err = fmt.Errorf("timed out waiting for vxlan heartbeat")
 			}
 
 		case <-fwd.stopChan:
