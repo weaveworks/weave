@@ -31,6 +31,7 @@ var (
 	allowMcast  bool
 	nodeName    string
 	maxList     int
+	bridgeName  string
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -127,7 +128,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	// If the destination address is not any of the local pods, let it through
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "physdev", "--physdev-out=vethwe-bridge", "-j", "ACCEPT"); err != nil {
+		"-m", "physdev", "--physdev-out="+bridgeName, "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
@@ -170,7 +171,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
-		{"-m", "physdev", "--physdev-in=vethwe-bridge", "-j", "RETURN"},
+		{"-m", "physdev", "--physdev-in=" + bridgeName, "-j", "RETURN"},
 	}
 	if allowMcast {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
@@ -323,6 +324,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
+	rootCmd.PersistentFlags().StringVar(&bridgeName, "bridge-name", "vethwe-bridge", "name of the brige on which packets are received and sent")
 
 	handleError(rootCmd.Execute())
 }
