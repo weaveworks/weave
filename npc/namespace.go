@@ -4,16 +4,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net/ipset"
+	"github.com/weaveworks/weave/npc/iptables"
 	coreapi "k8s.io/api/core/v1"
 	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/ipset"
-	"github.com/weaveworks/weave/npc/iptables"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 var errInvalidNetworkPolicyObjType = errors.New("invalid NetworkPolicy object type")
@@ -583,4 +584,24 @@ func (ns *ns) analyse(obj interface{}) (
 	}
 
 	return
+}
+
+func (ns *ns) getMatchingNamespeces(ls *metav1.LabelSelector) (*coreapi.NamespaceList, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	nsSelector, err := metav1.LabelSelectorAsSelector(ls)
+	if err != nil {
+		return nil, err
+	}
+	matchedNamespaces, err := clientset.CoreV1().Namespaces().List(metav1.ListOptions{LabelSelector: nsSelector.String()})
+	if err != nil {
+		return nil, err
+	}
+	return matchedNamespaces, nil
 }
