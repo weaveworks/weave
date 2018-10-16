@@ -326,6 +326,7 @@ type sleeveForwarder struct {
 	// listener channels
 	establishedChan chan struct{}
 	errorChan       chan error
+	healthChan      chan bool
 
 	// Explicitly locked state
 	lock       sync.RWMutex
@@ -443,6 +444,10 @@ func (fwd *sleeveForwarder) EstablishedChannel() <-chan struct{} {
 
 func (fwd *sleeveForwarder) ErrorChannel() <-chan error {
 	return fwd.errorChan
+}
+
+func (fwd *sleeveForwarder) HealthChannel() <-chan bool {
+	return fwd.healthChan
 }
 
 type curriedForward struct {
