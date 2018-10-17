@@ -385,7 +385,7 @@ func main() {
 		dockerVersion = dockerCli.DockerVersion()
 	}
 
-	checkForUpdates(dockerVersion, router)
+	checkForUpdates(dockerVersion, router, peers)
 
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
