@@ -26,7 +26,7 @@ func newSelectorSpec(json *metav1.LabelSelector, policyType []policyType, nsName
 	if err != nil {
 		return nil, err
 	}
-	key := selector.String()
+	key := "namespace=" + nsName + ":" + selector.String()
 	return &selectorSpec{
 		key:         key,
 		selector:    selector,
