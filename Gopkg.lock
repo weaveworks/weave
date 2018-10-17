@@ -670,12 +670,13 @@
   revision = "ebbb8b0518ab326368631225cabc9435fe580dcc"
 
 [[projects]]
-  branch = "master"
-  digest = "1:96b0adb40f5818192dd016ca387c722cc02c190cb7399294cb0d80f7b0fd8501"
+  branch = "handle-fixed-genl-reply-messages"
+  digest = "1:9d08fc4089d25531e35e78bd5b39fb0efcfc07c00be00ea53fe602bb81a636ae"
   name = "github.com/weaveworks/go-odp"
   packages = ["odp"]
   pruneopts = "UT"
-  revision = "eec09c2fbfb96be47bfe11165ce300ad9a60bef5"
+  revision = "cb88024f5d9fb20898d86b1c43254b1440749b64"
+  source = "github.com/lkpdn/go-odp"
 
 [[projects]]
   digest = "1:277e090a58afaeb00fb9fd04e2b2f3466ff8fb327a331e0e531a3399a72697e3"

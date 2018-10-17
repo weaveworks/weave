@@ -18,15 +18,22 @@ func (nlmsg *NlMsgBuilder) PutGenlMsghdr(cmd uint8, version uint8) *GenlMsghdr {
 	return res
 }
 
-func (nlmsg *NlMsgParser) CheckGenlMsghdr(cmd int) (*GenlMsghdr, error) {
+func (nlmsg *NlMsgParser) CheckGenlMsghdr(cmds ...int) (*GenlMsghdr, error) {
 	pos, err := nlmsg.AlignAdvance(syscall.NLMSG_ALIGNTO, SizeofGenlMsghdr)
 	if err != nil {
 		return nil, err
 	}
 
 	gh := genlMsghdrAt(nlmsg.data, pos)
-	if cmd >= 0 && gh.Cmd != uint8(cmd) {
-		return nil, fmt.Errorf("generic netlink response has wrong cmd (got %d, expected %d)", gh.Cmd, cmd)
+	cmdMatch := false
+	for _, cmd := range cmds {
+		if cmd < 0 || gh.Cmd == uint8(cmd) {
+			cmdMatch = true
+			break
+		}
+	}
+	if !cmdMatch {
+		return nil, fmt.Errorf("generic netlink response has wrong cmd (got %d, expected either of %v)", gh.Cmd, cmds)
 	}
 
 	// Deliberately ignore the version field in the genl header.
@@ -57,6 +64,9 @@ func (s *NetlinkSocket) LookupGenlFamily(name string) (family GenlFamily, err er
 		return
 	}
 
+	// TODO: It should have been CTRL_CMD_GETFAMILY, though it would be a huge breaking change for
+	//       userspace apps. If kernel folks would decide to correct it by any chance, we will
+	//       correct the next line as well.
 	_, err = resp.CheckGenlMsghdr(CTRL_CMD_NEWFAMILY)
 	if err != nil {
 		return

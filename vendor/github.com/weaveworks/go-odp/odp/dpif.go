@@ -155,7 +155,22 @@ func (dpif *Dpif) checkNlMsgHeaders(msg *NlMsgParser, family int, cmd int) (*Gen
 		return nil, nil, err
 	}
 
-	genlhdr, err := msg.CheckGenlMsghdr(cmd)
+	// Until Linux Kernel v4.19, generic netlink command in reply message
+	// for some of ovs requests had incorrectly been set to OVS_*_CMD_NEW.
+	// For details, see: http://patchwork.ozlabs.org/patch/975343/
+	// ("openvswitch: Use correct reply values in datapath and vport ops")
+	var genlhdr *GenlMsghdr
+	var err error
+	switch family {
+	case DATAPATH:
+		genlhdr, err = msg.CheckGenlMsghdr(cmd, OVS_DP_CMD_NEW)
+	case VPORT:
+		genlhdr, err = msg.CheckGenlMsghdr(cmd, OVS_VPORT_CMD_NEW)
+	case FLOW:
+		genlhdr, err = msg.CheckGenlMsghdr(cmd, OVS_FLOW_CMD_NEW)
+	default:
+		genlhdr, err = msg.CheckGenlMsghdr(cmd)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
