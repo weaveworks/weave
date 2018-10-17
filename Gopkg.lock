@@ -671,11 +671,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:96b0adb40f5818192dd016ca387c722cc02c190cb7399294cb0d80f7b0fd8501"
+  digest = "1:fe397579b11f84d3a36ad3d8e5d9f144705d2416e1cd4550d475584ef6e2e25c"
   name = "github.com/weaveworks/go-odp"
   packages = ["odp"]
   pruneopts = "UT"
-  revision = "eec09c2fbfb96be47bfe11165ce300ad9a60bef5"
+  revision = "6b0aa22550d9325eb8f43418185859e13dc0de1d"
 
 [[projects]]
   digest = "1:277e090a58afaeb00fb9fd04e2b2f3466ff8fb327a331e0e531a3399a72697e3"

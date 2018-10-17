@@ -840,7 +840,7 @@ func (key TunnelFlowKey) Ignored() bool {
 		AllBytes(m.Ipv4Dst[:], 0) &&
 		m.Tos == 0 &&
 		m.Ttl == 0 &&
-		!m.Csum && !m.Csum &&
+		!m.Csum &&
 		m.TpSrc == 0 && m.TpDst == 0
 }
 
@@ -1236,8 +1236,8 @@ func (a FlowSpec) Equals(b FlowSpec) bool {
 	return true
 }
 
-func (dp DatapathHandle) parseFlowMsg(msg *NlMsgParser) (Attrs, error) {
-	if err := dp.checkNlMsgHeaders(msg, FLOW, OVS_FLOW_CMD_NEW); err != nil {
+func (dp DatapathHandle) parseFlowMsg(msg *NlMsgParser, cmd int) (Attrs, error) {
+	if err := dp.checkNlMsgHeaders(msg, FLOW, cmd); err != nil {
 		return nil, err
 	}
 
@@ -1375,7 +1375,7 @@ func (dp DatapathHandle) EnumerateFlows() ([]FlowInfo, error) {
 	req.putOvsHeader(dp.ifindex)
 
 	consumer := func(resp *NlMsgParser) error {
-		attrs, err := dp.parseFlowMsg(resp)
+		attrs, err := dp.parseFlowMsg(resp, OVS_FLOW_CMD_GET)
 		if err != nil {
 			return err
 		}

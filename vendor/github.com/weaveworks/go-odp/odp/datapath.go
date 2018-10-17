@@ -13,8 +13,8 @@ type datapathInfo struct {
 	name    string
 }
 
-func (dpif *Dpif) parseDatapathInfo(msg *NlMsgParser) (res datapathInfo, err error) {
-	_, ovshdr, err := dpif.checkNlMsgHeaders(msg, DATAPATH, OVS_DP_CMD_NEW)
+func (dpif *Dpif) parseDatapathInfo(msg *NlMsgParser, cmd int) (res datapathInfo, err error) {
+	_, ovshdr, err := dpif.checkNlMsgHeaders(msg, DATAPATH, cmd)
 	if err != nil {
 		return
 	}
@@ -58,7 +58,7 @@ func (dpif *Dpif) CreateDatapath(name string) (DatapathHandle, error) {
 		return DatapathHandle{}, err
 	}
 
-	dpi, err := dpif.parseDatapathInfo(resp)
+	dpi, err := dpif.parseDatapathInfo(resp, OVS_DP_CMD_NEW)
 	if err != nil {
 		return DatapathHandle{}, err
 	}
@@ -81,7 +81,7 @@ func (dpif *Dpif) LookupDatapath(name string) (DatapathHandle, error) {
 		return DatapathHandle{}, err
 	}
 
-	dpi, err := dpif.parseDatapathInfo(resp)
+	dpi, err := dpif.parseDatapathInfo(resp, OVS_DP_CMD_GET)
 	if err != nil {
 		return DatapathHandle{}, err
 	}
@@ -104,7 +104,7 @@ func (dpif *Dpif) LookupDatapathByID(ifindex DatapathID) (Datapath, error) {
 		return Datapath{}, err
 	}
 
-	dpi, err := dpif.parseDatapathInfo(resp)
+	dpi, err := dpif.parseDatapathInfo(resp, OVS_DP_CMD_GET)
 	if err != nil {
 		return Datapath{}, err
 	}
@@ -127,7 +127,7 @@ func (dpif *Dpif) EnumerateDatapaths() (map[string]DatapathHandle, error) {
 	req.putOvsHeader(0)
 
 	consumer := func(resp *NlMsgParser) error {
-		dpi, err := dpif.parseDatapathInfo(resp)
+		dpi, err := dpif.parseDatapathInfo(resp, OVS_DP_CMD_GET)
 		if err != nil {
 			return err
 		}
