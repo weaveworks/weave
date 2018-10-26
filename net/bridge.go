@@ -304,7 +304,7 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 
 	linkAttrs := netlink.NewLinkAttrs()
 	linkAttrs.Name = config.WeaveBridgeName
-	linkAttrs.HardwareAddr = mac
+	//linkAttrs.HardwareAddr = mac
 	if config.MTU == 0 {
 		config.MTU = 65535
 	}
