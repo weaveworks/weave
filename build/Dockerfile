@@ -50,7 +50,7 @@ RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt
 
 # Install common Go tools
 RUN go get \
-	github.com/golang/lint/golint \
+	golang.org/x/lint/golint \
 	github.com/fzipp/gocyclo \
 	github.com/fatih/hclfmt \
 	github.com/client9/misspell/cmd/misspell
@@ -74,7 +74,7 @@ RUN chmod -R a+w /usr/local/go
 # The libpcap version from Debian packages is 1.6.2, matching that version here although newer versions of libpcap have been released
 # We have to cross-compile the libpcap library for the new architectures, that's what we're doing here
 ENV LIBPCAP_CROSS_VERSION=1.6.2
-RUN curl -sSL http://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.tar.gz | tar -xz \
+RUN curl -sSL https://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.tar.gz | tar -xz \
 	&& cd libpcap-${LIBPCAP_CROSS_VERSION} \
 	&& for crosscompiler in ${GCC_CROSSCOMPILERS}; do \
 		CC=${crosscompiler}-gcc ac_cv_linux_vers=2 ./configure --host=${crosscompiler} --with-pcap=linux \
