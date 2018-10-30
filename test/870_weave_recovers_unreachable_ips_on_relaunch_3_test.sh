@@ -100,8 +100,6 @@ function main {
 
     force_drop_node $HOST2;
 
-    relaunch_weave_pod $HOST3;
-
     sleep $IPAM_RECOVER_DELAY;
 
     greyly echo "Checking unreachable IPs"
