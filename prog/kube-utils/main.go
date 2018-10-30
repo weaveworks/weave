@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	v1core "k8s.io/api/core/v1"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -210,34 +209,13 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 	common.Log.Debugln("registering for updates for node delete events")
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
-			nodeObj, ok := obj.(*v1core.Node)
-			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					common.Log.Fatalf("[kube-peers] Couldn't get node object from tombstone: %#v", obj)
-				}
-				nodeObj, ok = tombstone.Obj.(*v1core.Node)
-				if !ok {
-					common.Log.Fatalf("[kube-peers] Tombstone contained object that is not a Node: %#v", obj)
-				}
-			}
-			common.Log.Debugln("[kube-peers] Nodes deleted:", nodeObj.Name)
-			config, err := rest.InClusterConfig()
-			if err != nil {
-				common.Log.Fatalf("[kube-peers] Could not get cluster config: %v", err)
-			}
-			client, err := kubernetes.NewForConfig(config)
-			if err != nil {
-				common.Log.Fatalf("[kube-peers] Could not make Kubernetes connection: %v", err)
-			}
-			cml := newConfigMapAnnotations(configMapNamespace, configMapName, client)
-
 			// add random delay to avoid all nodes acting on node delete event at the same
 			// time leading to contention to use `weave-net` configmap
 			r := rand.Intn(5000)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 
-			err = reclaimRemovedPeers(client, cml, peerName, nodeName)
+			cml := newConfigMapAnnotations(configMapNamespace, configMapName, client)
+			err := reclaimRemovedPeers(client, cml, peerName, nodeName)
 			if err != nil {
 				common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 			}
