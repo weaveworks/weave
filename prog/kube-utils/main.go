@@ -201,6 +201,16 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 	return true, err
 }
 
+// resetPeers replaces the peers list with empty list of peers
+func resetPeers() error {
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
+	err := weave.ReplacePeers(nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // regiesters with Kubernetes API server for node delete events. Node delete event handler
 // invokes reclaimRemovedPeers to remove it from IPAM so that IP space is reclaimed
 func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}, nodeName, peerName string) {
@@ -218,6 +228,10 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 			err := reclaimRemovedPeers(client, cml, peerName, nodeName)
 			if err != nil {
 				common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
+			}
+			err = resetPeers()
+			if err != nil {
+				common.Log.Fatalf("[kube-peers] Error resetting peer list: %v", err)
 			}
 		},
 	})
