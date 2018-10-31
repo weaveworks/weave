@@ -201,10 +201,18 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 	return true, err
 }
 
-// resetPeers replaces the peers list with empty list of peers
-func resetPeers() error {
+// resetPeers replaces the peers list with current set of peers
+func resetPeers(kube kubernetes.Interface) error {
+	nodes, err := getKubePeers(kube, false)
+	if err != nil {
+		return err
+	}
+	peerList := make([]string, 0)
+	for _, node := range nodes {
+		peerList = append(peerList, node.addr)
+	}
 	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
-	err := weave.ReplacePeers(nil)
+	err = weave.ReplacePeers(peerList)
 	if err != nil {
 		return err
 	}
@@ -229,7 +237,7 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 			if err != nil {
 				common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 			}
-			err = resetPeers()
+			err = resetPeers(client)
 			if err != nil {
 				common.Log.Fatalf("[kube-peers] Error resetting peer list: %v", err)
 			}
