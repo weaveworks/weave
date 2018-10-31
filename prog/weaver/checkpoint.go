@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"os"
-	"strconv"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -24,7 +24,7 @@ const (
 	configMapNamespace = "kube-system"
 )
 
-func checkForUpdates(dockerVersion string, router *weave.NetworkRouter, peers []string) {
+func checkForUpdates(dockerVersion string, router *weave.NetworkRouter, clusterSize uint) {
 	newVersion.Store("")
 	success.Store(true)
 
@@ -55,11 +55,12 @@ func checkForUpdates(dockerVersion string, router *weave.NetworkRouter, peers []
 	}
 	kernelVersion := string(releaseBytes[:i])
 
-	flags := make(map[string]string)
-	flags["docker-version"] = dockerVersion
-	flags["kernel-version"] = kernelVersion
+	flags := map[string]string{
+		"docker-version": dockerVersion,
+		"kernel-version": kernelVersion,
+	}
 
-	checkpointKubernetes(flags, peers)
+	checkpointKubernetes(flags, clusterSize)
 
 	// Start background version checking
 	params := checkpoint.CheckParams{
@@ -87,7 +88,7 @@ func checkpointFlags(router *weave.NetworkRouter) []checkpoint.Flag {
 }
 
 // checkpoint Kubernetes specific details
-func checkpointKubernetes(flags map[string]string, peers []string) {
+func checkpointKubernetes(flags map[string]string, clusterSize uint) {
 	// checks if weaver is running in Kubernetes
 	host := os.Getenv("KUBERNETES_SERVICE_HOST")
 	if len(host) == 0 {
@@ -117,5 +118,5 @@ func checkpointKubernetes(flags map[string]string, peers []string) {
 		return
 	}
 	flags["kubernetes-cluster-uid"] = string(cm.ObjectMeta.UID)
-	flags["kubernetes-cluster-size"] = strconv.Itoa(len(peers))
+	flags["kubernetes-cluster-size"] = fmt.Sprint(clusterSize)
 }
