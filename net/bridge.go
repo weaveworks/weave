@@ -309,7 +309,10 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 
 	linkAttrs := netlink.NewLinkAttrs()
 	linkAttrs.Name = config.WeaveBridgeName
-	linkAttrs.HardwareAddr = mac
+	// NB: Do not set MAC addr when creating the bridge, set it manually
+	// afterwards instead. Otherwise, on an older than 3.14 kernel FDB
+	// entry won't be created which results in containers not being able to
+	// reach the bridge w/o promiscuous mode.
 	if config.MTU == 0 {
 		config.MTU = 65535
 	}
