@@ -985,7 +985,7 @@ func (alloc *Allocator) loadPersistedData() bool {
 		alloc.persistOwned()
 	}
 
-	if !nameFound || !ringFound {
+	if !nameFound || !ringFound || persistedRing == nil || persistedRing.Empty() {
 		overwritePersisted("No valid persisted data")
 		return false
 	}
