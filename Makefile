@@ -116,8 +116,8 @@ WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
 RUNNER_EXE=tools/runner/runner
-# manifest-tool needs registry credentials; we assume here that the active user has logged in
-MANIFEST_TOOL_CMD=docker run --rm -v $(HOME)/.docker:/.docker weshigbee/manifest-tool --docker-cfg=/.docker
+# Get this from https://github.com/estesp/manifest-tool/releases
+MANIFEST_TOOL_CMD=manifest-tool
 TEST_TLS_EXE=test/tls/tls
 NETWORKTESTER_EXE=test/images/network-tester/webserver
 
