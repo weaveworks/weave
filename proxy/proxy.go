@@ -225,7 +225,7 @@ func (proxy *Proxy) findVolume(v string) (string, error) {
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	Log.Infof("%s %s", r.Method, r.URL)
+	Log.Debugf("%s %s", r.Method, r.URL)
 	path := r.URL.Path
 	var i interceptor
 	switch {
