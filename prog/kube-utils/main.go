@@ -8,12 +8,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	weaveapi "github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
@@ -65,7 +71,8 @@ type weaveClient interface {
 
 // For each of those peers that is no longer listed as a node by
 // Kubernetes, remove it from Weave IPAM
-func reclaimRemovedPeers(kube kubernetes.Interface, weave weaveClient, cml *configMapAnnotations, myPeerName, myNodeName string) error {
+func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, myPeerName, myNodeName string) error {
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
 		if err := cml.Init(); err != nil {
 			return err
@@ -194,6 +201,52 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 	return true, err
 }
 
+// resetPeers replaces the peers list with current set of peers
+func resetPeers(kube kubernetes.Interface) error {
+	nodes, err := getKubePeers(kube, false)
+	if err != nil {
+		return err
+	}
+	peerList := make([]string, 0)
+	for _, node := range nodes {
+		peerList = append(peerList, node.addr)
+	}
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
+	err = weave.ReplacePeers(peerList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// regiesters with Kubernetes API server for node delete events. Node delete event handler
+// invokes reclaimRemovedPeers to remove it from IPAM so that IP space is reclaimed
+func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}, nodeName, peerName string) {
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	common.Log.Debugln("registering for updates for node delete events")
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			// add random delay to avoid all nodes acting on node delete event at the same
+			// time leading to contention to use `weave-net` configmap
+			r := rand.Intn(5000)
+			time.Sleep(time.Duration(r) * time.Millisecond)
+
+			cml := newConfigMapAnnotations(configMapNamespace, configMapName, client)
+			err := reclaimRemovedPeers(client, cml, peerName, nodeName)
+			if err != nil {
+				common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
+			}
+			err = resetPeers(client)
+			if err != nil {
+				common.Log.Fatalf("[kube-peers] Error resetting peer list: %v", err)
+			}
+		},
+	})
+	informerFactory.WaitForCacheSync(stopCh)
+	informerFactory.Start(stopCh)
+}
+
 func main() {
 	var (
 		justReclaim       bool
@@ -202,8 +255,10 @@ func main() {
 		peerName          string
 		nodeName          string
 		logLevel          string
+		runReclaimDaemon  bool
 	)
 	flag.BoolVar(&justReclaim, "reclaim", false, "reclaim IP space from dead peers")
+	flag.BoolVar(&runReclaimDaemon, "run-reclaim-daemon", false, "run background process that reclaim IP space from dead peers ")
 	flag.BoolVar(&justCheck, "check-peer-new", false, "return success if peer name is not stored in annotation")
 	flag.BoolVar(&justSetNodeStatus, "set-node-status", false, "set NodeNetworkUnavailable to false")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
@@ -251,8 +306,7 @@ func main() {
 		}
 		common.Log.Infoln("[kube-peers] Added myself to peer list", list)
 
-		weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
-		err = reclaimRemovedPeers(c, weave, cml, peerName, nodeName)
+		err = reclaimRemovedPeers(c, cml, peerName, nodeName)
 		if err != nil {
 			common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 		}
@@ -261,5 +315,15 @@ func main() {
 	peers, err := getKubePeers(c, false)
 	for _, node := range peers {
 		fmt.Println(node.addr)
+	}
+
+	if runReclaimDaemon {
+		// Handle SIGINT and SIGTERM
+		ch := make(chan os.Signal)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		stopCh := make(chan struct{})
+		registerForNodeUpdates(c, stopCh, nodeName, peerName)
+		<-ch
+		close(stopCh)
 	}
 }
