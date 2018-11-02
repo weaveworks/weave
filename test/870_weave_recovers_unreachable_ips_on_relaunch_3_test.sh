@@ -80,6 +80,22 @@ function relaunch_weave_pod {
     run_on $HOST1 "$KUBECTL get pods -n kube-system \"$podname\" -o yaml | $KUBECTL replace --force -f -"
 }
 
+function log_weave_pod {
+    local target=$(echo "$1" | awk -F"." '{print $1}')
+
+    # This is a pretty complex jq query. Is there a simpler way to
+    # get the weave-net pod name back using kubectl templates?
+    local QUERY="$KUBECTL get pods -n kube-system -o json | jq -r \".items | map(select(.spec.nodeName == \\\"$target\\\")) | map(select(.metadata.labels.name == \\\"weave-net\\\")) | map(.metadata.name) | .[]\""
+    local podname=$(get_command_output_on $HOST1 $QUERY) # Run on master node
+    local LOGQUERY="$KUBECTL logs \"$podname\" -n kube-system -c weave"
+    local pod_log=$(get_command_output_on $HOST1 $LOGQUERY)
+    greyly echo $pod_log
+
+    local host=$1
+    local ipam_status=$(get_command_output_on $host "sudo weave status ipam")
+    greyly echo $ipam_status
+}
+
 #
 # Suite
 #
@@ -106,6 +122,8 @@ function main {
     assert "unreachable_ip_addresses_count $HOST1" "0";
     assert "unreachable_ip_addresses_count $HOST3" "0";
 
+    log_weave_pod $HOST1
+    log_weave_pod $HOST3
     teardown_kubernetes_cluster;
 
     end_suite;
