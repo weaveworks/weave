@@ -1,3 +1,54 @@
+## Release 2.5.0
+
+This release adds support for Kubernetes `hostPort` mapping (#3016,#3356)
+and the `ipBlock` NetworkPolicy feature (#3168,#3367)
+
+### Bug fixes
+
+* Fix a crash at start-up on Docker for Mac #3405, #3408
+* Network policy: block ingress traffic when no namespaceSelector or
+  podSelector is specified #3347
+* Reclaim IP addresses which are locked by a non-existent peer #3386, #3416
+* Fix a crash when blank IP data was loaded #3067, #3415
+
+### Other improvements
+
+* If a connection is downgraded to the slower "sleeve" mode, Weave Net
+  will now periodically try to upgrade it to "fast datapath" again. #1737, #3385
+* Reclaim removed Kubernetes nodes' IP space when they are deleted,
+  rather than on next restart #3372, #3399
+* Replace Kubernetes livenessProbe with readinessProbe, so the pod is
+  not killed if it runs slowly #3471, #3421
+* In Kubernetes NetworkPolicy controller, remove the need to maintain
+  a set of local pod IP addresses #3344, #3423
+* Don't crash on Kubernetes named port in NetworkPolicy, just report as unsupported #3375
+* Ensure the `weave` network bridge is accessible on Linux kernels
+  older than 3.14 #3442, #3297, #3239
+* Better reporting in the logs if the `weave` network device is in the Down state #3133, #3381
+* Change log-level to debug of calls through the Docker proxy, to reduce noise #3439
+* Add `--without-masquerade` option to `weave expose`, so external
+  services can see the original container IP address #3388
+* Include Kubernetes cluster information in checkpoint call #3324,#3431
+* Bump go-odp dependency, so that `fastdp` works on the 4.19 kernel #3430
+
+### Build and Testing
+
+* CI builds on master branch now publish images for all platforms
+* Fix golint path and use https for download of libpcap #3435
+* Update Kubernetes client-go to v8.0.0, removing code licenced under LGPL3 #3358,#3366
+* Migrate CircleCI to V2, which is much faster #3255,#3270
+
+### External Contributors
+
+Thanks to the following contributors:
+
+* @Ashiroq
+* @leprechau
+* @lkpdn
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/74?closed=1)
+
+
 ## Release 2.4.1
 
 This release fixes several bugs causing inconsistencies in IPAM for
