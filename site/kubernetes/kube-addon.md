@@ -33,6 +33,8 @@ with a single command:
 $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
+**Important:** this configuration won't enable encryption and might be unfit for production use depending on your circumstances. Read on to see the alteranatives.
+
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
 network.
@@ -442,3 +444,7 @@ For example,
             - name: IPALLOC_RANGE
               value: 10.0.0.0/16
 ```
+
+## <a name="securing-the-setup"></a> Securing the Setup
+
+You must pass the `password-secret` option as noted in the previous section to enable the data plane encryption; this is a recommended option in case you cannot be sure about the security of the fabric between your nodes. Read on the [Securing Connections Across Untrusted Networks](/site/tasks/manage/security-untrusted-networks/) document to see the alternatives.
