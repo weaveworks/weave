@@ -128,7 +128,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	// If the destination address is not any of the local pods, let it through
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "physdev", "--physdev-out="+bridgePortName, "-j", "ACCEPT"); err != nil {
+		"-m", "physdev", "--physdev-is-bridged", "--physdev-out="+bridgePortName, "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
@@ -171,7 +171,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
-		{"-m", "physdev", "--physdev-in=" + bridgePortName, "-j", "RETURN"},
+		{"-m", "physdev", "--physdev-is-bridged", "--physdev-in=" + bridgePortName, "-j", "RETURN"},
 	}
 	if allowMcast {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
