@@ -15,14 +15,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vishvananda/netlink"
+	weaveapi "github.com/weaveworks/weave/api"
+	"github.com/weaveworks/weave/common"
+	"golang.org/x/sys/unix"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
 )
 
 type nodeInfo struct {
@@ -54,6 +55,10 @@ func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo,
 
 		// Fallback for cases where a Node has an ExternalIP but no InternalIP
 		if internalIP != "" {
+			// exclude self from the list of peers this node will peer with
+			if isLocalNodeIP(internalIP) {
+				continue
+			}
 			addresses = append(addresses, nodeInfo{name: peer.Name, addr: internalIP})
 		} else if externalIP != "" {
 			addresses = append(addresses, nodeInfo{name: peer.Name, addr: externalIP})
@@ -62,6 +67,20 @@ func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo,
 		}
 	}
 	return addresses, nil
+}
+
+// returns true if given IP matches with one of the local IP's
+func isLocalNodeIP(ip string) bool {
+	addrs, err := netlink.AddrList(nil, unix.AF_INET)
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		if addr.Peer.IP.String() == ip {
+			return true
+		}
+	}
+	return false
 }
 
 // (minimal, incomplete) interface so weaver can be mocked for testing.
