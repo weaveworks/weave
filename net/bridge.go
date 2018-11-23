@@ -55,6 +55,7 @@ datapath of old kernel versions (https://github.com/weaveworks/weave/issues/1577
 
 const (
 	WeaveBridgeName  = "weave"
+	WeaveDummyIfName = "vethwedu"
 	DatapathName     = "datapath"
 	DatapathIfName   = "vethwe-datapath"
 	BridgeIfName     = "vethwe-bridge"
@@ -328,8 +329,8 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	// instead we create a temporary interface with the desired MTU,
 	// attach that to the bridge, and then remove it again.
 	dummy := &netlink.Dummy{LinkAttrs: netlink.NewLinkAttrs()}
-	dummy.LinkAttrs.Name = "vethwedu"
-	if err = netlink.LinkAdd(dummy); err != nil {
+	dummy.LinkAttrs.Name = WeaveDummyIfName
+	if err = LinkAddIfNotExist(dummy); err != nil {
 		return errors.Wrap(err, "creating dummy interface")
 	}
 	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
@@ -338,11 +339,16 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	if err := netlink.LinkSetMasterByIndex(dummy, b.bridge.Attrs().Index); err != nil {
 		return errors.Wrap(err, "setting dummy interface master")
 	}
-	if err := netlink.LinkDel(dummy); err != nil {
-		return errors.Wrap(err, "deleting dummy interface")
-	}
-
-	return nil
+	defer func() {
+		var dummyIf netlink.Link
+		dummyIf, err = netlink.LinkByName(WeaveDummyIfName)
+		if err == nil {
+			if err = netlink.LinkDel(dummyIf); err != nil {
+				err = errors.Wrap(err, "deleting dummy interface")
+			}
+		}
+	}()
+	return err
 }
 
 func (b bridgeImpl) init(config *BridgeConfig) error {
