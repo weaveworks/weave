@@ -332,6 +332,6 @@ and the container image versions as git hashes.
 
 **See Also**
 
- * [Troubleshooting the Kubernetes Addon](/site/kubernetes/kube-addon/#troubleshooting)
+ * [Troubleshooting the Kubernetes Addon](/site/kubernetes/kube-addon.md#troubleshooting)
  * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
  * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)
