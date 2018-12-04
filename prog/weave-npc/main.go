@@ -150,8 +150,8 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// Egress rules:
 	//
 	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j ACCEPT
-	// -A WEAVE-NPC-EGRESS -m physdev --physdev-in=vethwe-bridge -j RETURN
-	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
+	// -A WEAVE-NPC-EGRESS -m physdev --physdev-in vethwe-bridge --physdev-is-bridged -j RETURN
+	// -A WEAVE-NPC-EGRESS -m addrtype --dst-type LOCAL -j RETURN
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j WEAVE-NPC-EGRESS-CUSTOM
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j NFLOG --nflog-group 86
@@ -171,7 +171,10 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
+		// skip running through egress network policies for the traffic not coming from local pods
 		{"-m", "physdev", "--physdev-is-bridged", "--physdev-in=" + bridgePortName, "-j", "RETURN"},
+		// skip running through egress network policies for the traffic bound for IP address assigned for the bridge
+		{"-m", "addrtype", "--dst-type", "LOCAL", "-j", "RETURN"},
 	}
 	if allowMcast {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
