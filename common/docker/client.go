@@ -231,7 +231,7 @@ func (c *Client) EnsureNetwork(networkName, driver, subnet string, options map[s
 			Name:           networkName,
 			CheckDuplicate: true,
 			Driver:         driver,
-			IPAM: docker.IPAMOptions{
+			IPAM: &docker.IPAMOptions{
 				Driver: driver,
 				Config: []docker.IPAMConfig{{Subnet: subnet}},
 			},

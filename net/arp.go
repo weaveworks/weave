@@ -10,7 +10,7 @@ import (
 // Configure the ARP cache parameters for the given interface.  This
 // makes containers react more quickly to a change in the MAC address
 // associated with an IP address.
-func ConfigureARPCache(procPath, name string) error {
+func configureARPCache(procPath, name string) error {
 	if err := sysctl(procPath, fmt.Sprintf("net/ipv4/neigh/%s/base_reachable_time", name), "5"); err != nil {
 		return err
 	}

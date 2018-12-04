@@ -1,4 +1,4 @@
-VAGRANT_IMAGE = 'bento/ubuntu-16.04'
+VAGRANT_IMAGE = 'bento/ubuntu-18.04'
 VAGRANTFILE_API_VERSION = '2'
 
 def get_dependencies_version_from_file_and_env()
@@ -16,7 +16,7 @@ def ansibleize(h)
 end
 
 def get_go_version_from_build_dockerfile()
-  go_regexp = /FROM golang:(\S*).*?/
+  go_regexp = /FROM golang:([\d\.]*).*?/
   dockerfile_path = File.expand_path(File.join(File.dirname(__FILE__), 'build', 'Dockerfile'))
   go_version = File.readlines(dockerfile_path).select { |line| line.match(go_regexp) }.first.match(go_regexp).captures.first
   if go_version.nil?

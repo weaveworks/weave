@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -294,6 +294,11 @@ func TestDefaultAllow(t *testing.T) {
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
 	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+
+	controller.DeleteNamespace(defaultNamespace)
+	// Should remove default ipset
+	require.NotContains(t, m.sets, defaultAllowIPSetName)
+
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
@@ -375,4 +380,77 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	// Should remove from default-allow and run=bar ipsets
 	require.Equal(t, 0, len(m.sets[defaultAllowIPSetName].subSets))
 	require.False(t, m.entryExists(runBarIPSetName, podIP))
+}
+
+// Test case for https://github.com/weaveworks/weave/issues/3222
+func TestNewDstSelector(t *testing.T) {
+	const (
+		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
+		podIP                 = "10.32.0.10"
+	)
+
+	m := newMockIPSet()
+	controller := New("baz", false, &mockIPTables{}, &m)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	controller.AddNamespace(defaultNamespace)
+
+	podFoo := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "foo",
+			Namespace: "default",
+			Name:      "foo",
+			Labels:    map[string]string{"run": "foo"}},
+		Status: coreapi.PodStatus{PodIP: podIP}}
+	controller.AddPod(podFoo)
+
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	netpolBar := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-bar",
+			Name:      "allow-from-default-1",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolBar)
+
+	// netpolBar dst selector selects podFoo
+	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+
+	netpolFoo := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo",
+			Name:      "allow-from-default-2",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolFoo)
+
+	controller.DeleteNetworkPolicy(netpolBar)
+	// netpolFoo dst-selects podFoo
+	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	controller.DeleteNetworkPolicy(netpolFoo)
+	// No netpol dst-selects podFoo
+	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/plugin"
 	weaveproxy "github.com/weaveworks/weave/proxy"
 	weave "github.com/weaveworks/weave/router"
@@ -45,12 +46,20 @@ type ipamConfig struct {
 }
 
 type dnsConfig struct {
-	Domain                 string
-	ListenAddress          string
-	TTL                    int
-	ClientTimeout          time.Duration
-	EffectiveListenAddress string
-	ResolvConf             string
+	Domain        string
+	ListenAddress string
+	TTL           int
+	ClientTimeout time.Duration
+	ResolvConf    string
+}
+
+// return the address part of the DNS listen address, without ":53" on the end
+func (c dnsConfig) addressOnly() string {
+	addr, _, err := net.SplitHostPort(c.ListenAddress)
+	if err != nil {
+		Log.Fatalf("Error when parsing DNS listen address %q: %s", c.ListenAddress, err)
+	}
+	return addr
 }
 
 func (c *ipamConfig) Enabled() bool {
@@ -147,6 +156,7 @@ func main() {
 		noDiscovery        bool
 		httpAddr           string
 		statusAddr         string
+		metricsAddr        string
 		ipamConfig         ipamConfig
 		dockerAPI          string
 		peers              []string
@@ -178,12 +188,13 @@ func main() {
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	mflag.BoolVar(&pktdebug, []string{"-pkt-debug"}, false, "enable per-packet debug logging")
 	mflag.StringVar(&prof, []string{"-profile"}, "", "enable profiling and write profiles to given path")
-	mflag.IntVar(&config.ConnLimit, []string{"-conn-limit"}, 30, "connection limit (0 for unlimited)")
+	mflag.IntVar(&config.ConnLimit, []string{"-conn-limit"}, 100, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"-bufsz"}, 8, "capture buffer size in MB")
 	mflag.IntVar(&bridgeConfig.MTU, []string{"-mtu"}, 0, "MTU size")
 	mflag.StringVar(&httpAddr, []string{"-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&statusAddr, []string{"-status-addr"}, "", "address to bind status+metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&metricsAddr, []string{"-metrics-addr"}, "", "address to bind metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
 	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
@@ -193,10 +204,10 @@ func main() {
 	mflag.StringVar(&dnsConfig.ListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
 	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
-	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
 	mflag.StringVar(&bridgeConfig.DatapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.BoolVar(&bridgeConfig.NoFastdp, []string{"-no-fastdp"}, false, "Disable Fast Datapath")
+	mflag.BoolVar(&bridgeConfig.NoBridgedFastdp, []string{"-no-bridged-fastdp"}, false, "Disable Bridged Fast Datapath")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
 	mflag.StringVar(&procPath, []string{"-proc-path"}, "/proc", "path to reach host /proc filesystem")
@@ -211,6 +222,7 @@ func main() {
 	mflag.BoolVar(&pluginConfig.EnableV2Multicast, []string{"-plugin-v2-multicast"}, false, "enable multicast for Docker plugin (v2)")
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
+	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to containers running on this node")
 
 	proxyConfig := newProxyConfig()
 
@@ -263,6 +275,8 @@ func main() {
 	var proxy *weaveproxy.Proxy
 	var err error
 	if proxyConfig.Enabled {
+		proxyConfig.DNSListenAddress = dnsConfig.addressOnly()
+		proxyConfig.DNSDomain = dnsConfig.Domain
 		if noDNS {
 			proxyConfig.WithoutDNS = true
 		}
@@ -293,7 +307,8 @@ func main() {
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
-	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log)
+	ips := ipset.New(common.LogLogger(), 0)
+	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
 	Log.Println("Bridge type is", bridgeType)
 
@@ -323,6 +338,9 @@ func main() {
 	}
 	if bridgeConfig.AWSVPC && !ipamConfig.Enabled() {
 		Log.Fatalf("--awsvpc mode requires IPAM enabled")
+	}
+	if bridgeConfig.AWSVPC && bridgeConfig.NoMasqLocal {
+		Log.Fatalf("--awsvpc mode is not compatible with the --no-masq-local option")
 	}
 
 	db, err := db.NewBoltDB(dbPrefix)
@@ -383,17 +401,19 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
-		trackerName   string
 	)
 	if ipamConfig.Enabled() {
 		var t tracker.LocalRangeTracker
 		if bridgeConfig.AWSVPC {
-			Log.Infoln("Creating AWSVPC LocalRangeTracker")
 			t, err = tracker.NewAWSVPCTracker(bridgeConfig.WeaveBridgeName)
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
-			trackerName = "awsvpc"
+		} else if bridgeConfig.NoMasqLocal {
+			t = weavenet.NewNoMasqLocalTracker(ips)
+		}
+		if t != nil {
+			Log.Infof("Using %q LocalRangeTracker", t)
 		}
 
 		preClaims, err := findExistingAddresses(dockerCli, bridgeConfig.WeaveBridgeName)
@@ -441,7 +461,7 @@ func main() {
 	if httpAddr != "" {
 		muxRouter := mux.NewRouter()
 		if allocator != nil {
-			allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
+			allocator.HandleHTTP(muxRouter, defaultSubnet, dockerCli)
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)
@@ -464,8 +484,15 @@ func main() {
 		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)
-		Log.Println("Listening for metrics requests on", statusAddr)
+		Log.Println("Listening for status+metrics requests on", statusAddr)
 		go listenAndServeHTTP(statusAddr, statusMux)
+	}
+
+	if metricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", metricsHandler(router, allocator, ns, dnsserver))
+		Log.Println("Listening for metrics requests on", metricsAddr)
+		go listenAndServeHTTP(metricsAddr, metricsMux)
 	}
 
 	if plugin != nil {
@@ -635,17 +662,13 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	gossip, err := router.NewGossip("nameserver", ns)
 	checkFatal(err)
 	ns.SetGossip(gossip)
-	upstream := nameserver.NewUpstream(config.ResolvConf, config.EffectiveListenAddress)
+	upstream := nameserver.NewUpstream(config.ResolvConf, config.addressOnly())
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
 		upstream, uint32(config.TTL), config.ClientTimeout)
 	if err != nil {
 		Log.Fatal("Unable to start dns server: ", err)
 	}
-	listenAddr := config.ListenAddress
-	if config.EffectiveListenAddress != "" {
-		listenAddr = config.EffectiveListenAddress
-	}
-	Log.Println("Listening for DNS queries on", listenAddr)
+	Log.Println("Listening for DNS queries on", config.ListenAddress)
 	return ns, dnsserver
 }
 

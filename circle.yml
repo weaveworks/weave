@@ -44,7 +44,7 @@ test:
         parallel: true
     - "$SRCDIR/bin/circle-test-smoke":
         parallel: true
-        timeout: 300
+        timeout: 360
   post:
     - "$SRCDIR/bin/circle-test-teardown":
         parallel: true

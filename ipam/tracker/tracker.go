@@ -17,4 +17,7 @@ type LocalRangeTracker interface {
 	// The local parameter indicates whether the ranges belong to the peer
 	// by which the method is called.
 	HandleUpdate(prevRanges, currRanges []address.Range, local bool) error
+
+	// String returns the tracker name
+	String() string
 }

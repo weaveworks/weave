@@ -61,6 +61,8 @@ type Config struct {
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
 	WithoutDNS          bool
+	DNSListenAddress    string
+	DNSDomain           string
 	NoMulticastRoute    bool
 	KeepTXOn            bool
 	DockerBridge        string
@@ -78,7 +80,6 @@ type Proxy struct {
 	Config
 	client                 *weavedocker.Client
 	weave                  *weaveapi.Client
-	dockerBridgeIP         string
 	hostnameMatchRegexp    *regexp.Regexp
 	weaveWaitVolume        string
 	weaveWaitNoopVolume    string
@@ -157,15 +158,6 @@ func NewProxy(c Config) (*Proxy, error) {
 	}
 
 	Log.Info(p.client.Info())
-
-	if !p.WithoutDNS {
-		ip, err := weavenet.FindBridgeIP(c.DockerBridge, nil)
-		if err != nil {
-			return nil, err
-		}
-		p.dockerBridgeIP = ip.String()
-		Log.Infof("Using docker bridge IP for DNS: %v", p.dockerBridgeIP)
-	}
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
 	if err != nil {
@@ -595,7 +587,7 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 	if err != nil {
 		return err
 	}
-	hostConfig["Dns"] = append(dns, proxy.dockerBridgeIP)
+	hostConfig["Dns"] = append(dns, proxy.DNSListenAddress)
 
 	dnsSearch, err := hostConfig.StringArray("DnsSearch")
 	if err != nil {
@@ -610,14 +602,6 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 	}
 
 	return nil
-}
-
-func (proxy *Proxy) getDNSDomain() string {
-	if proxy.WithoutDNS {
-		return ""
-	}
-	domain, _ := proxy.weave.DNSDomain()
-	return domain
 }
 
 func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {

@@ -101,6 +101,7 @@ endif
 # The name of the user that this Makefile should produce image artifacts for. Can/should be overridden
 DOCKERHUB_USER?=weaveworks
 # The default version that's chosen when pushing the images. Can/should be overridden
+GIT_REVISION=$(shell git rev-parse HEAD)
 WEAVE_VERSION?=git-$(shell git rev-parse --short=12 HEAD)
 # Docker Store does not allow the "latest" tag.
 NET_PLUGIN_LATEST=latest_release
@@ -108,20 +109,20 @@ NET_PLUGIN_LATEST=latest_release
 # Paths to all relevant binaries that should be compiled
 WEAVER_EXE=prog/weaver/weaver
 SIGPROXY_EXE=prog/sigproxy/sigproxy
-KUBEPEERS_EXE=prog/kube-peers/kube-peers
+KUBEUTILS_EXE=prog/kube-utils/kube-utils
 WEAVENPC_EXE=prog/weave-npc/weave-npc
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
 RUNNER_EXE=tools/runner/runner
-MANIFEST_TOOL_DIR=vendor/github.com/estesp/manifest-tool
-MANIFEST_TOOL_EXE=$(MANIFEST_TOOL_DIR)/manifest-tool
+# manifest-tool needs registry credentials; we assume here that the active user has logged in
+MANIFEST_TOOL_CMD=docker run --rm -v $(HOME)/.docker:/.docker weshigbee/manifest-tool --docker-cfg=/.docker
 TEST_TLS_EXE=test/tls/tls
 NETWORKTESTER_EXE=test/images/network-tester/webserver
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE) $(NETWORKTESTER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(NETWORKTESTER_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
@@ -179,11 +180,10 @@ $(WEAVER_EXE): api/*.go plugin/*.go plugin/*/*
 $(WEAVER_EXE):  proxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go plugin/net/*.go plugin/ipam/*.go db/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(KUBEPEERS_EXE): prog/kube-peers/*.go
+$(KUBEUTILS_EXE): prog/kube-utils/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(RUNNER_EXE): tools/runner/*.go
-$(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
@@ -196,9 +196,6 @@ ifeq ($(BUILD_IN_CONTAINER),true)
 # This make target compiles all binaries inside of the weaveworks/build container
 # It bind-mounts the source into the container and passes all important variables
 exes $(EXES) tests lint: $(BUILD_UPTODATE)
-	git submodule update --init
-# Containernetworking has another copy of vishvananda/netlink which leads to duplicate definitions
-	-@rm -r vendor/github.com/containernetworking/cni/vendor
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
@@ -220,7 +217,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
+$(WEAVEUTIL_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
@@ -234,7 +231,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE) $(MANIFEST_TOOL_EXE):
+$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
@@ -274,7 +271,7 @@ endif
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) weave $(WEAVEUTIL_EXE)
 	cp $(WEAVEUTIL_EXE) prog/weaver/weaveutil
 	cp weave prog/weaver/weave
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(SIGPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVER_UPTODATE)
@@ -282,7 +279,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
 # Builds Docker plugin.
@@ -302,17 +299,17 @@ $(PLUGIN_UPTODATE): prog/net-plugin/launch.sh prog/net-plugin/config.json $(WEAV
 	$(SUDO) docker plugin create $(PLUGIN_IMAGE):$(NET_PLUGIN_LATEST) prog/net-plugin
 	touch $@
 
-$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
-	cp $(KUBEPEERS_EXE) prog/weave-kube/
-	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
+$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEUTILS_EXE) $(WEAVER_UPTODATE)
+	cp $(KUBEUTILS_EXE) prog/weave-kube/
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
 $(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) $(WEAVENPC_EXE) prog/weave-npc/ulogd.conf
-	$(SUDO) docker build -f prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVENPC_IMAGE) prog/weave-npc
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -f prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVENPC_IMAGE) prog/weave-npc
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
-	$(SUDO) docker build -t $(WEAVEDB_IMAGE) prog/weavedb
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -t $(WEAVEDB_IMAGE) prog/weavedb
 	touch $@
 
 $(NETWORKTESTER_UPTODATE): test/images/network-tester/Dockerfile $(NETWORKTESTER_EXE)
@@ -322,7 +319,7 @@ $(NETWORKTESTER_UPTODATE): test/images/network-tester/Dockerfile $(NETWORKTESTER
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
-tools/.git $(MANIFEST_TOOL_DIR)/.git:
+tools/.git:
 	git submodule update --init
 
 # CODE FOR PUBLISHING THE IMAGES
@@ -378,13 +375,13 @@ endif
 
 # This target pushes a manifest list; it takes one parameter, the image name.
 # The variable UPDATE_LATEST controls whether it updates the versioned tag and/or the latest tag
-$(PUSH_ML): push_ml_%: $(MANIFEST_TOOL_EXE)
+$(PUSH_ML): push_ml_%:
 ifneq ($(UPDATE_LATEST),latest-only)
-	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(MANIFEST_TOOL_CMD) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 endif
 ifneq ($(UPDATE_LATEST),false)
 # Push the manifest list to :latest as well
-	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
+	$(MANIFEST_TOOL_CMD) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
 endif
 
 clean-work-dir:
@@ -398,7 +395,7 @@ clean-bin:
 
 clean: clean-bin clean-work-dir
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
-	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE) $(MANIFEST_TOOL_EXE)
+	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
 
 build:
 	$(SUDO) go clean -i net

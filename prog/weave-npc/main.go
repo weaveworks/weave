@@ -18,8 +18,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
-	"github.com/weaveworks/weave/npc/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
 	"github.com/weaveworks/weave/npc/ulogd"
 )
@@ -31,6 +31,7 @@ var (
 	allowMcast  bool
 	nodeName    string
 	legacy      bool
+	maxList     int
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -56,7 +57,7 @@ func resetIPTables(ipt *iptables.IPTables) error {
 }
 
 func resetIPSets(ips ipset.Interface) error {
-	// Remove ipsets prefixed `weave-` only
+	// Remove ipsets prefixed `weave-` only.
 
 	sets, err := ips.List(npc.IpsetNamePrefix)
 	if err != nil {
@@ -152,7 +153,7 @@ func root(cmd *cobra.Command, args []string) {
 	ipt, err := iptables.New()
 	handleError(err)
 
-	ips := ipset.New(common.LogLogger())
+	ips := ipset.New(common.LogLogger(), maxList)
 
 	handleError(resetIPTables(ipt))
 	handleError(resetIPSets(ips))
@@ -245,6 +246,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().BoolVar(&legacy, "use-legacy-netpol", false, "use legacy network policies (pre k8s 1.7 vsn)")
+	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
 
 	handleError(rootCmd.Execute())
 }

@@ -46,8 +46,8 @@ prog/weavewait/weavewait_noop
 prog/weavewait/weavewait_nomcast
 prog/weaveutil/weaveutil
 prog/*/Dockerfile.weaveworks
-prog/kube-peers/kube-peers
-prog/weave-kube/kube-peers
+prog/kube-utils/kube-utils
+prog/weave-kube/kube-utils
 prog/weave-npc/weave-npc
 prog/plugin/plugin
 testing/cover/cover
@@ -68,6 +68,7 @@ test/tls/tls
 test/tls/*.pem
 test/coverage
 test/coverage.*
+test/images/network-tester/webserver
 *qemu-*-static
 terraform.tfstate
 terraform.tfstate.backup

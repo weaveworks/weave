@@ -1,3 +1,87 @@
+## Release 2.3.0
+
+### Security fixes
+
+* By default, do not expose Weave "/status" and "/report" to all (0.0.0.0) when
+  running on Kubernetes #3271
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100) when
+running on Kubernetes, so that more peers could directly connect #3265
+
+## Build and test
+
+* Build Weave Net with Go 1.10.1 #3273
+* Run integration tests against Kubernetes 1.10.0 #3266
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/70?closed=1)
+
+## Release 2.2.1
+
+### Bug fixes
+
+* Fix a bug in weave-npc which would allow ingress traffic to Kubernetes Pods selected
+  by a NetworkPolicy in which source and destination selectors were the same #3222,#3237
+* Fix a bug in weave-npc which would crash if a previously deleted Kubernetes Namespace
+  has been created again #3247,#3250
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100), so that
+  more peers could directly connect #3234
+* When doing a rolling update of Weave Net on Kubernetes, allow each node five seconds
+  to initialize before rolling next Weave Net Pod, so that issues at startup will halt
+  the rollout and not spread across the whole cluster #3235
+* Install common CA certificates from Alpine Linux package instead of copying
+  them manually #3236
+
+### External contributors
+
+Thanks to the following contributors:
+
+* @alok87
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/71?closed=1)
+
+## Release 2.2.0
+
+This release improves the way Weave Net configures Linux network
+devices and network filter rules, so that it is more robust in the face
+of unexpected changes in its environment. #3204,#3224
+
+As a consequence of these changes, the `weave attach` command will now
+fail unless the Weave Net daemon is up and running - previously it was
+possible to run independently as long as you managed all IP addresses
+yourself.
+
+## Other improvements
+
+* Update library miekg/dns for CVE-2017-15133 (details under embargo) #3223,#3227
+* Reduce the volume of logging from weave-npc #3183
+* Add ability to set log level for Docker "v2" plugin, and change
+  default log level from DEBUG to INFO #3197
+* Downgrade log messages about Discovery and Expiration to DEBUG level #3202,#3203
+* Use command-line parameter for WeaveDNS address in Docker proxy #3196
+
+## Bug fixes
+
+* Ensure that rules to block traffic for NetworkPolicy are placed
+  ahead of rules that Kubernetes has added to allow other traffic #3209,#3210
+
+## Build and test
+
+* Update CI tests to use Kubernetes 1.9.2 #3229
+* Remove "daily update" from test VMs that only run for a few minutes #3224
+
+## External Contributors
+
+Thanks to the following contributors:
+@vetal4444
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/67?closed=1)
+
+
 ## Release 2.1.3
 
 This release fixes a race-condition in the IP reclaim code for weave-kube

@@ -405,27 +405,6 @@ detect_bridge_type() {
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
-try_create_bridge() {
-    # Pass /dev/null because we do not have access to the weavedb files when this runs; BoltDB
-    # cannot open the file anyway if weaver is running, which is likely for attach|expose|hide.
-    MAC=$(util_op unique-id "/dev/null" "$HOST_ROOT")
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
-    # Set some variables that are expected by code that comes later
-    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
-    MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
-}
-
-create_bridge() {
-    validate_bridge_type
-    if ! try_create_bridge "$@" ; then
-        echo "Creating bridge '$BRIDGE' failed" >&2
-        # reset to original value so we destroy both kinds
-        DATAPATH=datapath
-        destroy_bridge
-        exit 1
-    fi
-}
-
 validate_bridge_type() {
     detect_bridge_type || return 0
 
@@ -526,6 +505,8 @@ destroy_bridge() {
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+
+    ipset destroy weaver-no-masq-local >/dev/null 2>&1 || true
 }
 
 add_iface_fastdp() {
@@ -557,6 +538,7 @@ router_bridge_opts() {
     echo --docker-bridge "$DOCKER_BRIDGE" --weave-bridge "$BRIDGE" --datapath "$DATAPATH"
     [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
     [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
+    [ -z $WEAVE_NO_BRIDGED_FASTDP ] || echo --no-bridged-fastdp
 }
 
 ######################################################################
@@ -918,9 +900,7 @@ check_overlap() {
 }
 
 detect_awsvpc() {
-    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
-    # steps, because "attach" should work without the weave router running.
-    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+    [ "$(call_weave GET /ipinfo/tracker 2>/dev/null)" != "awsvpc" ] || AWSVPC=1
 }
 
 # Call IPAM as necessary to lookup or allocate addresses
@@ -1256,7 +1236,6 @@ launch() {
         --host-root=/host \
         $(router_bridge_opts) \
         --ipalloc-range "$IPRANGE" \
-        --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         --dns-listen-address $DOCKER_BRIDGE_IP:53 \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
@@ -1436,7 +1415,6 @@ case "$COMMAND" in
         done
         [ $# -eq 1 ] || usage
         CONTAINER=$(util_op container-id $1)
-        create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         if [ -n "$REWRITE_HOSTS" ] ; then
             # rewrite /etc/hosts, unlinking the file (so Docker does
@@ -1444,7 +1422,7 @@ case "$COMMAND" in
             util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" $DNS_EXTRA_HOSTS
         fi
         [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
-        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU $ALL_CIDRS >/dev/null
+        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $ALL_CIDRS >/dev/null
         [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
@@ -1494,7 +1472,6 @@ case "$COMMAND" in
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
-        create_bridge
         expose_ip
         show_addrs $ALL_CIDRS
         ;;
@@ -1502,7 +1479,6 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         ipam_cidrs lookup weave:expose $CIDR_ARGS
-        create_bridge
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR

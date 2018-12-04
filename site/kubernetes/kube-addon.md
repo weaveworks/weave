@@ -11,7 +11,9 @@ The following topics are discussed:
  * [Upgrading the Daemon Sets](#daemon-sets)
  * [CPU and Memory Requirements](#resources)
  * [Pod Eviction](#eviction)
-* [Network Policy Controller](#npc)
+* [Features](#features)
+ * [Pod Network](#pod-network)
+ * [Network Policy](#npc)
 * [Troubleshooting](#troubleshooting)
  * [Troubleshooting Blocked Connections](#blocked-connections)
  * [Things to watch out for](#key-points)
@@ -19,6 +21,10 @@ The following topics are discussed:
 
 
 ## <a name="install"></a> Installation
+
+*Before installing Weave Net, you should make sure the following ports are not
+blocked by your firewall: TCP 6783 and UDP 6783/6784.
+For more details, see the [FAQ](/site/faq.md#ports).*
 
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
@@ -147,14 +153,31 @@ mypod-09vkd         0/1       Evicted   0          1h        <none>      node-1
 If you see this in your cluster, consider some of the above steps to
 reduce disruption.
 
-## <a name="npc"></a>Network Policy Controller
+## <a name="features"></a>Features
 
-The addon also supports the [Kubernetes policy
-API](http://kubernetes.io/docs/user-guide/networkpolicies/) so that
-you can securely isolate pods from each other based on namespaces and
+### <a name="pod-network"></a>Pod Network
+
+Weave Net provides a network to connect all pods together,
+implementing the [Kubernetes
+model](https://kubernetes.io/docs/concepts/cluster-administration/networking/#kubernetes-model).
+
+Kubernetes uses the _Container Network Interface_
+([CNI](https://github.com/containernetworking/cni)) to join pods onto Weave Net.
+
+Kubernetes implements many network features itself on top of the pod
+network.  This includes
+[Services](https://kubernetes.io/docs/concepts/services-networking/service/),
+[Service Discovery via DNS](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+and [Ingress into the cluster](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+WeaveDNS is disabled when using the Kubernetes addon.
+
+### <a name="npc"></a>Network Policy
+
+[Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) let
+you securely isolate pods from each other based on namespaces and
 labels. For more information on configuring network policies in
 Kubernetes see the
-[walkthrough](http://kubernetes.io/docs/getting-started-guides/network-policy/walkthrough/)
+[walkthrough](https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/)
 and the [NetworkPolicy API object
 definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpolicy-v1-networking)
 
@@ -166,6 +189,11 @@ definition](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpoli
   argument to `weave-npc` in the YAML configuration.
 
 ## <a name="troubleshooting"></a> Troubleshooting
+
+Many Kubernetes network issues occur at a higher level than Weave Net.
+The [Kubernetes Service Debugging Guide]
+(https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
+has a detailed step-by-step guide.
 
 The status of Weave Net can be checked by running its CLI commands. This can be done in various ways:
 
@@ -279,6 +307,11 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
   pods can talk.
 - If you do set the `--cluster-cidr` option on kube-proxy, make sure
   it matches the `IPALLOC_RANGE` given to Weave Net (see below)
+- IP forwarding must be enabled on each node, in order for pods to
+  access Kubernetes services or other IP addresses on another
+  network. Check this with `sysctl net.ipv4.ip_forward`; the result
+  should be `1`. (Be aware that there can be security implications of
+  enabling IP forwarding)
 
 ## <a name="configuration-options"></a> Changing Configuration Options
 
@@ -287,11 +320,11 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 You can customise the YAML you get from `cloud.weave.works` by passing some of Weave Net's options, arguments and environment variables as query parameters:
 
   - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time from `cloud.weave.works`.
-  - `password-secret`: name of the Kubernetes secret containing your password.
+  - `password-secret`: name of the Kubernetes secret containing your password.  *N.B*: The Kubernetes secret name must correspond to a name of a file containing your password.
      Example:
 
-        $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd.txt
-        $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd.txt
+        $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd
+        $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd
         $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
 
   - `known-peers`: comma-separated list of hosts. Default: empty.
@@ -299,12 +332,14 @@ You can customise the YAML you get from `cloud.weave.works` by passing some of W
   - `disable-npc`: boolean (`true|false`). Default: `false`.
   - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`.
   - `seLinuxOptions.NAME=VALUE`: add SELinux option `NAME` and set it to `VALUE`, e.g. `seLinuxOptions.type=spc_t`
-  - `use-legacy-netpol`: use [legacy NetworkPolicy semantics](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#networkpolicy-v1-networking), boolean (`true|false`). Default: `true` for Kubernetes version <= 1.6, `false` for > 1.6.
+  - `use-legacy-netpol`: use [legacy NetworkPolicy semantics](https://v1-6.docs.kubernetes.io/docs/api-reference/v1.6/#networkpolicy-v1beta1-extensions), boolean (`true|false`). Default: `true` for Kubernetes version <= 1.6, `false` for > 1.6.
 
 The list of variables you can set is:
 
 * `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
   versions (default is blank, i.e. check is enabled)
+* `CONN_LIMIT` - soft limit on the number of connections between
+  peers. Defaults to 30.
 * `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
   the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
   kernel is one of those that can panic if hairpin is enabled, then you can disable it
@@ -320,11 +355,18 @@ The list of variables you can set is:
 * `WEAVE_EXPOSE_IP` - set the IP address used as a gateway from the
   Weave network to the host network - this is useful if you are
   configuring the addon as a static pod.
+* `WEAVE_METRICS_ADDR` - address and port that the Weave Net
+  daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
+* `WEAVE_STATUS_ADDR` - address and port that the Weave Net
+  daemon will serve status requests on (defaults to disabled)
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
   frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
   details.
+* `NO_MASQ_LOCAL` - set to 1 to preserve the client source IP address when
+  accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
+  The feature works only with Weave IPAM (default).
 
 Example:
 ```

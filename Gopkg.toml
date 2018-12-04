@@ -1,0 +1,29 @@
+# Pin to version before sctp was added, because latest libnetwork is
+# incompatible with latest sctp
+[[constraint]]
+  name = "github.com/docker/libnetwork"
+  revision = "119badbd"
+
+# Encourage dep not to use the docker-1.9 version
+[[constraint]]
+  name = "github.com/fsouza/go-dockerclient"
+  version = "1"
+
+# Use recent version: last tagged version is years old
+[[constraint]]
+  branch = "master"
+  name = "github.com/prometheus/client_golang"
+
+# For compatibility with fsouza/go-dockerclient
+[[constraint]]
+  branch = "master"
+  name = "github.com/docker/docker"
+
+# Most recent release tag is incompatible with docker/docker; see https://github.com/docker/distribution/issues/2503
+[[override]]
+  branch = "master"
+  name = "github.com/docker/distribution"
+
+[prune]
+  go-tests = true
+  unused-packages = true

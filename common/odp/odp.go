@@ -75,6 +75,14 @@ func DeleteDatapath(dpname string) error {
 }
 
 func AddDatapathInterface(dpname string, ifname string) error {
+	return addDatapathInterface(dpname, ifname, false)
+}
+
+func AddDatapathInterfaceIfNotExist(dpname string, ifname string) error {
+	return addDatapathInterface(dpname, ifname, true)
+}
+
+func addDatapathInterface(dpname, ifname string, ignoreIfExist bool) error {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return err
@@ -87,5 +95,9 @@ func AddDatapathInterface(dpname string, ifname string) error {
 	}
 
 	_, err = dp.CreateVport(odp.NewNetdevVportSpec(ifname))
+	if ignoreIfExist && err == odp.NetlinkError(syscall.EEXIST) {
+		return nil
+	}
+
 	return err
 }

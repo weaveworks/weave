@@ -40,6 +40,18 @@ A simple way to accomplish this would be to run Weave on the host and then run, 
 Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/tasks/manage/service-management.md#exporting).
 
 
+<a name="duplicate-peer"></a>
+**Q: Why am I seeing "peer names collision" and failed connections?**
+
+This sometimes happens when machines are cloned; we require each
+machine in your cluster to have a unique identity.
+
+For more information see [Peer Names](/site/operational-guide/concepts.md#peer-name).
+
+Depending on your Linux distribution you may need to [set up
+machine-id](https://www.freedesktop.org/software/systemd/man/machine-id.html)
+or [generate a dbus id](https://dbus.freedesktop.org/doc/dbus-uuidgen.1.html).
+
 <a name="duplicate-ip"></a>
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
 
@@ -92,7 +104,8 @@ Yes, of course!  Weave allows you to run isolated networks and still allow open 
 You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
 which are Weave’s control and data ports.
 
-The daemon also uses TCP port 6782 for [metrics](/site/tasks/manage/metrics.md), but
+The daemon also uses TCP 6781/6782 for
+[metrics](/site/tasks/manage/metrics.md#metrics-endpoint-addresses), but
 you would only need to open up this port if you wish to collect metrics
 from another host.
 

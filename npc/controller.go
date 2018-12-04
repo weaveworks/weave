@@ -9,7 +9,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
 )
 

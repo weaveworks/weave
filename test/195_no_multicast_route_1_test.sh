@@ -21,7 +21,7 @@ start_container_local_plugin $HOST1 --name=c3
 
 assert "show_multicast_route_on $HOST1 c1"
 assert "show_multicast_route_on $HOST1 c2"
-assert "show_multicast_route_on $HOST1 c3" "224.0.0.0/4 dev ethwe0 "
+assert "show_multicast_route_on $HOST1 c3" "224.0.0.0/4 dev ethwe0 scope link "
 
 # Now try via docker network options
 # using ssh rather than docker -H because CircleCI docker client is older
@@ -30,7 +30,7 @@ $SSH $HOST1 docker run --net=testmcastfalse --name c4 -di $SMALL_IMAGE /bin/sh
 assert "show_multicast_route_on $HOST1 c4"
 $SSH $HOST1 docker network create --driver weavemesh --ipam-driver weavemesh --opt works.weave.multicast testmcasttrue
 $SSH $HOST1 docker run --net=testmcasttrue --name c5 -di $SMALL_IMAGE /bin/sh
-assert "show_multicast_route_on $HOST1 c5" "224.0.0.0/4 dev ethwe0 "
+assert "show_multicast_route_on $HOST1 c5" "224.0.0.0/4 dev ethwe0 scope link "
 
 # Ensure current proxy options are obeyed on container start
 docker_on $HOST1 stop -t 1 c2
@@ -39,7 +39,7 @@ weave_on $HOST1 launch
 
 proxy docker_on $HOST1 start c2
 
-assert "show_multicast_route_on $HOST1 c2" "224.0.0.0/4 dev ethwe "
+assert "show_multicast_route_on $HOST1 c2" "224.0.0.0/4 dev ethwe scope link "
 
 docker_on $HOST1 rm -f c3 c4 c5
 $SSH $HOST1 docker network rm testmcasttrue testmcastfalse

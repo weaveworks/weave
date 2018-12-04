@@ -8,7 +8,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 )
 
 // analysePolicyLegacy is used to analyse extensions/v1beta1/NetworkPolicy (legacy) and
@@ -108,7 +108,12 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podSelectors[dstSelector.key] = dstSelector
+
+	// To prevent dstSelector being overwritten by a subsequent selector with
+	// the same key, addIfNotExist MUST be used when adding to podSelectors.
+	// Otherwise, dstSelector' "dst" property might be lost resulting in
+	// an invalid content of the "default-allow" ipset.
+	addIfNotExist(dstSelector, podSelectors)
 
 	// If ingress is empty then this NetworkPolicy does not allow any traffic
 	if policy.Spec.Ingress == nil || len(policy.Spec.Ingress) == 0 {
@@ -142,7 +147,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 					if err != nil {
 						return nil, nil, nil, err
 					}
-					podSelectors[srcSelector.key] = srcSelector
+					addIfNotExist(srcSelector, podSelectors)
 
 				} else if peer.NamespaceSelector != nil {
 					srcSelector, err = newSelectorSpec(peer.NamespaceSelector, false, "", ipset.ListSet)
@@ -166,6 +171,12 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	}
 
 	return rules, nsSelectors, podSelectors, nil
+}
+
+func addIfNotExist(s *selectorSpec, ss map[string]*selectorSpec) {
+	if _, ok := ss[s.key]; !ok {
+		ss[s.key] = s
+	}
 }
 
 func withNormalisedProtoAndPortLegacy(npps []extnapi.NetworkPolicyPort, f func(proto, port string)) {

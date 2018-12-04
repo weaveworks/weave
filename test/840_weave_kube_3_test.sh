@@ -5,6 +5,10 @@
 tear_down_kubeadm() {
     for host in $HOSTS; do
         run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+        # Remove the rule to ensure that api-server is not accessible while kube-proxy
+        # is not ready. Otherwise, we have a race between "-j KUBE-FORWARD" and "-j WEAVE-NPC"
+        # which makes the NodePort isolation test case to fail.
+        run_on $host "sudo iptables -t nat -D PREROUTING -m comment --comment \"kubernetes service portals\" -j KUBE-SERVICES" || true
     done
 }
 
@@ -18,6 +22,7 @@ NUM_HOSTS=$(howmany $HOSTS)
 SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 KUBECTL="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"
 KUBE_PORT=6443
+WEAVE_NETWORK=10.32.0.0/12
 IMAGE=weaveworks/network-tester:latest
 DOMAIN=nettest.default.svc.cluster.local.
 
@@ -29,25 +34,24 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 
 # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
 k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
-k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --kubernetes-version=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
     fi
 done
 
 if [ -n "$COVERAGE" ]; then
-    COVERAGE_ARGS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
 else
-    COVERAGE_ARGS="env:"
+    WEAVE_ENV_VARS="env:"
 fi
 
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
     -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
@@ -59,7 +63,7 @@ check_connections() {
 
 assert_raises 'wait_for_x check_connections "connections to establish"'
 
-# Check we can ping between the Weave bridg IPs on each host
+# Check we can ping between the Weave bridge IPs on each host
 HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
 HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
 HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
@@ -134,6 +138,22 @@ spec:
     run: nettest
 EOF
 
+# And a NodePort service so we can test virtual IP access
+run_on $HOST1 "$KUBECTL create -f -" <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: netvirt
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 31138
+  selector:
+    run: nettest
+EOF
+
 podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index .items 0).metadata.name}}'")
 
 check_all_pods_communicate() {
@@ -162,13 +182,22 @@ assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 ht
 # Restart weave-net with npc in non-legacy mode
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# check access via virtual IP
+VIRTUAL_IP=$($SSH $HOST1 $KUBECTL get service netvirt -o template --template={{.spec.clusterIP}})
+assert_raises   "$SSH $HOST1 $KUBECTL exec     $podName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+
+# host should not be able to reach pods via service virtual IP or NodePort
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
 
 # allow access for nettest-deny
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
@@ -196,12 +225,39 @@ run_on $HOST1 "$KUBECTL delete netpol allow-nettest-deny"
 # nettest-deny should still not be able to reach nettest pods
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-# allow access for all
+# Create many namespaces to stress namespaceSelector
+for n in 1 2 3 4 5 6 7 8 9 10; do
+    run_on $HOST1 "$KUBECTL create namespace namespace${n}"
+done
+
+# allow access from any namespace
 run_on $HOST1 "$KUBECTL apply -f -" <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-nettest-deny
+  name: allow-any-namespace
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+      - namespaceSelector: {}
+EOF
+
+# Should be able to access from the "deny" pod now
+assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+
+# host should still not be able to reach pods via service virtual IP or NodePort
+# because host is not in a namespace
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "! $SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+# allow access from anywhere
+run_on $HOST1 "$KUBECTL apply -f -" <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-anywhere
   namespace: default
 spec:
   podSelector: {}
@@ -209,7 +265,29 @@ spec:
     - {}
 EOF
 
-assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
+# Virtual IP and NodePort should now work
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
+assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$HOST2:31138/status >/dev/null"
+
+# Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
+# the client source IP addr
+
+CLIENT_IP_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
+
+WEAVE_ENV_VARS="${WEAVE_ENV_VARS}\\n                - name: NO_MASQ_LOCAL\\n                  value: \"1\""
+$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
+sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
+    -e "s%env:%$WEAVE_ENV_VARS%" \
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+
+sleep 5
+
+run_on $HOST1 "$KUBECTL patch svc netvirt -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
+
+CLIENT_IP_NO_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
+
+assert_raises "[ $CLIENT_IP_NO_MASQ != $CLIENT_IP_MASQ ]"
+assert_raises "[ $HOST1IP == $CLIENT_IP_NO_MASQ ]"
 
 tear_down_kubeadm
 

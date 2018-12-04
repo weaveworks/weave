@@ -74,6 +74,7 @@ type Allocator struct {
 	isKnownPeer       func(mesh.PeerName) bool
 	quorum            func() uint
 	now               func() time.Time
+	tracker           tracker.LocalRangeTracker
 }
 
 // PreClaims are IP addresses discovered before we could initialize IPAM
@@ -130,6 +131,7 @@ func NewAllocator(config Config) *Allocator {
 		quorum:      config.Quorum,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
+		tracker:     config.Tracker,
 	}
 
 	alloc.pendingClaims = make([]operation, len(config.PreClaims))
