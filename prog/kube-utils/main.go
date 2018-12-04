@@ -16,14 +16,15 @@ import (
 	"time"
 
 	"github.com/vishvananda/netlink"
-	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
 	"golang.org/x/sys/unix"
 	api "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	weaveapi "github.com/weaveworks/weave/api"
+	"github.com/weaveworks/weave/common"
 )
 
 type nodeInfo struct {
