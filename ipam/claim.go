@@ -92,6 +92,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 				c.sendResult(nil)
 			} else { // just tell the user they can't do this.
 				c.deniedBy(alloc, owner)
+				return true
 			}
 		}
 		return false
