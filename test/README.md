@@ -13,7 +13,7 @@ it is recommended to run the tests from the build VM and not the host.
 
 > **NOTE WELL** The number of hosts required by a test must be specified in the test name. For example, `000_some_test.sh` will use one host, while `001_some_other_3_test.sh` will use three hosts. The number of hosts must be the last part of the test name before the `_test.sh` prefix. See `/tools/runner/runner.go` for details
 
-## Running tests
+## Running tests locally using VMs
 
 **TL;DR**: You can run the steps 2. to 7. below with one command: 
 
@@ -23,46 +23,62 @@ it is recommended to run the tests from the build VM and not the host.
 
   1. Start the build virtual machine (see above article for more details):
 
+        ```
         vagrant up
+        ```
 
   2. Start the three testing VMs:
 
+        ```
         cd test
         vagrant up
+        ```
 
   3. SSH into the build VM and go to Weave Net's sources:
 
+        ```
         cd ..
         vagrant ssh
         # you are now on the build VM:
         cd ~/weave 
+        ```
 
   4. Compile all code and dependencies:
 
+        ```
         make
         make testrunner
         cd test
+        ```
 
   5. Upload the weave images from where the `Makefile` puts them (`weave.tar.gz`) to 
      the three docker hosts, `docker load` these, and copies the `weave` script over:
 
+        ```
         ./setup.sh
+        ```
 
   6. Run individual tests, e.g.:
 
+        ```
         ./200_dns_test.sh
+        ```
 
      or run all tests (everything named `*_test.sh`):
 
+        ```
         ./run_all.sh
+        ```
 
   7. Stop all VMs:
 
+        ```
         exit
         # you are now on your host machine
         vagrant destroy -f
         cd test
         vagrant destroy -f
+        ```
 
 
 ## Using other VMs
@@ -92,3 +108,65 @@ When a new version of Docker is released, you willneed to update the GCE test im
 To do this, change the Docker version in `run-integration-tests.sh` and push the change.
 Next build in CircleCI will detect that there is no template for this version of Docker and will first create the template before running tests.
 Subsequent builds will then simply re-use the template.
+
+## Running the tests on a cloud provider
+
+Running the tests against a remote provider instead of local vagrant VMs is a little more involved, and reproduces the environment used for CI. It is recommended that you use the build VM to coordinate the build phase. Make sure you have a recent version of [ansible](https://github.com/ansible/ansible) installed, terraform will fail to provision the VMs.
+
+1. Create the build VM in the repository root and log in
+    
+    ```
+    # On your development machine
+    $ vagrant up
+    $ vagrant ssh
+    ```
+
+2. Once in the build vm, install the `gcloud` tools as [per the documentation](https://cloud.google.com/sdk/downloads). You need to do this manually as the circleCI VMs are already provisioned with `gcloud`.
+
+    ```
+    # On the build VM
+    $ curl https://sdk.cloud.google.com | bash
+    $ exec -l $SHELL
+    ```
+
+    You don't need to initialise the `gcloud` tools by running `gcloud init`.
+
+3. Export the secret key needed to decrypt the cloud credentials - This assumes you're using the build tools 
+
+    ```
+    # On the build VM
+    $ export SECRET_KEY="XXXXXXXXXX"
+    ```
+
+4. Navigate to the test directory and provision the VMs
+
+    ```
+    # On the build VM
+    $ cd weave/test
+    /weave/test$ ./run-integration-tests.sh up
+    ```
+5. Run the tests you need
+
+    ```
+    # On the build VM
+    /weave/test$ export TESTS="./090_docker_restart_policy_2_test.sh" 
+    /weave/test$ ./run-integration-tests.sh test
+    ```
+
+6. Don't forget to close down your remote VMs when you're done
+
+    ```
+    # On the build VM
+    /weave/test$ ./run-integration-tests.sh destroy
+    ```
+
+7. And switch off your build VM
+
+    ```
+    # On the build VM
+    /weave/test$ exit
+
+    # On your development machine
+    $ vagrant destroy -f 
+    # or "vagrant suspend" if you want to preserve the machine state
+    ```

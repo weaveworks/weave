@@ -1,0 +1,123 @@
+version: 2
+defaults: &defaults
+  docker:
+    - image: weaveworks/weavebuild:circle20-2e6504d3
+  working_directory: /go/src/github.com/weaveworks/weave
+
+jobs:
+  lint:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - run: make DEBUG=1 BUILD_IN_CONTAINER=false lint
+
+  unit-test:
+    <<: *defaults
+    parallelism: 2
+    steps:
+      - checkout
+      - run: COVERDIR=test/coverage make BUILD_IN_CONTAINER=false tests
+      - persist_to_workspace:
+          root: .
+          paths:
+          - test/coverage
+
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: git submodule update --init
+      - run: make COVERAGE=true BUILD_IN_CONTAINER=false SUDO= exes all
+      - persist_to_workspace:
+          root: .
+          paths:
+          - weave.tar.gz
+          - tools/runner/runner
+          - test/tls/tls
+
+  smoke-tests:
+    machine:
+      image: circleci/classic:201709-01
+    working_directory: /home/circleci/src/github.com/weaveworks/weave
+    environment:
+      SRCDIR: /home/circleci/src/github.com/weaveworks/weave
+      CIRCLE_ARTIFACTS: /tmp/artifacts
+    parallelism: 2
+    steps:
+      - checkout
+      - run: mkdir $CIRCLE_ARTIFACTS
+      - run: git submodule update --init
+      - attach_workspace:
+          at: .
+      # kick off creation of test VMs
+      - run: bin/provision_test_vms.sh
+      # when VMs are ready, copy built software to them
+      - run: bin/circle-test-pre
+      - run:
+          command: bin/circle-test-smoke
+          no_output_timeout: 360s
+      # Destroy testing VMs:
+      - run:
+          command: bin/circle-destroy-vms
+          background: true
+      - persist_to_workspace:
+          root: .
+          paths:
+          - test/coverage
+      - store_artifacts:
+          path: /tmp/artifacts
+
+  gen-coverage:
+    <<: *defaults
+    environment:
+      CIRCLE_ARTIFACTS: /tmp/artifacts
+    steps:
+      - checkout
+      - run: mkdir $CIRCLE_ARTIFACTS
+      - attach_workspace:
+          at: .
+      - run: cd test; ./gen_coverage_reports.sh
+      - run: goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=test/profile.cov -service=circleci
+      - run: cp test/coverage.* $CIRCLE_ARTIFACTS
+      - store_artifacts:
+          path: /tmp/artifacts
+
+  deploy:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      # Register qemu hooks, rebuild without coverage and push to dockerhub
+      - deploy:
+          command: |
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker run --rm --privileged multiarch/qemu-user-static:register --reset
+            wget https://github.com/estesp/manifest-tool/releases/download/v0.8.0/manifest-tool-linux-amd64
+            chmod +x manifest-tool-linux-amd64
+            make clean-bin
+            make publish MANIFEST_TOOL_CMD=./manifest-tool-linux-amd64 UPDATE_LATEST=latest-only SUDO= BUILD_IN_CONTAINER=false
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - lint
+      - unit-test
+      - build
+      - smoke-tests:
+          requires:
+            - lint
+            - unit-test
+            - build
+      - gen-coverage:
+          requires:
+            - unit-test
+            - smoke-tests
+      - deploy:
+          requires:
+            - smoke-tests
+          filters:
+            branches:
+              only: master

@@ -127,14 +127,52 @@ Finally, for **Mainline** releases only:
 
 * Images tagged `latest` are updated on DockerHub
 
+Now, you can validate whether images were published for all platforms:
+
+    # Required platforms for each image:
+    grep '^ML_PLATFORMS=' Makefile
+
+    # Published platforms per image:
+    for img in $(grep '^PUBLISH=' Makefile); do
+        img="weaveworks/$(echo $img | cut -d_ -f2):${TAG#v}"
+        platforms=$(vendor/github.com/estesp/manifest-tool/manifest-tool \
+                inspect --raw "$img" | \
+                jq '.[].Platform | .os + "/" +.architecture' | \
+                tr '\n' ' ')
+        echo "$img: $platforms"
+    done
+
+
+### Docker Store
+
+Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-net-plugin) and should also be released there.
+
+* Go to https://store.docker.com/ and log in.
+* Go to "[_Publish_](https://store.docker.com/publisher/center)".
+* Under "_My Products_", select "_owners (weaveworks)_". Weave Net should be listed among our products.
+* Click "_Actions_" > "_Edit Product_".
+* Go to "_Plans & Pricing_" > "_Free Tier_".
+* Under "_Source Repositories & Tags_", click on "_Add Source_", select "_net-plugin_" under "_Repository_" and the version to release under "_Tag_".
+* Under "_Resources_" > "_Installation Instructions_", update the lines containing `export NET_VERSION=<version>`.
+* Click "_Submit For Review_". You should see a message like: "_Your product has been submitted for approval. [...] We'll be in touch with next steps soon!_".
+* You should receive an email saying:
+
+> This email confirms that we received your submission on \<date\> of Weave Net to the Docker Store.
+>
+> We're reviewing your submission to ensure that it meets our [security guidelines](https://success.docker.com/Store#Security_and_Audit_Policies) and complies with our [best practices](https://success.docker.com/Store#Create_Great_Content). Don't worry! We'll let you know if there's anything you need to change before we publish your submission. You should hear back from us within the next 14 days.
+> 
+> Thanks for submitting your content to the Docker Store!
+
+* Hope Docker eventually performs the release or contacts us. If nothing happens within 14 days, contact their support team: publisher-support@docker.com.
+
 ### Finish up
 
 * If not on master, merge branch into master and push to GitHub.
 * Close the [milestone](https://github.com/weaveworks/weave/milestones) in GitHub and create the next milestone
 * Update the `#weavenetwork` topic heading on freenode (requires 'chanops' permission)
 * For a mainline release vX.Y.0, create a release branch X.Y from the
-  tag and push to GitHub - this will result in X.Y.0 site docs being
-  published to https://www.weave.works
+  tag, push to GitHub and set [WEAVE_NET_REV](https://github.com/weaveworks/website-next/blob/master/Makefile)
+  to X.Y via a PR - this will result in X.Y.0 site docs being published to https://www.weave.works
 * Add the new version of `weave-net` to the checkpoint system at
   https://checkpoint-api.weave.works/admin
 * File a PR to update the version of the daemonset at

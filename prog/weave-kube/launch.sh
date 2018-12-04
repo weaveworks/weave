@@ -27,9 +27,9 @@ xt_set_exists() {
 # Default if not supplied - same as weave net default
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
-STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
+METRICS_ADDR=${WEAVE_METRICS_ADDR:-0.0.0.0:6782}
 HOST_ROOT=${HOST_ROOT:-/host}
-CONN_LIMIT=${CONN_LIMIT:-30}
+CONN_LIMIT=${CONN_LIMIT:-100}
 DB_PREFIX=${DB_PREFIX:-/weavedb/weave-net}
 
 # Check if the IP range overlaps anything existing on the host
@@ -54,10 +54,21 @@ else
     fi
 fi
 
+STATUS_OPTS="--metrics-addr=$METRICS_ADDR"
+# --status-addr exposes internal information, so only turn it on if asked to.
+if [ -n "${WEAVE_STATUS_ADDR}" ]; then
+    STATUS_OPTS="$STATUS_OPTS --status-addr=$WEAVE_STATUS_ADDR"
+fi
+
 # Default is that npc will be running; allow caller to override
 WEAVE_NPC_OPTS="--expect-npc"
 if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
+fi
+
+NO_MASQ_LOCAL_OPT=""
+if [ -n "${NO_MASQ_LOCAL}" ]; then
+    NO_MASQ_LOCAL_OPT="--no-masq-local"
 fi
 
 # Kubernetes sets HOSTNAME to the host's hostname
@@ -74,7 +85,7 @@ router_bridge_opts() {
 }
 
 if [ -z "$KUBE_PEERS" ]; then
-    if ! KUBE_PEERS=$(/home/weave/kube-peers) || [ -z "$KUBE_PEERS" ]; then
+    if ! KUBE_PEERS=$(/home/weave/kube-utils) || [ -z "$KUBE_PEERS" ]; then
         echo Failed to get peers >&2
         exit 1
     fi
@@ -99,7 +110,7 @@ fi
 if [ -f ${DB_PREFIX}data.db ]; then
     if /usr/bin/weaveutil get-db-flag "$DB_PREFIX" peer-reclaim >/dev/null ; then
         # If this peer name is not stored in the list then we were removed by another peer.
-        if /home/weave/kube-peers -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
+        if /home/weave/kube-utils -check-peer-new -peer-name="$PEERNAME" -log-level=debug ; then
             # In order to avoid a CRDT clash, clean up
             echo "Peer not in list; removing persisted data" >&2
             rm -f ${DB_PREFIX}data.db
@@ -133,10 +144,15 @@ post_start_actions() {
     /home/weave/weave --local setup-cni
 
     # Attempt to run the reclaim process, but don't halt the script if it fails
-    /home/weave/kube-peers -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
+    /home/weave/kube-utils -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
 
     # Expose the weave network so host processes can communicate with pods
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
+
+    # Mark network as up
+    /home/weave/kube-utils -set-node-status -node-name="$HOSTNAME"
+
+    /home/weave/kube-utils -run-reclaim-daemon -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug&
 }
 
 post_start_actions &
@@ -144,11 +160,12 @@ post_start_actions &
 /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
      --name="$PEERNAME" \
      --host-root=$HOST_ROOT \
-     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
+     --http-addr=$HTTP_ADDR $STATUS_OPTS --docker-api='' --no-dns \
      --db-prefix="$DB_PREFIX" \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \
      $WEAVE_NPC_OPTS \
+     $NO_MASQ_LOCAL_OPT \
      "$@" \
      $KUBE_PEERS

@@ -1,3 +1,206 @@
+## Release 2.5.0
+
+This release adds support for Kubernetes `hostPort` mapping (#3016,#3356)
+and the `ipBlock` NetworkPolicy feature (#3168,#3367)
+
+### Bug fixes
+
+* Fix a crash at start-up on Docker for Mac #3405, #3408
+* Network policy: block ingress traffic when no namespaceSelector or
+  podSelector is specified #3347
+* Reclaim IP addresses which are locked by a non-existent peer #3386, #3416
+* Fix a crash when blank IP data was loaded #3067, #3415
+
+### Other improvements
+
+* If a connection is downgraded to the slower "sleeve" mode, Weave Net
+  will now periodically try to upgrade it to "fast datapath" again. #1737, #3385
+* Reclaim removed Kubernetes nodes' IP space when they are deleted,
+  rather than on next restart #3372, #3399
+* Replace Kubernetes livenessProbe with readinessProbe, so the pod is
+  not killed if it runs slowly #3471, #3421
+* In Kubernetes NetworkPolicy controller, remove the need to maintain
+  a set of local pod IP addresses #3344, #3423
+* Don't crash on Kubernetes named port in NetworkPolicy, just report as unsupported #3375
+* Ensure the `weave` network bridge is accessible on Linux kernels
+  older than 3.14 #3442, #3297, #3239
+* Better reporting in the logs if the `weave` network device is in the Down state #3133, #3381
+* Change log-level to debug of calls through the Docker proxy, to reduce noise #3439
+* Add `--without-masquerade` option to `weave expose`, so external
+  services can see the original container IP address #3388
+* Include Kubernetes cluster information in checkpoint call #3324,#3431
+* Bump go-odp dependency, so that `fastdp` works on the 4.19 kernel #3430
+
+### Build and Testing
+
+* CI builds on master branch now publish images for all platforms
+* Fix golint path and use https for download of libpcap #3435
+* Update Kubernetes client-go to v8.0.0, removing code licenced under LGPL3 #3358,#3366
+* Migrate CircleCI to V2, which is much faster #3255,#3270
+
+### External Contributors
+
+Thanks to the following contributors:
+
+* @Ashiroq
+* @leprechau
+* @lkpdn
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/74?closed=1)
+
+
+## Release 2.4.1
+
+This release fixes several bugs causing inconsistencies in IPAM for
+Kubernetes users whose clusters scale up and down over time.
+
+### Bug fixes
+
+* Nodes unable to connect after Kubernetes addon erroneously reclaimed
+  node without any IP addresses #3392, #3393
+* Kubernetes addon could have run out of free IP addresses after nodes
+  are deleted #3384, #3400
+* Kubernetes addon had reduced free IP addresses due to not reclaiming
+  IP addresses when node name is re-used #3397
+
+### Other improvements
+
+* Support `--label` in `WEAVE_DOCKER_ARGS` when starting Weave #3370,#3371
+* Add missing `--token` argument in help for `weave launch` #3226, #3379
+* Print defunct processes after smoke-tests #3362
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/75?closed=1)
+
+
+## Release 2.4.0
+
+This release introduces a support for Kubernetes Egress Network Policy (#2624, #3313)
+and adds a mechanism for preserving the client source IP address to enable
+`externalTrafficPolicy: Local` on Kubernetes (#2924, #3298).
+
+### Bug fixes
+
+* Increase the ipset list size which prevents weave-npc from crashing on older
+  kernels when more than eight Kubernetes Namespaces are used (#3289, #3305).
+* Avoid a possible livelock when reclaiming IP address space in weave-kube (#3317).
+* Ensure `xtables.lock` is mounted as a file so that kube-proxy can take the lock
+  if it has started after Weave Net (#3351, #3353).
+* Upgrade the CNI plugin symlinks only if the plugin has changed (#3337, #3345).
+
+### Other improvements
+
+* Manipulate the Kubernetes node status `NetworkUnavailable` so that Pods can be
+  scheduled on nodes when the GCE cloud provider is in use (#3249, #3307, #3332, #3334).
+* Refrain from creating a subprocess for configuring a network interface in
+  a container network namespace (#3291).
+* Protect against handling the CNI plugin request with the host namespace which
+  prevents Weave Net from misconfiguring the host network (#3206, #3346).
+* Weave Net can be run on minikube VM (#3124).
+* Add `org.opencontainers.image.*` labels to Dockerfiles to improve association
+  of the container images with git revisions (#3299).
+* Improve the error message when running `weave reset` on Kubernetes (#3319).
+
+### Build and Testing
+
+* Use `dep` instead of `git submodules` for managing external packages (#3268).
+* Fix usage of `manifest-tool` in Makefile (#3320).
+* Update Kubernetes to 1.11 for the integration tests (#3340).
+
+### External Contributors
+
+Thanks to the following contributors:
+
+* @kitt1987
+* @louismunro
+* @Nodraak
+* @stevenjohnstone
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/73?closed=1)
+
+## Release 2.3.0
+
+### Security fixes
+
+* By default, do not expose Weave "/status" and "/report" to all (0.0.0.0) when
+  running on Kubernetes #3271
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100) when
+running on Kubernetes, so that more peers could directly connect #3265
+
+## Build and test
+
+* Build Weave Net with Go 1.10.1 #3273
+* Run integration tests against Kubernetes 1.10.0 #3266
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/70?closed=1)
+
+## Release 2.2.1
+
+### Bug fixes
+
+* Fix a bug in weave-npc which would allow ingress traffic to Kubernetes Pods selected
+  by a NetworkPolicy in which source and destination selectors were the same #3222,#3237
+* Fix a bug in weave-npc which would crash if a previously deleted Kubernetes Namespace
+  has been created again #3247,#3250
+
+### Other improvements
+
+* Increase the default connection limit for Weave peers (from 30 to 100), so that
+  more peers could directly connect #3234
+* When doing a rolling update of Weave Net on Kubernetes, allow each node five seconds
+  to initialize before rolling next Weave Net Pod, so that issues at startup will halt
+  the rollout and not spread across the whole cluster #3235
+* Install common CA certificates from Alpine Linux package instead of copying
+  them manually #3236
+
+### External contributors
+
+Thanks to the following contributors:
+
+* @alok87
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/71?closed=1)
+
+## Release 2.2.0
+
+This release improves the way Weave Net configures Linux network
+devices and network filter rules, so that it is more robust in the face
+of unexpected changes in its environment. #3204,#3224
+
+As a consequence of these changes, the `weave attach` command will now
+fail unless the Weave Net daemon is up and running - previously it was
+possible to run independently as long as you managed all IP addresses
+yourself.
+
+## Other improvements
+
+* Update library miekg/dns for CVE-2017-15133 (details under embargo) #3223,#3227
+* Reduce the volume of logging from weave-npc #3183
+* Add ability to set log level for Docker "v2" plugin, and change
+  default log level from DEBUG to INFO #3197
+* Downgrade log messages about Discovery and Expiration to DEBUG level #3202,#3203
+* Use command-line parameter for WeaveDNS address in Docker proxy #3196
+
+## Bug fixes
+
+* Ensure that rules to block traffic for NetworkPolicy are placed
+  ahead of rules that Kubernetes has added to allow other traffic #3209,#3210
+
+## Build and test
+
+* Update CI tests to use Kubernetes 1.9.2 #3229
+* Remove "daily update" from test VMs that only run for a few minutes #3224
+
+## External Contributors
+
+Thanks to the following contributors:
+@vetal4444
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/67?closed=1)
+
+
 ## Release 2.1.3
 
 This release fixes a race-condition in the IP reclaim code for weave-kube

@@ -5,13 +5,20 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/odp"
+	"github.com/weaveworks/weave/ipam/tracker"
+	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/net/ipset"
+	"github.com/weaveworks/weave/npc"
 )
 
 /* This code implements three possible configurations to connect
@@ -47,11 +54,13 @@ datapath of old kernel versions (https://github.com/weaveworks/weave/issues/1577
 */
 
 const (
-	WeaveBridgeName = "weave"
-	DatapathName    = "datapath"
-	DatapathIfName  = "vethwe-datapath"
-	BridgeIfName    = "vethwe-bridge"
-	PcapIfName      = "vethwe-pcap"
+	WeaveBridgeName  = "weave"
+	WeaveDummyIfName = "vethwedu"
+	DatapathName     = "datapath"
+	DatapathIfName   = "vethwe-datapath"
+	BridgeIfName     = "vethwe-bridge"
+	PcapIfName       = "vethwe-pcap"
+	NoMasqLocalIpset = ipset.Name("weaver-no-masq-local")
 )
 
 type Bridge interface {
@@ -213,6 +222,7 @@ type BridgeConfig struct {
 	MTU              int
 	Mac              string
 	Port             int
+	NoMasqLocal      bool
 }
 
 func (config *BridgeConfig) configuredBridgeType() Bridge {
@@ -226,13 +236,20 @@ func (config *BridgeConfig) configuredBridgeType() Bridge {
 	}
 }
 
-func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Bridge, error) {
-	bridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
-	if bridgeType != nil || err != nil {
-		return bridgeType, err
+func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips ipset.Interface) (Bridge, error) {
+	existingBridgeType, err := ExistingBridgeType(config.WeaveBridgeName, config.DatapathName)
+	if err != nil {
+		return nil, err
 	}
 
-	bridgeType = config.configuredBridgeType()
+	bridgeType := config.configuredBridgeType()
+
+	if existingBridgeType != nil && bridgeType.String() != existingBridgeType.String() {
+		return nil,
+			fmt.Errorf("Existing bridge type %q is different than requested %q. Please do 'weave reset' and try again",
+				existingBridgeType, bridgeType)
+	}
+
 	for {
 		if err := bridgeType.init(config); err != nil {
 			if errors.Cause(err) == errBridgeNotSupported {
@@ -245,7 +262,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Br
 		break
 	}
 
-	if err := configureIPTables(config); err != nil {
+	if err := configureIPTables(config, ips); err != nil {
 		return bridgeType, errors.Wrap(err, "configuring iptables")
 	}
 
@@ -268,8 +285,18 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger) (Br
 		return bridgeType, err
 	}
 
-	if err := ConfigureARPCache(procPath, config.WeaveBridgeName); err != nil {
+	if err := monitorInterface(config.WeaveBridgeName, log); err != nil {
+		return bridgeType, err
+	}
+
+	if err := configureARPCache(procPath, config.WeaveBridgeName); err != nil {
 		return bridgeType, errors.Wrapf(err, "configuring ARP cache on bridge %q", config.WeaveBridgeName)
+	}
+
+	// NB: No concurrent call to Expose is possible, as EnsureBridge is called
+	// before any service has been started.
+	if err := reexpose(config, log); err != nil {
+		return bridgeType, err
 	}
 
 	return bridgeType, nil
@@ -283,12 +310,15 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 
 	linkAttrs := netlink.NewLinkAttrs()
 	linkAttrs.Name = config.WeaveBridgeName
-	linkAttrs.HardwareAddr = mac
+	// NB: Do not set MAC addr when creating the bridge, set it manually
+	// afterwards instead. Otherwise, on an older than 3.14 kernel FDB
+	// entry won't be created which results in containers not being able to
+	// reach the bridge w/o promiscuous mode.
 	if config.MTU == 0 {
 		config.MTU = 65535
 	}
 	b.bridge = &netlink.Bridge{LinkAttrs: linkAttrs}
-	if err = netlink.LinkAdd(b.bridge); err != nil {
+	if err := LinkAddIfNotExist(b.bridge); err != nil {
 		return errors.Wrapf(err, "creating bridge %q", config.WeaveBridgeName)
 	}
 	if err := netlink.LinkSetHardwareAddr(b.bridge, mac); err != nil {
@@ -299,8 +329,8 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	// instead we create a temporary interface with the desired MTU,
 	// attach that to the bridge, and then remove it again.
 	dummy := &netlink.Dummy{LinkAttrs: netlink.NewLinkAttrs()}
-	dummy.LinkAttrs.Name = "vethwedu"
-	if err = netlink.LinkAdd(dummy); err != nil {
+	dummy.LinkAttrs.Name = WeaveDummyIfName
+	if err = LinkAddIfNotExist(dummy); err != nil {
 		return errors.Wrap(err, "creating dummy interface")
 	}
 	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
@@ -309,18 +339,23 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	if err := netlink.LinkSetMasterByIndex(dummy, b.bridge.Attrs().Index); err != nil {
 		return errors.Wrap(err, "setting dummy interface master")
 	}
-	if err := netlink.LinkDel(dummy); err != nil {
-		return errors.Wrap(err, "deleting dummy interface")
-	}
-
-	return nil
+	defer func() {
+		var dummyIf netlink.Link
+		dummyIf, err = netlink.LinkByName(WeaveDummyIfName)
+		if err == nil {
+			if err = netlink.LinkDel(dummyIf); err != nil {
+				err = errors.Wrap(err, "deleting dummy interface")
+			}
+		}
+	}()
+	return err
 }
 
 func (b bridgeImpl) init(config *BridgeConfig) error {
 	if err := b.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		return netlink.LinkSetUp(veth)
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
@@ -370,11 +405,11 @@ func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
 	if err := bf.bridgeImpl.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
-		if err := odp.AddDatapathInterface(bf.datapathName, veth.Attrs().Name); err != nil {
+		if err := odp.AddDatapathInterfaceIfNotExist(bf.datapathName, veth.Attrs().Name); err != nil {
 			return errors.Wrapf(err, "adding interface %q to datapath %q", veth.Attrs().Name, bf.datapathName)
 		}
 		return nil
@@ -394,20 +429,21 @@ func (bf bridgedFastdpImpl) attach(veth *netlink.Veth) error {
 }
 
 func (f fastdpImpl) attach(veth *netlink.Veth) error {
-	return odp.AddDatapathInterface(f.datapathName, veth.Attrs().Name)
+	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
-func configureIPTables(config *BridgeConfig) error {
+func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "creating iptables object")
 	}
+
+	// The order among weave filter/FORWARD rules is important!
+	fwdRules := make([][]string, 0)
+
 	if config.DockerBridgeName != "" {
 		if config.WeaveBridgeName != config.DockerBridgeName {
-			err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
-			if err != nil {
-				return err
-			}
+			fwdRules = append(fwdRules, []string{"-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP"})
 		}
 
 		dockerBridgeIP, err := FindBridgeIP(config.DockerBridgeName, nil)
@@ -436,48 +472,122 @@ func configureIPTables(config *BridgeConfig) error {
 	}
 
 	if config.NPC {
-		// Steer traffic via the NPC
-		_ = ipt.NewChain("filter", "WEAVE-NPC") // ignore error because it might already exist
-		// If WEAVE-NPC chain doesn't exist then next line will fail
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
+		// Steer traffic via the NPC.
+
+		if err = ensureChains(ipt, "filter", npc.MainChain, npc.EgressChain); err != nil {
 			return err
 		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"); err != nil {
+
+		// Steer egress traffic destined to local node.
+		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
 			return err
 		}
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "DROP"); err != nil {
-			return err
-		}
+		fwdRules = append(fwdRules,
+			[][]string{
+				// Might include ingress traffic which is fine as long as we do not
+				// ACCEPT in WEAVE-NPC-EGRESS chain
+				{"-i", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", npc.EgressChain},
+				// The following rules are for ingress NPC processing
+				{"-o", config.WeaveBridgeName,
+					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
+					"-j", npc.MainChain},
+				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
+				{"-o", config.WeaveBridgeName, "-j", "DROP"},
+			}...)
 	} else {
 		// Work around the situation where there are no rules allowing traffic
 		// across our bridge. E.g. ufw
-		if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
-			return err
-		}
+		fwdRules = append(fwdRules, []string{"-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"})
 	}
 
 	if !config.NPC {
-		// Create a chain for allowing ingress traffic when the bridge is exposed
-		_ = ipt.NewChain("filter", "WEAVE-EXPOSE")
-		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"); err != nil {
+		// Create/Flush a chain for allowing ingress traffic when the bridge is exposed
+		if err := ipt.ClearChain("filter", "WEAVE-EXPOSE"); err != nil {
+			return errors.Wrap(err, "failed to clear/create filter/WEAVE-EXPOSE chain")
+		}
+
+		fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"})
+	}
+
+	// Forward from weave to the rest of the world
+	fwdRules = append(fwdRules, []string{"-i", config.WeaveBridgeName, "!", "-o", config.WeaveBridgeName, "-j", "ACCEPT"})
+	// and allow replies back
+	fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
+
+	if err := ensureRulesAtTop("filter", "FORWARD", fwdRules, ipt); err != nil {
+		return err
+	}
+
+	// Create a chain for masquerading
+	if err := ipt.ClearChain("nat", "WEAVE"); err != nil {
+		return errors.Wrap(err, "failed to clear/create nat/WEAVE chain")
+	}
+	if err := ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
+		return err
+	}
+
+	// For the cases where the weave bridge is the default gateway for
+	// containers (e.g. Kubernetes): create the ipset to store CIDRs allocated
+	// by IPAM for local containers. In the case of Kubernetes, external traffic
+	// sent to these CIDRs avoids SNAT'ing so that NodePort with
+	// `"externalTrafficPolicy":"Local"` would receive packets with correct
+	// src IP addr.
+	if config.NoMasqLocal {
+		ips := ipset.New(common.LogLogger(), 0)
+		_ = ips.Destroy(NoMasqLocalIpset)
+		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
+			return err
+		}
+		if err := ipt.Insert("nat", "WEAVE", 1,
+			"-m", "set", "--match-set", string(NoMasqLocalIpset), "dst",
+			"-m", "comment", "--comment", "Prevent SNAT to locally running containers",
+			"-j", "RETURN"); err != nil {
 			return err
 		}
 	}
 
-	// Forward from weave to the rest of the world
-	if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "!", "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
-		return err
+	return nil
+}
+
+type NoMasqLocalTracker struct {
+	ips   ipset.Interface
+	owner types.UID
+}
+
+func NewNoMasqLocalTracker(ips ipset.Interface) *NoMasqLocalTracker {
+	return &NoMasqLocalTracker{
+		ips:   ips,
+		owner: types.UID(0), // dummy ipset owner
 	}
-	// and allow replies back
-	if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
-		return err
+}
+
+func (t *NoMasqLocalTracker) String() string {
+	return "no-masq-local"
+}
+
+func (t *NoMasqLocalTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
+	if !local {
+		return nil
 	}
 
-	// create a chain for masquerading
-	if err = ipt.ClearChain("nat", "WEAVE"); err != nil {
-		return errors.Wrap(err, "clearing WEAVE chain")
+	prev, curr := tracker.RemoveCommon(
+		address.NewCIDRs(tracker.Merge(prevRanges)),
+		address.NewCIDRs(tracker.Merge(currRanges)))
+
+	for _, cidr := range curr {
+		if err := t.ips.AddEntry(t.owner, NoMasqLocalIpset, cidr.String(), ""); err != nil {
+			return err
+		}
 	}
-	return ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE")
+	for _, cidr := range prev {
+		if err := t.ips.DelEntry(t.owner, NoMasqLocalIpset, cidr.String()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func linkSetUpByName(linkName string) error {
@@ -486,4 +596,51 @@ func linkSetUpByName(linkName string) error {
 		return errors.Wrapf(err, "setting link up on %q", linkName)
 	}
 	return netlink.LinkSetUp(link)
+}
+
+func reexpose(config *BridgeConfig, log *logrus.Logger) error {
+	// Get existing IP addrs of the weave bridge.
+	// If the bridge hasn't been exposed, then this functions does nothing.
+	//
+	// Ideally, we should consult IPAM for IP addrs allocated to "weave:expose",
+	// but we don't want to introduce dependency on IPAM, as weave should be able
+	// to run w/o IPAM.
+	link, err := netlink.LinkByName(config.WeaveBridgeName)
+	if err != nil {
+		return errors.Wrapf(err, "cannot find bridge %q", config.WeaveBridgeName)
+	}
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return errors.Wrapf(err, "cannot list IPv4 addrs of bridge %q", config.WeaveBridgeName)
+	}
+
+	for _, addr := range addrs {
+		log.Infof("Re-exposing %s on bridge %q", addr.IPNet, config.WeaveBridgeName)
+		if err := Expose(config.WeaveBridgeName, addr.IPNet, config.AWSVPC, config.NPC, false); err != nil {
+			return errors.Wrapf(err, "unable to re-expose %s on bridge: %q", addr.IPNet, config.WeaveBridgeName)
+		}
+	}
+
+	return nil
+}
+
+func monitorInterface(ifaceName string, log *logrus.Logger) error {
+	_, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return fmt.Errorf("Unable to find link %q: %s", ifaceName, err)
+	}
+
+	updatesChannel := make(chan netlink.LinkUpdate)
+	if err := netlink.LinkSubscribe(updatesChannel, nil); err != nil {
+		return errors.Wrapf(err, "error monitoring link %q for UP/DOWN notifications", ifaceName)
+	}
+
+	go func() {
+		for update := range updatesChannel {
+			if update.Link.Attrs().Name == ifaceName && update.IfInfomsg.Flags&syscall.IFF_UP == 0 {
+				log.Errorf("Interface %q which needs to be in UP state for Weave functioning is found to be in DOWN state", ifaceName)
+			}
+		}
+	}()
+	return nil
 }

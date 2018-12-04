@@ -27,7 +27,7 @@ fi
 function teardown_kubernetes_cluster {
     greyly echo "Tearing down kubernetes cluster"
     for host in $HOSTS; do
-        run_on $host "sudo kubeadm reset && sudo rm -r -f /opt/cni/bin/*weave*"
+        run_on $host "sudo kubeadm reset --force && sudo rm -r -f /opt/cni/bin/*weave*"
     done
 }
 
@@ -38,13 +38,12 @@ function setup_kubernetes_cluster {
 
     # kubeadm init upgrades to latest Kubernetes version by default, therefore we try to lock the version using the below option:
     k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
-    k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
     for host in $HOSTS; do
         if [ $host = $HOST1 ] ; then
-        run_on $host "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
+        run_on $host "sudo systemctl start kubelet && sudo kubeadm init --kubernetes-version=$k8s_version --token=$TOKEN"
         else
-        run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP:$KUBE_PORT"
+        run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
         fi
     done
 
@@ -85,7 +84,7 @@ function relaunch_weave_pod {
 # Suite
 #
 function main {
-    local IPAM_RECOVER_DELAY=15
+    local IPAM_RECOVER_DELAY=90
 
     start_suite "Test weave-net deallocates from IPAM on node failure";
 
@@ -100,8 +99,6 @@ function main {
     assert "unreachable_ip_addresses_count $HOST3" "0";
 
     force_drop_node $HOST2;
-
-    relaunch_weave_pod $HOST3;
 
     sleep $IPAM_RECOVER_DELAY;
 

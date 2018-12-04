@@ -117,6 +117,16 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 	defer ns.Close()
 
+	hostNs, err := netns.Get()
+	if err != nil {
+		return fmt.Errorf("error accessing host network namespace: %s", err)
+	}
+	defer hostNs.Close()
+
+	if ns.Equal(hostNs) {
+		return fmt.Errorf("can not specify host network namespace as network namespace to which container should be added")
+	}
+
 	id := args.ContainerID
 	if len(id) < 5 {
 		data := make([]byte, 5)
@@ -130,7 +140,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if err := weavenet.AttachContainer(args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&ip.Address}, false, conf.HairpinMode); err != nil {
 		return err
 	}
-	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
+	if err := weavenet.WithNetNSLink(ns, args.IfName, func(link netlink.Link) error {
 		return setupRoutes(link, args.IfName, ip.Address, ip.Gateway, result.Routes)
 	}); err != nil {
 		return fmt.Errorf("error setting up routes: %s", err)
@@ -177,7 +187,13 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 
 	// As of CNI 0.3 spec, runtimes can send blank if they just want the address deallocated
 	if args.Netns != "" {
-		if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
+		if err = weavenet.WithNetNSByPath(args.Netns, func() error {
+			link, err := netlink.LinkByName(args.IfName)
+			if err != nil {
+				return err
+			}
+			return netlink.LinkDel(link)
+		}); err != nil {
 			// We log the error and carry on instead of returning nil, as there may still be resources to free in IPAM.
 			logOnStderr(fmt.Errorf("error removing interface %q: %s", args.IfName, err))
 		}

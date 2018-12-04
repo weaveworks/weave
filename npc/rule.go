@@ -2,6 +2,7 @@ package npc
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -10,38 +11,71 @@ import (
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
-type ruleSpec struct {
-	key  string
-	args []string
+type ruleHost interface {
+	// getRuleSpec returns source or destination specification and comment which
+	// are used in an iptables rule.
+	//
+	// If src=true then the rulespec is for source, otherwise - for destination.
+	getRuleSpec(src bool) ([]string, string)
 }
 
-func newRuleSpec(proto *string, srcHost *selectorSpec, dstHost *selectorSpec, dstPort *string) *ruleSpec {
+type ruleSpec struct {
+	key        string
+	args       []string
+	policyType policyType
+}
+
+func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost, dstPort *string) *ruleSpec {
 	args := []string{}
 	if proto != nil {
 		args = append(args, "-p", *proto)
 	}
 	srcComment := "anywhere"
-	if srcHost != nil {
-		args = append(args, "-m", "set", "--match-set", string(srcHost.ipsetName), "src")
-		if srcHost.nsName != "" {
-			srcComment = fmt.Sprintf("pods: namespace: %s, selector: %s", srcHost.nsName, srcHost.key)
-		} else {
-			srcComment = fmt.Sprintf("namespaces: selector: %s", srcHost.key)
-		}
+	if srcHost != nil && !reflect.ValueOf(srcHost).IsNil() {
+		rule, comment := srcHost.getRuleSpec(true)
+		args = append(args, rule...)
+		srcComment = comment
 	}
 	dstComment := "anywhere"
-	if dstHost != nil {
-		args = append(args, "-m", "set", "--match-set", string(dstHost.ipsetName), "dst")
-		dstComment = fmt.Sprintf("pods: namespace: %s, selector: %s", dstHost.nsName, dstHost.key)
+	if dstHost != nil && !reflect.ValueOf(dstHost).IsNil() {
+		rule, comment := dstHost.getRuleSpec(false)
+		args = append(args, rule...)
+		dstComment = comment
 	}
 	if dstPort != nil {
 		args = append(args, "--dport", *dstPort)
 	}
-	args = append(args, "-j", "ACCEPT")
-	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s", srcComment, dstComment))
+	// NOTE: if you remove the comment bellow, then embed `policyType` into `key`.
+	// Otherwise, the rule won't be provisioned if it exists for other policy type.
+	args = append(args, "-m", "comment", "--comment", fmt.Sprintf("%s -> %s (%s)", srcComment, dstComment, policyTypeStr(policyType)))
 	key := strings.Join(args, " ")
 
-	return &ruleSpec{key, args}
+	return &ruleSpec{key, args, policyType}
+}
+
+func (spec *ruleSpec) iptChain() string {
+	if spec.policyType == policyTypeEgress {
+		return EgressCustomChain
+	}
+	return IngressChain
+}
+
+func (spec *ruleSpec) iptRuleSpecs() [][]string {
+	if spec.policyType == policyTypeIngress {
+		rule := make([]string, len(spec.args))
+		copy(rule, spec.args)
+		rule = append(rule, "-j", "ACCEPT")
+		return [][]string{rule}
+	}
+
+	// policyTypeEgress
+	ruleMark := make([]string, len(spec.args))
+	copy(ruleMark, spec.args)
+	ruleMark = append(ruleMark, "-j", EgressMarkChain)
+	ruleReturn := make([]string, len(spec.args))
+	copy(ruleReturn, spec.args)
+	ruleReturn = append(ruleReturn, "-j", "RETURN")
+	return [][]string{ruleMark, ruleReturn}
 }
 
 type ruleSet struct {
@@ -58,10 +92,14 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
-				common.Log.Infof("deleting rule: %v", spec.args)
-				if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); err != nil {
-					return err
+				chain := spec.iptChain()
+				for _, rule := range spec.iptRuleSpecs() {
+					common.Log.Infof("deleting rule %v from %q chain", rule, chain)
+					if err := rs.ipt.Delete(TableFilter, chain, rule...); err != nil {
+						return err
+					}
 				}
+
 				delete(rs.users, key)
 			}
 		}
@@ -74,9 +112,12 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
-				common.Log.Infof("adding rule: %v", spec.args)
-				if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); err != nil {
-					return err
+				chain := spec.iptChain()
+				for _, rule := range spec.iptRuleSpecs() {
+					common.Log.Infof("adding rule %v to %q chain", rule, chain)
+					if err := rs.ipt.Append(TableFilter, chain, rule...); err != nil {
+						return err
+					}
 				}
 				rs.users[key] = make(map[types.UID]struct{})
 			}

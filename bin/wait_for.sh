@@ -16,6 +16,6 @@ wait_for() {
         if ! ((i % 10)); then echo "[$i seconds]: Waiting for $lock_file to be created..."; fi
         sleep 1
     done
-    echo "Timed out waiting for test VMs to be ready. See details in: $TEST_VMS_SETUP_OUTPUT_FILE" >&2
+    echo "Timed out waiting for test VMs to be ready." >&2
     return 1
 }

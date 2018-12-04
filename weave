@@ -53,6 +53,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--hostname-replacement <replacement>]
                     [--rewrite-inspect]
                     [--log-level=debug|info|warning|error]
+                    [--token <weave-cloud-service-token>]
                     <peer> ...
 
 weave prime
@@ -68,7 +69,7 @@ weave attach        [--without-dns] [--rewrite-hosts] [--no-multicast-route]
                       [<addr> ...] <container_id>
       detach        [<addr> ...] <container_id>
 
-weave expose        [<addr> ...] [-h <fqdn>]
+weave expose        [<addr> ...] [-h <fqdn>] [--without-masquerade]
       hide          [<addr> ...]
 
 weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
@@ -405,27 +406,6 @@ detect_bridge_type() {
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
-try_create_bridge() {
-    # Pass /dev/null because we do not have access to the weavedb files when this runs; BoltDB
-    # cannot open the file anyway if weaver is running, which is likely for attach|expose|hide.
-    MAC=$(util_op unique-id "/dev/null" "$HOST_ROOT")
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$PROC_PATH" "$1")
-    # Set some variables that are expected by code that comes later
-    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
-    MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
-}
-
-create_bridge() {
-    validate_bridge_type
-    if ! try_create_bridge "$@" ; then
-        echo "Creating bridge '$BRIDGE' failed" >&2
-        # reset to original value so we destroy both kinds
-        DATAPATH=datapath
-        destroy_bridge
-        exit 1
-    fi
-}
-
 validate_bridge_type() {
     detect_bridge_type || return 0
 
@@ -450,9 +430,10 @@ EOF
 }
 
 expose_ip() {
+    [ -z $WITHOUT_MASQUERADE ] || skipNAT="?skipNAT=true"
     ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
     for CIDR in $ALL_CIDRS ; do
-        call_weave "POST" "/expose/$CIDR"
+        call_weave "POST" "/expose/$CIDR$skipNAT"
 
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
@@ -513,10 +494,20 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -o $BRIDGE -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
     run_iptables -F WEAVE-NPC >/dev/null 2>&1 || true
-    run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-NPC 2>/dev/null || true
+    run_iptables -t filter -D FORWARD -o $BRIDGE -m comment --comment "NOTE: this must go before '-j KUBE-FORWARD'" -j WEAVE-NPC 2>/dev/null || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86 2>/dev/null || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j DROP 2>/dev/null || true
     run_iptables -X WEAVE-NPC >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
+    run_iptables -t filter -D FORWARD -i $BRIDGE -m comment --comment "NOTE: this must go before '-j KUBE-FORWARD'" -j WEAVE-NPC-EGRESS 2>/dev/null || true
+    run_iptables -t filter -D INPUT -i $BRIDGE -j WEAVE-NPC-EGRESS 2>/dev/null || true
+    run_iptables -X WEAVE-NPC-EGRESS >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-DEFAULT >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-DEFAULT >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-CUSTOM >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-CUSTOM >/dev/null 2>&1 || true
+    run_iptables -F WEAVE-NPC-EGRESS-ACCEPT >/dev/null 2>&1 || true
+    run_iptables -X WEAVE-NPC-EGRESS-ACCEPT >/dev/null 2>&1 || true
 
     run_iptables -F WEAVE-EXPOSE >/dev/null 2>&1 || true
     run_iptables -t filter -D FORWARD -o $BRIDGE -j WEAVE-EXPOSE 2>/dev/null || true
@@ -526,6 +517,8 @@ destroy_bridge() {
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+
+    ipset destroy weaver-no-masq-local >/dev/null 2>&1 || true
 }
 
 add_iface_fastdp() {
@@ -557,6 +550,7 @@ router_bridge_opts() {
     echo --docker-bridge "$DOCKER_BRIDGE" --weave-bridge "$BRIDGE" --datapath "$DATAPATH"
     [ -z "$WEAVE_MTU" ] || echo --mtu "$WEAVE_MTU"
     [ -z $WEAVE_NO_FASTDP ] || echo --no-fastdp
+    [ -z $WEAVE_NO_BRIDGED_FASTDP ] || echo --no-bridged-fastdp
 }
 
 ######################################################################
@@ -725,10 +719,10 @@ upgrade_cni_plugin() {
 
     # Create two symlinks to the plugin, as it has different
     # behaviour depending on its name:
-    if [ "$(readlink -f $1/weave-net)" != "$CNI_PLUGIN_NAME" ]; then
+    if [ "$(readlink -f $1/weave-net)" != "$1/$CNI_PLUGIN_NAME" ]; then
         upgrade_cni_plugin_symlink $1 weave-net
     fi
-    if [ "$(readlink -f $1/weave-ipam)" != "$CNI_PLUGIN_NAME" ]; then
+    if [ "$(readlink -f $1/weave-ipam)" != "$1/$CNI_PLUGIN_NAME" ]; then
         upgrade_cni_plugin_symlink $1 weave-ipam
     fi
 }
@@ -736,9 +730,20 @@ upgrade_cni_plugin() {
 create_cni_config() {
     cat >"$1" <<EOF
 {
+    "cniVersion": "0.3.0",
     "name": "weave",
-    "type": "weave-net",
-    "hairpinMode": $2
+    "plugins": [
+        {
+            "name": "weave",
+            "type": "weave-net",
+            "hairpinMode": $2
+        },
+        {
+            "type": "portmap",
+            "capabilities": {"portMappings": true},
+            "snat": true
+        }
+    ]
 }
 EOF
 }
@@ -749,8 +754,13 @@ setup_cni() {
     if install_cni_plugin $CNI_PLUGIN_DIR ; then
         upgrade_cni_plugin $CNI_PLUGIN_DIR
     fi
-    if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf $HAIRPIN_MODE
+
+    # Weave will use .conflist for versions > 2.4.0. So in case of upgrade of old
+    # clusters with Weave version <= 2.4.0 remove existing 10-weave.conf
+    rm -f $HOST_ROOT/etc/cni/net.d/10-weave.conf
+
+    if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conflist ] ; then
+        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conflist $HAIRPIN_MODE
     fi
 }
 
@@ -918,9 +928,7 @@ check_overlap() {
 }
 
 detect_awsvpc() {
-    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
-    # steps, because "attach" should work without the weave router running.
-    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+    [ "$(call_weave GET /ipinfo/tracker 2>/dev/null)" != "awsvpc" ] || AWSVPC=1
 }
 
 # Call IPAM as necessary to lookup or allocate addresses
@@ -1256,7 +1264,6 @@ launch() {
         --host-root=/host \
         $(router_bridge_opts) \
         --ipalloc-range "$IPRANGE" \
-        --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         --dns-listen-address $DOCKER_BRIDGE_IP:53 \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \
@@ -1269,7 +1276,7 @@ launch() {
 stop() {
     util_op remove-plugin-network weave || true
     warn_if_stopping_proxy_in_env
-    util_op stop-container $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running." >&2
+    util_op stop-container $CONTAINER_NAME >/dev/null 2>&1 || echo "Weave is not running (ignore on Kubernetes)." >&2
     # In case user has upgraded from <v2.0 and left old containers running
     util_op stop-container $OLD_PLUGIN_CONTAINER_NAME >/dev/null 2>&1 || true
     util_op stop-container $OLD_PROXY_CONTAINER_NAME >/dev/null 2>&1 || true
@@ -1436,7 +1443,6 @@ case "$COMMAND" in
         done
         [ $# -eq 1 ] || usage
         CONTAINER=$(util_op container-id $1)
-        create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         if [ -n "$REWRITE_HOSTS" ] ; then
             # rewrite /etc/hosts, unlinking the file (so Docker does
@@ -1444,7 +1450,7 @@ case "$COMMAND" in
             util_op rewrite-etc-hosts "$CONTAINER" "$EXEC_IMAGE" "$ALL_CIDRS" $DNS_EXTRA_HOSTS
         fi
         [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
-        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU $ALL_CIDRS >/dev/null
+        util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $ALL_CIDRS >/dev/null
         [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
@@ -1486,15 +1492,25 @@ case "$COMMAND" in
         dig @$DOCKER_BRIDGE_IP +short $1
         ;;
     expose)
+        WITHOUT_MASQUERADE=
+        FQDN=
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        if [ $# -eq 0 ] ; then
-            FQDN=""
-        else
-            [ $# -eq 2 -a "$1" = "-h" ] || usage
-            FQDN="$2"
-        fi
-        create_bridge
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -h)
+                    [ -z $FQDN ] && FQDN=$2 && shift || usage
+                    ;;
+                --without-masquerade)
+                    WITHOUT_MASQUERADE=1
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+            shift
+        done
+        [ $# -eq 0 ] || usage
         expose_ip
         show_addrs $ALL_CIDRS
         ;;
@@ -1502,7 +1518,6 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         ipam_cidrs lookup weave:expose $CIDR_ARGS
-        create_bridge
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR

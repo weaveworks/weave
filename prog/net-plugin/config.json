@@ -51,6 +51,14 @@
   ],
   "env": [
     {
+      "description": "Log level",
+      "name": "LOG_LEVEL",
+      "settable": [
+          "value"
+      ],
+      "value": ""
+    },
+    {
       "description": "Extra args to `weaver` and `plugin`",
       "name": "EXTRA_ARGS",
       "settable": [

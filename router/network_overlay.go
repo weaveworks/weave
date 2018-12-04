@@ -31,6 +31,8 @@ type OverlayForwarder interface {
 	// Confirm().  The return value nil means the key could not be
 	// handled by this forwarder.
 	Forward(ForwardPacketKey) FlowOp
+
+	HealthChannel() <-chan bool
 }
 
 type NullNetworkOverlay struct{ mesh.NullOverlay }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -15,8 +14,8 @@ import (
 )
 
 func attach(args []string) error {
-	if len(args) < 4 {
-		cmdUsage("attach-container", "[--no-multicast-route] [--keep-tx-on] [--hairpin-mode=true|false] <container-id> <bridge-name> <mtu> <cidr>...")
+	if len(args) < 3 {
+		cmdUsage("attach-container", "[--no-multicast-route] [--keep-tx-on] [--hairpin-mode=true|false] <container-id> <bridge-name> <cidr>...")
 	}
 
 	keepTXOn := false
@@ -52,16 +51,12 @@ func attach(args []string) error {
 	} else if nsHost.Equal(nsContainer) {
 		return fmt.Errorf("Container is running in the host network namespace, and therefore cannot be\nconnected to weave - perhaps the container was started with --net=host")
 	}
-	mtu, err := strconv.Atoi(args[2])
-	if err != nil && args[3] != "" {
-		return fmt.Errorf("unable to parse mtu %q: %s", args[2], err)
-	}
-	cidrs, err := parseCIDRs(args[3:])
+	cidrs, err := parseCIDRs(args[2:])
 	if err != nil {
 		return err
 	}
 
-	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn, hairpinMode)
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], 0, withMulticastRoute, cidrs, keepTXOn, hairpinMode)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
 		err = fmt.Errorf("Container %s died", args[0])

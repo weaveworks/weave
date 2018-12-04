@@ -43,7 +43,7 @@ func listenHTTP(alloc *Allocator, subnet address.CIDR) int {
 	router.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHTTP(router, subnet, "", nil)
+	alloc.HandleHTTP(router, subnet, nil)
 
 	httpListener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -132,7 +132,7 @@ func TestBadHttp(t *testing.T) {
 	// Verb that's not handled
 	resp, err := doHTTP("HEAD", fmt.Sprintf("http://localhost:%d/ip/%s/%s", port, containerID, testAddr1))
 	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, resp.StatusCode, "http response")
+	require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode, "http response")
 	// Mis-spelled URL
 	resp, err = doHTTP("POST", fmt.Sprintf("http://localhost:%d/xip/%s/", port, containerID))
 	require.NoError(t, err)

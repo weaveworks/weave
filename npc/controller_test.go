@@ -1,12 +1,14 @@
 package npc
 
 import (
+	"fmt"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/npc/ipset"
+	"github.com/weaveworks/weave/net/ipset"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,18 +105,46 @@ func (i *mockIPSet) List(prefix string) ([]ipset.Name, error) {
 }
 
 type mockIPTables struct {
+	rules map[string]map[string]struct{} // chain -> rulespec -> struct{}
+}
+
+func newMockIPTables() *mockIPTables {
+	return &mockIPTables{rules: make(map[string]map[string]struct{})}
 }
 
 func (ipt *mockIPTables) Append(table, chain string, rulespec ...string) error {
+	if table != TableFilter {
+		return fmt.Errorf("invalid table: %q", table)
+	}
+
+	if _, found := ipt.rules[chain]; !found {
+		ipt.rules[chain] = make(map[string]struct{})
+	}
+
+	rule := strings.Join(rulespec, " ")
+	if _, found := ipt.rules[chain][rule]; found {
+		return fmt.Errorf("rule already exists. chain: %q, rule: %q", chain, rule)
+	}
+
+	ipt.rules[chain][rule] = struct{}{}
+
 	return nil
 }
 
 func (ipt *mockIPTables) Delete(table, chain string, rulespec ...string) error {
+	rule := strings.Join(rulespec, " ")
+
+	if _, found := ipt.rules[chain][rule]; !found {
+		return fmt.Errorf("rule does not exist. chain: %q rule: %q", chain, rule)
+	}
+
+	delete(ipt.rules[chain], rule)
+
 	return nil
 }
 
 func (ipt *mockIPTables) Insert(table, chain string, pos int, rulespec ...string) error {
-	return nil
+	return errors.New("Not Implemented")
 }
 
 func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
@@ -144,6 +174,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 			Namespace: "destination",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
 					From: []networkingv1.NetworkPolicyPeer{
@@ -167,7 +198,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", false, &mockIPTables{}, &m)
+	controller := New("foo", newMockIPTables(), &m)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -183,7 +214,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", false, &mockIPTables{}, &m)
+	controller = New("foo", newMockIPTables(), &m)
 
 	controller.AddNetworkPolicy(networkPolicy)
 
@@ -193,17 +224,18 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	require.Equal(t, true, len(m.sets[selectorIPSetName].subSets[sourceIPSetName]) > 0)
 }
 
-// Tests default-allow ipset behavior when running in non-legacy mode.
+// Tests default-allow ipset behavior
 func TestDefaultAllow(t *testing.T) {
 	const (
-		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
-		fooPodIP              = "10.32.0.10"
-		barPodIP              = "10.32.0.11"
-		barPodNewIP           = "10.32.0.12"
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		egressDefaultAllowIPSetName  = "weave-s_+ChJId4Uy_$}G;WdH|~TK)I"
+		fooPodIP                     = "10.32.0.10"
+		barPodIP                     = "10.32.0.11"
+		barPodNewIP                  = "10.32.0.12"
 	)
 
 	m := newMockIPSet()
-	controller := New("bar", false, &mockIPTables{}, &m)
+	controller := New("bar", newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -213,7 +245,8 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddNamespace(defaultNamespace)
 
 	// Should create an ipset for default-allow
-	require.Contains(t, m.sets, defaultAllowIPSetName)
+	require.Contains(t, m.sets, ingressDefaultAllowIPSetName)
+	require.Contains(t, m.sets, egressDefaultAllowIPSetName)
 
 	podFoo := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -225,7 +258,8 @@ func TestDefaultAllow(t *testing.T) {
 	controller.AddPod(podFoo)
 
 	// Should add the foo pod to default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -236,10 +270,12 @@ func TestDefaultAllow(t *testing.T) {
 		Status: coreapi.PodStatus{PodIP: barPodIP}}
 	podBarNoIP := &coreapi.Pod{ObjectMeta: podBar.ObjectMeta}
 	controller.AddPod(podBarNoIP)
+
 	controller.UpdatePod(podBarNoIP, podBar)
 
 	// Should add the bar pod to default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
 
 	// Allow access from the bar pod to the foo pod
 	netpol := &networkingv1.NetworkPolicy{
@@ -248,6 +284,10 @@ func TestDefaultAllow(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			},
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -256,55 +296,74 @@ func TestDefaultAllow(t *testing.T) {
 					},
 				}},
 			}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{CIDR: "192.168.48.0/24"},
+				}},
+			}},
 		},
 	}
 	controller.AddNetworkPolicy(netpol)
 
 	// Should remove the foo pod from default-allow as the netpol selects it
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
 
 	podBarWithNewIP := *podBar
 	podBarWithNewIP.Status.PodIP = barPodNewIP
 	controller.UpdatePod(podBar, &podBarWithNewIP)
 
 	// Should update IP addr of the bar pod in default-allow
-	require.False(t, m.entryExists(defaultAllowIPSetName, barPodIP))
-	require.True(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, barPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, barPodNewIP))
 
 	controller.UpdatePod(&podBarWithNewIP, podBarNoIP)
 	// Should remove the bar pod from default-allow as it does not have any IP addr
-	require.False(t, m.entryExists(defaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, barPodNewIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, barPodNewIP))
 
 	podFooWithNewLabel := *podFoo
 	podFooWithNewLabel.ObjectMeta.Labels = map[string]string{"run": "new-foo"}
 	controller.UpdatePod(podFoo, &podFooWithNewLabel)
 
 	// Should bring back the foo pod to default-allow as it does not match dst of any netpol
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.UpdatePod(&podFooWithNewLabel, podFoo)
 	// Should remove from default-allow as it matches the netpol after the update
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeleteNetworkPolicy(netpol)
 	// Should bring back the foo pod to default-allow as no netpol selects it
-	require.True(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.True(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
 
 	controller.DeletePod(podFoo)
 	// Should remove foo pod from default-allow
-	require.False(t, m.entryExists(defaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, fooPodIP))
+	require.False(t, m.entryExists(egressDefaultAllowIPSetName, fooPodIP))
+
+	controller.DeleteNamespace(defaultNamespace)
+	// Should remove default ipset
+	require.NotContains(t, m.sets, ingressDefaultAllowIPSetName)
+	require.NotContains(t, m.sets, egressDefaultAllowIPSetName)
 }
 
 func TestOutOfOrderPodEvents(t *testing.T) {
 	const (
-		defaultAllowIPSetName = "weave-E.1.0W^NGSp]0_t5WwH/]gX@L"
-		runBarIPSetName       = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
-		podIP                 = "10.32.0.10"
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		runBarIPSetName              = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
+		podIP                        = "10.32.0.10"
 	)
 
 	m := newMockIPSet()
-	controller := New("qux", false, &mockIPTables{}, &m)
+	controller := New("qux", newMockIPTables(), &m)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -323,7 +382,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddPod(podFoo)
 
 	// Should be in default-allow as no netpol selects podFoo
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	netpol := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -331,6 +390,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "foo"}},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
 				From: []networkingv1.NetworkPolicyPeer{{
@@ -344,7 +404,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddNetworkPolicy(netpol)
 
 	// Shouldn't be in default-allow as netpol above selects podFoo
-	require.False(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -356,8 +416,8 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	controller.AddPod(podBar)
 
 	// Should be in default-allow as no netpol selects podBar
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
-	require.True(t, m.Exist(podBar.ObjectMeta.UID, defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+	require.True(t, m.Exist(podBar.ObjectMeta.UID, ingressDefaultAllowIPSetName, podIP))
 	// Should be in run=bar ipset
 	require.True(t, m.entryExists(runBarIPSetName, podIP))
 
@@ -368,11 +428,167 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 
 	// Should be in default-allow as no netpol selects podBar and podFoo removal
 	// should not affect podBar in default-allow
-	require.True(t, m.entryExists(defaultAllowIPSetName, podIP))
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
 
 	controller.DeletePod(podBar)
 
 	// Should remove from default-allow and run=bar ipsets
-	require.Equal(t, 0, len(m.sets[defaultAllowIPSetName].subSets))
+	require.Equal(t, 0, len(m.sets[ingressDefaultAllowIPSetName].subSets))
 	require.False(t, m.entryExists(runBarIPSetName, podIP))
+}
+
+// Test case for https://github.com/weaveworks/weave/issues/3222
+func TestNewTargetSelector(t *testing.T) {
+	const (
+		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
+		podIP                        = "10.32.0.10"
+	)
+
+	m := newMockIPSet()
+	controller := New("baz", newMockIPTables(), &m)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	controller.AddNamespace(defaultNamespace)
+
+	podFoo := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "foo",
+			Namespace: "default",
+			Name:      "foo",
+			Labels:    map[string]string{"run": "foo"}},
+		Status: coreapi.PodStatus{PodIP: podIP}}
+	controller.AddPod(podFoo)
+
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+
+	netpolBar := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-bar",
+			Name:      "allow-from-default-1",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolBar)
+
+	// netpolBar target selector selects podFoo
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+
+	netpolFoo := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo",
+			Name:      "allow-from-default-2",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				From: []networkingv1.NetworkPolicyPeer{{
+					PodSelector: &metav1.LabelSelector{},
+				}},
+			}},
+		},
+	}
+	controller.AddNetworkPolicy(netpolFoo)
+
+	controller.DeleteNetworkPolicy(netpolBar)
+	// netpolFoo target-selects podFoo
+	require.False(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+	controller.DeleteNetworkPolicy(netpolFoo)
+	// No netpol target-selects podFoo
+	require.True(t, m.entryExists(ingressDefaultAllowIPSetName, podIP))
+}
+
+func TestEgressPolicyWithIPBlock(t *testing.T) {
+	const (
+		fooPodIP                    = "10.32.0.10"
+		exceptIPSetName             = "weave-j:W$5om!$8JS})buYAD7q^#sX"
+		exceptIPSetNameInNonDefault = "weave-|*P{aL2C@#N/1IZ!IvQItv_pt"
+	)
+
+	m := newMockIPSet()
+	ipt := newMockIPTables()
+	controller := New("foo", ipt, &m)
+
+	netpolFoo := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo",
+			Name:      "allow-from-bar-to-foo",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeEgress,
+			},
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "bar"}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{
+						CIDR: "192.168.48.0/24",
+						Except: []string{
+							"192.168.48.1/32",
+							"192.168.48.2/32",
+						},
+					},
+				}},
+			}},
+		},
+	}
+	err := controller.AddNetworkPolicy(netpolFoo)
+	require.NoError(t, err)
+
+	require.Equal(t, 2, len(m.sets[exceptIPSetName].subSets))
+	require.True(t, m.entryExists(exceptIPSetName, "192.168.48.1/32"))
+	require.True(t, m.entryExists(exceptIPSetName, "192.168.48.2/32"))
+
+	// Each egress rule is represented as two iptables rules (-J MARK and -J RETURN).
+	require.Equal(t, 2, len(ipt.rules[EgressCustomChain]))
+	for rule := range ipt.rules[EgressCustomChain] {
+		require.Contains(t, rule, "-d 192.168.48.0/24 -m set ! --match-set "+exceptIPSetName+" dst")
+	}
+
+	// Check that we create a new ipset for the ipBlock bellow. An ipset with the
+	// same content already exists (created by netpolFoo), but we need to create
+	// a new one, as netpolBar is in a different namespace and weave-npc does
+	// object refcounting only within namespace boundaries.
+	netpolBar := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "netpol-foo-bar",
+			Name:      "allow-from-bar-to-foo-in-non-default",
+			Namespace: "non-default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeEgress,
+			},
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"run": "bar"}},
+			Egress: []networkingv1.NetworkPolicyEgressRule{{
+				To: []networkingv1.NetworkPolicyPeer{{
+					IPBlock: &networkingv1.IPBlock{
+						CIDR: "192.168.48.0/24",
+						Except: []string{
+							"192.168.48.1/32",
+							"192.168.48.2/32",
+						},
+					},
+				}},
+			}},
+		},
+	}
+	err = controller.AddNetworkPolicy(netpolBar)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(m.sets[exceptIPSetNameInNonDefault].subSets))
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -58,7 +59,7 @@ func isDockerPluginEnabled(args []string) error {
 
 	ctx := context.Background()
 
-	plugins, err := c.PluginList(ctx)
+	plugins, err := c.PluginList(ctx, filters.Args{})
 	if err != nil {
 		return err
 	}
