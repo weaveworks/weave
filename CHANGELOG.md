@@ -1,3 +1,341 @@
+## Release 1.8.2
+
+Bug fixes and minor improvements
+
+* Fixed a bug where looping flows were installed which caused high CPU
+  usage #2650, #2674
+* Fixed a bug where Kubernetes master could not contact pods #2673, #2683
+* Fixed a bug where weave-kube was crashing in a loop due to invalid
+  Weave bridge state #2657
+* Fixed a bug where iptables NAT rules were not appended due to
+  "temporary unavailable" iptables error #2679
+* Added a detection of enabling the hairpin mode on the Weave bridge port
+  which caused installation of looping flows #2674
+* Added a detection of overlaps between Weave and the host IP address
+  ranges when launching weave-kube #2669, #2672
+* Added logging of connections blocked by weave-npc #2546, #2573
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.8.2).
+
+## Release 1.8.1
+
+Bug fixes and minor improvements
+
+* Fixed weave-npc crash from Succeeded/Failed pods #2632,#2658
+* Fixed occasional failure to create Weave bridge on node reboot
+  #2617,#2637
+* Fixed a bug where weave-kube would fail to install when run with
+  unrelease snapshot builds #2642
+* Improved conformance to CNI spec by not releasing IP addresses when
+  a container dies #2643
+* Improved troubleshooting of install failure by creating CNI config
+  after Weave Net is up #2570
+* "up to date" shown even when the version check was blocked by
+  firewall #2537,#2565,#2645
+* "Unable to claim" message on re-launching Weave after using CNI
+  #2548,#2577
+* Eliminated spurious IP reclaim operations when IPAM was disabled
+  #2567,#2644
+* Include `jq` tool in our build VM configuration #2656
+
+## Release 1.8.0
+
+Highlights:
+
+* Exposed network policy controller Prometheus metrics
+  weaveworks/weave-npc#23, #2595, #2549
+* Exposed router Prometheus metrics #2535, #2547, #2523, #2579, #2578,
+  #2568, #2560, #2561
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.8.0).
+
+## Release 1.7.2
+
+Bug fixes and minor improvements
+
+* Fixed an error where the Docker plugin could fail to attach a
+  container with a `bridge "weave" not present` error #2540/#2541
+* Fixed `cannot connect to itself` panic on weave launch #2527/#2543
+* Fixed inferred initial peer count when target peers includes self
+  #2481/#2543
+* Fixed compilation on Raspberry Pi #2506/#2538
+
+## Release 1.7.1
+
+Bug fixes and minor improvements
+
+* Added utility to recover container addresses without asking Docker #2531
+* Improved CI #2274
+
+## Release 1.7.0
+
+Highlights:
+
+* weave-kube - Deploy Weave Net to Kubernetes with a single command
+* weave-npc - Kubernetes network policy controller implementation
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.7.0).
+
+## Release 1.6.2
+
+Bug fixes and minor improvements
+
+* Fixed hang after stopping and restarting on Docker 1.12 #2469/#2502
+* Avoid an error on Google container images by checking for tx offload support #2504
+* Fixed an issue where the supplied peer list could be ignored when restarting after failure #2503/#2509
+* Check for empty peer name on launch #2495/#2501
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.2).
+
+## Release 1.6.1
+
+Bug fixes and minor improvements
+
+* `weave ps` was occasionally failing to list allocated addresses of containers #2388/#2418/#2445
+* `weave launch[-router]` on 4.2 kernel would appear to succeed even if the fast datapath VXLAN UDP port was in use by a different process #2375/#2474
+* Launching the proxy would fail when the Docker daemon could not be detected #2457/#2424
+* The CNI plugin did not work with Apache Mesos #2394/#2442
+* Router stopped working after a restart in the AWSVPC mode #2381/#2409
+* Router crashed when the Docker API endpoint parameter was explicitly set to empty #2421/#2467
+* The CNI plugin did not work on recent versions of Docker for Mac #2434/#2442
+* The CNI plugin assigns an IP to the bridge if necessary, which avoids failures if `weave expose` has not run yet #2471
+* Distinguish peer name collisions from attempts to connect to self in logs #2460
+* Improve host clock skew detection message #2174
+* Improve the error message returned when executing `weave launch-plugin` without the router running #2293/#2416
+* The `create-bridge` subcommand was not enabled in the fast datapath mode #2464/2466
+* Allow users to omit `weave setup[-cni]` by initializing the CNI plugin on the `launch[-router]` subcommand #2435/#2442
+* Reduce verbosity of fast datapath miss event logs #1852/#2417
+* Include the `ipam` option in the help output of the `status` subcommand #2425/#2426
+* Remove a harmless duplication of the `--no-dns` parameter #2430
+* Internal refactoring
+* Improvements to testing and building
+* Improvements to the documentation
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.1).
+
+## Release 1.6.0
+
+## Highlights
+
+* A new [AWS VPC](https://weave.works/docs/net/latest/using-weave/awsvpc/) mode
+  that leverages Amazon Virtual Private Cloud for near-native network
+  performance, as an alternative to the Sleeve and Fast Datapath
+  overlays
+* Docker 1.12 introduced some internal changes that made it
+  incompatible with previous version of Weave Net - this version
+  restores compatibility
+* An [operational guide](https://weave.works/docs/net/latest/operational-guide)
+  detailing best practices for deploying and operating Weave Net
+* Changes to the target peer list are remembered across restarts,
+  making it much easier to deploy resilient networks
+* The version checkpoint now transmits network mode (e.g. 'awsvpc')
+  and kernel/docker versions to us to inform and guide our development
+  efforts. See the [installation documentation](https://weave.works/docs/net/latest/installing-weave/)
+  for instructions on disabling the checkpoint feature.
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.0).
+
+## Release 1.5.2
+
+Bug fixes and minor improvements
+
+* Weave Proxy did not flush the initial http header in the Docker event stream, which could cause Docker Swarm to show all nodes pending. #2306/#2311
+* When using the CNI plugin, if a container was removed and quickly replaced by another using the same IP address, other containers might be unable to contact it. Send an address resolution protocol message to update them. #2313
+* Avoid Docker hanging for 1 minute in `weave launch` if the plugin had not shut down cleanly #2286/#2292
+* Print an error message when Weave bridge mode is changed without `weave reset` #2304
+* Eliminate spurious warning message from IP allocator on plugin shutdown #2300/#2319
+* Display error message when address requested in a subnet that is too small (/31 or /32) #2282/#2321
+* Add short wait after `weave reset` to allow updates to reach peers #2280
+* Weave was occasionally unable to claim existing IP address immediately after launch #2275/#2281
+* Refactor some integration tests to run faster and more reliably #2291
+
+## Release 1.5.1
+
+Bug fixes and minor improvements
+
+* Persisted data that was rendered invalid by changing peer name or
+  allocation range is detected and removed automatically, preventing
+  crashes and hangs #2246/#2209/#2249
+* `weave rmpeer` persists the range takeover in case the peer on which
+  it was executed dies subsequently #2238
+* Launching a container with an explicit `WEAVE_CIDR` in the
+  allocation range now waits instead of erroring if the allocator
+  hasn't finished initialising #2232/#2265
+* Weave DNS now responds to AAAA queries with an empty answer section,
+  instead of NXDOMAIN which could be cached and block subsequent
+  resolution of A records #2244/#2252
+* Many improvements to the documentation.
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.5.1).
+
+## Release 1.5.0
+
+## Highlights
+
+- A new [Container Network Interface](https://github.com/appc/cni#cni---the-container-network-interface) plugin.
+- This release is much more robust against unscheduled restarts,
+  because it persists key data to disk.
+- New configuration options that are useful when you create or
+  auto-scale larger networks.
+- Weave now periodically checks for updates (can be disabled)
+
+Plus many bug fixes and minor enhancements. More details below and in
+the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.5.0).
+
+## Release 1.4.6
+
+Fixes some issues encountered by our users.
+
+* Restarting a peer could leave stale entries in WeaveDNS
+  #1867/#2023/#2081
+* Weave proxy occasionally failing to attach any new containers
+  #2016/#2049
+
+Other fixes:
+
+* Resolved a crash when a restarting peer re-connected to a peer that
+  had not received the latest IPAM data #2083/#2092
+* Make IP address space available immediately after a dead peer is
+  removed #2068
+
+## Release 1.4.5
+
+Higher performance for multicast and broadcast traffic when using
+Weave's Fast Datapath
+
+* The flow rule to deliver broadcast and multicast packets in-kernel
+  was not created correctly, hence every such packet caused a
+  context-switch to the software router #2003/#2008
+
+Other fixes:
+
+* Remove DNS entries for containers that are being restarted by Docker
+  but are not live yet #1977/#1989
+* Don't let one failing allocation attempt prevent others from
+  succeeding; they could be in different subnets which are more
+  available #1996/#2001
+* Don't complain on second router launch on kernels that lack support
+  for Fast Datapath #1929/#1983
+* Fix build broken by change in libnetwork IPAM API #1984/#1985
+
+## Release 1.4.4
+
+Fixing a rather serious issue that slipped through our preparations
+for Docker 1.10:
+
+* Restarting Docker or rebooting your machine while the Weave Net
+  plugin is running causes Docker 1.10.0 to fail to start #1959/#1963
+
+Also one other small fix:
+
+* Avoid a hang when trying to use plugin and proxy at the same time
+  #1956/#1961
+
+## Release 1.4.3
+
+Preparing for Docker 1.10, plus some bug-fixes.
+
+* Avoid hang in Docker v1.10 on `docker volume ls` after `weave stop`,
+  `weave stop-plugin` or `weave reset` #1934/#1936
+* Fix "unexpected EOF" from Docker 1.10 on `docker exec` with Weave
+  proxy `--rewrite-inspect` enabled #1911/#1917
+* Avoid losing DNS entries and potentially double-allocating IP
+  Addresses allocated via plugin, on router restart; also extend
+  `weave ps` to show IP addresses allocated via plugin #1745/#1921
+* Stop creating lots of copies of `weavewait` program in Docker
+  volumes #1757/#1935
+* Prevent container starting prematurely when proxy in
+`--no-multicast-route` mode #1942/#1943
+* Log error message from plugin rather than crashing when weave not
+  running #1906/#1918
+* Warn, don't error, if unable to remove plugin network in 'weave
+  stop', to avoid breaking the usual upgrade or config change process
+  #1900/#1919
+* Don't crash if network conditions suggest only very small packets
+  will get through #1905/#1926
+* Cope with unexpected errors during route traversal when starting
+  container via proxy #1909/#1910/#1932
+
+## Release 1.4.2
+
+Bug-fixes and minor improvements.
+
+* A race condition in weavewait that would occasionally hang
+  containers at startup #1882/#1884
+* Having the plugin auto-restart prevents successful `weave launch` on
+  reboot #1869
+* Work round weave router failure on CoreOS 4.3 caused by kernel bug
+  #1854
+* `weave launch` would exit with error code on docker <1.9 #1851
+* Running `eval $(weave env)` multiple times would break `eval $(weave
+  env --restore)` #1824/#1825
+* Don't complain in `weave stop` about "Plugin is not running" when
+  plugin is not enabled #1840/#1841
+* `weave --local launch` would fail if utility program
+  `docker_tls_args` could not be found #1844
+* Improved error reporting when TLS arg detection fails #1843
+* Improve error reporting when docker isn't running #1845
+* Add `--trusted-subnets` usage to `weave` script #1842
+* weave run can hang under rare combinations of options #1858
+
+## Release 1.4.1
+
+This is a bug-fix release to cover a few issues that came up since the
+release of 1.4.0.
+
+* Weave would fail to launch when `$DOCKER_HOST` was set to a TCP socket secured with TLS #1820/#1822
+* Weave would fail to stop when run against Docker pre-1.9 #1815/#1817
+* Issue a warning instead of failing on `--with-dns` option to proxy, which was removed #1810/#1812
+* Make `weave version` show the plugin version #1797/#1813
+* Make `weave launch` show when the a container is restarting #1778/#1814
+* Make `weave launch` fail if the plugin is running, for consistency with router and proxy. #1818/#1819
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.4.1).
+
+## Release 1.4.0
+
+**Highlights**
+
+* The Docker Network plugin can now operate without a cluster store, so it is now run by default.
+* You can now use the fast datapath over trusted links and Weave encryption over untrusted links, in the same network.
+
+Plus many bug fixes and minor enhancements. More details below and in
+the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.4.0).
+
+## Release 1.3.1
+
+**Highlights**
+
+* The minimum Docker version has been increased to 1.6 due to the
+  [upcoming deprecation of Dockerhub access](https://blog.docker.com/2015/10/docker-hub-deprecation-1-5/)
+  for old clients. From December 7th onwards previous versions of the
+  `weave` script will fail to pull down images from the hub; if you
+  are unable to upgrade to 1.3.1 immediately you can work around this
+  by running `weave --local setup` in conjunction with a compatible
+  Docker client installation
+* Docker networking plugin now works with older kernels and allows you
+  to configure the MTU
+
+More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.3.1).
+
+## Release 1.3.0
+
+**Highlights**
+
+This release includes a Docker Plugin, so you have the option to use
+Weave Net that way. More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.3.0).
+
+## Release 1.2.1
+
+This release contains a number of bug fixes and minor
+enhancements. More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.2.1).
+
+The release is fully compatible with 1.2.0 versions, so existing
+clusters can be upgraded incrementally.
+
 ## Release 1.2.0
 
 **Highlights**

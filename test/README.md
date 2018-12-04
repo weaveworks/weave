@@ -2,7 +2,7 @@ This directory contains integration tests for weave.
 
 ## Requirements
 
-You need two VMs with docker >=1.3.1 installed and listening on TCP
+You need two VMs with docker >=1.6.0 installed and listening on TCP
 port 2375 (see below). You also need to be able to ssh to these VMs,
 preferably without having to input anything.
 
@@ -18,7 +18,7 @@ To meet the aforementioned ssh requirement you may want to
 
 ## Running tests
 
-If you are [building weave using Vagrant](http://docs.weave.works/weave/latest_release/building.html),
+If you are [building weave using Vagrant](https://www.weave.works/docs/net/latest/building/),
 it is recommended to run the tests from the build VM and not the host.
 
     ./setup.sh

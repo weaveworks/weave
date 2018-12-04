@@ -1,4 +1,9 @@
-$go_version = "1.4.2"
+$go_regexp = /FROM golang:(\S*).*?/
+$dockerfile_path = File.expand_path(File.join(File.dirname(__FILE__), 'build', 'Dockerfile'))
+$go_version = File.readlines($dockerfile_path).first { |line| line.match($go_regexp) }.match($go_regexp).captures.first
+if $go_version.nil?
+  raise ArgumentError.new("Failed to read Go version from Dockerfile.")
+end
 
 $go_path = "/usr/local/go/bin"
 
@@ -15,7 +20,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-key adv \
   --keyserver hkp://p80.pool.sks-keyservers.net:80 \
   --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-echo 'deb https://apt.dockerproject.org/repo ubuntu-vivid main' \
+echo 'deb https://apt.dockerproject.org/repo ubuntu-wily main' \
   > /etc/apt/sources.list.d/docker.list
 SCRIPT
   install_packages(vm, pkgs)
@@ -45,7 +50,12 @@ end
 def tweak_docker_daemon(vm)
   vm.provision :shell, :inline => <<SCRIPT
 usermod -a -G docker vagrant
-sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service
+mkdir -p /etc/systemd/system/docker.service.d
+cat >/etc/systemd/system/docker.service.d/override.conf  <<EOF
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay
+EOF
 systemctl daemon-reload
 systemctl restart docker
 systemctl enable docker

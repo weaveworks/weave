@@ -8,15 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 var now = func() int64 { return time.Now().Unix() }
 
 type Entry struct {
 	ContainerID string
-	Origin      router.PeerName
+	Origin      mesh.PeerName
 	Addr        address.Address
 	Hostname    string // as supplied
 	lHostname   string // lowercased (not exported, so not encoded by gob)
@@ -93,6 +94,9 @@ func (e1 *Entry) merge(e2 *Entry) bool {
 		e1.Version = e2.Version
 		e1.Tombstone = e2.Tombstone
 		return true
+	} else if e2.Version == e1.Version && e2.Tombstone > e1.Tombstone {
+		e1.Tombstone = e2.Tombstone
+		return true
 	}
 	return false
 }
@@ -105,9 +109,18 @@ func (e1 *Entry) addLowercase() {
 	e1.lHostname = strings.ToLower(e1.Hostname)
 }
 
+func (e1 *Entry) tombstone() bool {
+	if e1.Tombstone > 0 {
+		return false
+	}
+	e1.Tombstone = now()
+	e1.Version++
+	return true
+}
+
 func check(es SortableEntries) error {
 	if !sort.IsSorted(es) {
-		return fmt.Errorf("Not sorted!")
+		return fmt.Errorf("Not sorted")
 	}
 	for i := 1; i < es.Len(); i++ {
 		if es.Get(i).equal(es.Get(i - 1)) {
@@ -128,7 +141,7 @@ func (es *Entries) checkAndPanic() *Entries {
 	return es
 }
 
-func (es *Entries) add(hostname, containerid string, origin router.PeerName, addr address.Address) Entry {
+func (es *Entries) add(hostname, containerid string, origin mesh.PeerName, addr address.Address) Entry {
 	defer es.checkAndPanic().checkAndPanic()
 
 	entry := Entry{Hostname: hostname, lHostname: strings.ToLower(hostname),
@@ -176,14 +189,12 @@ func (es *Entries) merge(incoming Entries) Entries {
 }
 
 // f returning true means keep the entry.
-func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entries {
+func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries {
 	defer es.checkAndPanic().checkAndPanic()
 
 	tombstoned := Entries{}
 	for i, e := range *es {
-		if f(&e) && e.Origin == ourname {
-			e.Version++
-			e.Tombstone = now()
+		if f(&e) && e.Origin == ourname && e.tombstone() {
 			(*es)[i] = e
 			tombstoned = append(tombstoned, e)
 		}
@@ -191,6 +202,7 @@ func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entri
 	return tombstoned
 }
 
+// note f() may only modify entries such that they remain in order defined by less()
 func (es *Entries) filter(f func(*Entry) bool) {
 	defer es.checkAndPanic().checkAndPanic()
 
@@ -203,6 +215,16 @@ func (es *Entries) filter(f func(*Entry) bool) {
 		i++
 	}
 	*es = (*es)[:i]
+}
+
+func (es Entries) findEqual(e *Entry) (*Entry, bool) {
+	i := sort.Search(len(es), func(i int) bool {
+		return !es[i].insensitiveLess(e)
+	})
+	if i < len(es) && es[i].equal(*e) {
+		return &es[i], true
+	}
+	return nil, false
 }
 
 func (es Entries) lookup(hostname string) Entries {
@@ -245,12 +267,14 @@ type GossipData struct {
 	Entries
 }
 
-func (g *GossipData) Merge(o router.GossipData) {
+func (g *GossipData) Merge(o mesh.GossipData) mesh.GossipData {
 	other := o.(*GossipData)
-	g.Entries.merge(other.Entries)
-	if g.Timestamp < other.Timestamp {
-		g.Timestamp = other.Timestamp
+	gossip := g.copy()
+	gossip.Entries.merge(other.Entries)
+	if gossip.Timestamp < other.Timestamp {
+		gossip.Timestamp = other.Timestamp
 	}
+	return gossip
 }
 
 func (g *GossipData) Decode(msg []byte) error {
@@ -264,13 +288,17 @@ func (g *GossipData) Decode(msg []byte) error {
 }
 
 func (g *GossipData) Encode() [][]byte {
-	// Make a copy so we can sort: all outgoing data is sent in case-sensitive order
-	g2 := GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
-	copy(g2.Entries, g.Entries)
+	g2 := g.copy()
 	sort.Sort(CaseSensitive(g2.Entries))
 	buf := &bytes.Buffer{}
 	if err := gob.NewEncoder(buf).Encode(g2); err != nil {
 		panic(err)
 	}
 	return [][]byte{buf.Bytes()}
+}
+
+func (g *GossipData) copy() *GossipData {
+	g2 := &GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
+	copy(g2.Entries, g.Entries)
+	return g2
 }

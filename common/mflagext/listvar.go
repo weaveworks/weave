@@ -3,7 +3,7 @@ package mflagext
 import (
 	"fmt"
 
-	"github.com/docker/docker/pkg/mflag"
+	"github.com/weaveworks/docker/pkg/mflag"
 )
 
 type listOpts struct {

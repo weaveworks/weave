@@ -5,21 +5,29 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/pkg/mflag"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/docker/pkg/mflag"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/mflagext"
 	"github.com/weaveworks/weave/proxy"
 )
 
-var (
-	version = "(unreleased version)"
-)
+var version = "unreleased"
+
+var Log = common.Log
+
+func getenv(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
+}
 
 func main() {
 	var (
 		justVersion bool
 		logLevel    = "info"
-		c           = proxy.Config{ListenAddrs: []string{}}
+		c           proxy.Config
+		withDNS     bool
 	)
 
 	c.Version = version
@@ -35,11 +43,12 @@ func main() {
 	mflag.BoolVar(&c.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&c.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
 	mflag.StringVar(&c.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
-	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tls-verify")
+	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&c.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
-	mflag.BoolVar(&c.WithDNS, []string{"-with-dns", "w"}, false, "instruct created containers to always use weaveDNS as their nameserver")
+	mflag.BoolVar(&withDNS, []string{"#-with-dns", "#w"}, false, "option removed")
 	mflag.BoolVar(&c.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
+	mflag.BoolVar(&c.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
 	mflag.Parse()
 
 	if justVersion {
@@ -47,23 +56,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	if c.WithDNS && c.WithoutDNS {
-		Log.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
-	}
-
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	if withDNS {
+		Log.Warning("--with-dns option has been removed; DNS is on by default")
+	}
+
+	c.Image = getenv("EXEC_IMAGE", "weaveworks/weaveexec")
+	c.DockerBridge = getenv("DOCKER_BRIDGE", "docker0")
+	c.DockerHost = getenv("DOCKER_HOST", "unix:///var/run/docker.sock")
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
 		Log.Fatalf("Could not start proxy: %s", err)
 	}
+	defer p.Stop()
 
 	listeners := p.Listen()
 	p.AttachExistingContainers()
 	go p.Serve(listeners)
 	go p.ListenAndServeStatus("/home/weave/status.sock")
-	SignalHandlerLoop()
+	common.SignalHandlerLoop()
 }

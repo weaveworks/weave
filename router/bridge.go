@@ -1,5 +1,9 @@
 package router
 
+import (
+	"net"
+)
+
 // Interface to packet handling on the local virtual bridge
 type Bridge interface {
 	// Inject a packet to be delivered locally
@@ -9,6 +13,7 @@ type Bridge interface {
 	// should not be included.
 	StartConsumingPackets(BridgeConsumer) error
 
+	Interface() *net.Interface
 	String() string
 	Stats() map[string]int
 }
@@ -26,8 +31,12 @@ func (NullBridge) StartConsumingPackets(BridgeConsumer) error {
 	return nil
 }
 
+func (NullBridge) Interface() *net.Interface {
+	return nil
+}
+
 func (NullBridge) String() string {
-	return "<no bridge networking>"
+	return "no overlay bridge"
 }
 
 func (NullBridge) Stats() map[string]int {

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 NAME=multicidr.weave.local
 
@@ -77,7 +77,7 @@ CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Stop the container
-docker_on              $HOST1 stop $CID
+docker_on              $HOST1 stop -t 1 $CID
 assert_ips_and_dns     $HOST1 $CID $NAME.
 
 # Restart with three IPs
@@ -121,5 +121,9 @@ IPS=$(weave_on         $HOST1 detach                                            
 assert_equal "$IPS"                                                      10.2.3.1
 CID2=$(start_container $HOST1                                        net:10.2.3.0/24)
 assert_container_cidrs $HOST1 $CID2                                      10.2.3.1/24
+
+# Error conditions: host address not network, subnet too small
+assert_raises "start_container $HOST1                                net:10.2.3.2/30" 1
+assert_raises "start_container $HOST1                                net:10.2.3.2/31" 1
 
 end_suite

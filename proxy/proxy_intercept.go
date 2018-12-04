@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
 )
 
 func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
@@ -78,19 +77,22 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	}
 	defer down.Close()
 	defer up.Close()
+	defer func() {
+		if err != nil {
+			Log.Warning(err)
+		}
+	}()
 
-	if _, err := down.Write([]byte("HTTP/1.1 200 OK\n")); err != nil {
-		Log.Warning(err)
+	if _, err = downBuf.Write([]byte("HTTP/1.1 " + resp.Status + "\n")); err != nil {
 		return
 	}
-
-	if err := resp.Header.Write(down); err != nil {
-		Log.Warning(err)
+	if err = resp.Header.Write(downBuf); err != nil {
 		return
 	}
-
-	if _, err := down.Write([]byte("\n")); err != nil {
-		Log.Warning(err)
+	if _, err = downBuf.Write([]byte("\n")); err != nil {
+		return
+	}
+	if err = downBuf.Flush(); err != nil {
 		return
 	}
 
@@ -134,6 +136,7 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 	}
 
 	w.WriteHeader(resp.StatusCode)
+	wf.Flush()
 
 	up, remaining := client.Hijack()
 	defer up.Close()

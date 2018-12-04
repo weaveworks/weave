@@ -2,8 +2,6 @@ package proxy
 
 import (
 	"net/http"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type inspectExecInterceptor struct{ proxy *Proxy }
@@ -20,6 +18,10 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 	exec := jsonObject{}
 	if err := unmarshalResponseBody(r, &exec); err != nil {
 		return err
+	}
+
+	if _, ok := exec["Container"]; !ok {
+		return nil
 	}
 
 	container, err := exec.Object("Container")

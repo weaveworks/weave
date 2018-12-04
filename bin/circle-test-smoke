@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+
+source "$STATE"
+
+if [ -n "$TEST_AND_PUBLISH" ] ; then
+    [ -n "$SECRET_PASSWORD" ] || { echo "Cannot run smoke tests: no secret key"; exit 1; }
+    cd $SRCDIR/test
+    eval $(./gce.sh hosts)
+    export COVERAGE=true
+    export WEAVE_NET_SANITY_CHECKS_FILES="$CIRCLE_ARTIFACTS/weave_net_sanity_check_*.log"
+    ./run_all.sh
+fi

@@ -40,8 +40,11 @@ TEST_IMAGES="$SMALL_IMAGE $DNS_IMAGE"
 
 PING="ping -nq -W 1 -c 1"
 CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
+CHECK_ETHWE_MISSING="test ! -d /sys/class/net/ethwe"
 
 DOCKER_PORT=2375
+
+CHECKPOINT_DISABLE=true
 
 upload_executable() {
     host=$1
@@ -117,20 +120,16 @@ weave_on() {
     host=$1
     shift 1
     [ -z "$DEBUG" ] || greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
-    DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
+    CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
-stop_router_on() {
+stop_weave_on() {
     host=$1
-    shift 1
-    # we don't invoke `weave stop-router` here because that removes
-    # the weave container, which means we a) can't grab coverage
-    # stats, and b) can't inspect the logs when tests fail.
-    docker_on $host stop weave 1>/dev/null 2>&1 || true
-    docker_on $host stop weaveproxy 1>/dev/null 2>&1 || true
-    if [ -n "$COVERAGE" ] ; then
-        collect_coverage $host weave
-        collect_coverage $host weaveproxy
+    weave_on $host stop 1>/dev/null 2>&1 || true
+    if [ -n "$COVERAGE" ]; then
+        for C in weaveplugin weaveproxy weave ; do
+            collect_coverage $host $C
+        done
     fi
 }
 
@@ -150,7 +149,14 @@ start_container() {
 start_container_with_dns() {
     host=$1
     shift 1
-    weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
+    weave_on $host run "$@" -t $DNS_IMAGE /bin/sh
+}
+
+start_container_local_plugin() {
+    host=$1
+    shift 1
+    # using ssh rather than docker -H because CircleCI docker client is older
+    $SSH $host docker run "$@" -dt --net=weave $SMALL_IMAGE /bin/sh
 }
 
 proxy_start_container() {
@@ -165,14 +171,44 @@ proxy_start_container_with_dns() {
     proxy docker_on $host run "$@" -dt $DNS_IMAGE /bin/sh
 }
 
+wait_for_proxy() {
+    for i in $(seq 1 120); do
+        echo "Waiting for proxy to start"
+        if proxy docker_on $1 info > /dev/null 2>&1 ; then
+            return
+        fi
+        sleep 1
+    done
+    echo "Timed out waiting for proxy to start" >&2
+    exit 1
+}
+
 rm_containers() {
     host=$1
     shift
-    [ $# -eq 0 ] || docker_on $host rm -f "$@" >/dev/null
+    [ $# -eq 0 ] || docker_on $host rm -f -v "$@" >/dev/null
 }
 
 container_ip() {
     weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+}
+
+container_pid() {
+    docker_on $1 inspect -f '{{.State.Pid}}' $2
+}
+
+wait_for_attached() {
+    host=$1
+    container=$2
+    for i in $(seq 1 10); do
+        echo "Waiting for $container on $host to be attached"
+        if exec_on $host $container $CHECK_ETHWE_UP > /dev/null 2>&1 ; then
+            return
+        fi
+        sleep 1
+    done
+    echo "Timed out waiting for $container on $host to be attached" >&2
+    exit 1
 }
 
 # assert_dns_record <host> <container> <name> [<ip> ...]
@@ -213,11 +249,31 @@ assert_dns_ptr_record() {
     assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
 }
 
+# Kill a container process and make sure it's restarted by Docker
+check_restart() {
+    OLD_PID=$(container_pid $1 $2)
+
+    run_on $1 sudo kill $OLD_PID
+
+    for i in $(seq 1 10); do
+        NEW_PID=$(container_pid $1 $2)
+
+        if [ $NEW_PID != 0 -a $NEW_PID != $OLD_PID ] ; then
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    return 1
+}
+
 start_suite() {
     for host in $HOSTS; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
+        PLUGIN_FILTER=$(docker_on $host inspect -f 'grep -v {{printf "%.12s" .Id}}' weaveplugin 2>/dev/null) || PLUGIN_FILTER=cat
+        rm_containers $host $(docker_on $host ps -aq 2>/dev/null | $PLUGIN_FILTER)
         weave_on $host reset 2>/dev/null
-        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
     done
     whitely echo "$@"
 }
@@ -225,7 +281,7 @@ start_suite() {
 end_suite() {
     whitely assert_end
     for host in $HOSTS; do
-        stop_router_on $host
+        stop_weave_on $host
     done
 }
 

@@ -22,6 +22,14 @@ const (
 
 func returnFalse() bool { return false }
 
+func (alloc *Allocator) SimplyAllocate(ident string, cidr address.CIDR) (address.Address, error) {
+	return alloc.Allocate(ident, cidr, true, returnFalse)
+}
+
+func (alloc *Allocator) SimplyClaim(ident string, cidr address.CIDR) error {
+	return alloc.Claim(ident, cidr, true, true, returnFalse)
+}
+
 func TestAllocFree(t *testing.T) {
 	const (
 		container1 = "abcdef"
@@ -37,40 +45,54 @@ func TestAllocFree(t *testing.T) {
 
 	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
-	_, cidr1, _ := address.ParseCIDR(subnet1)
-	_, cidr2, _ := address.ParseCIDR(subnet2)
+	cidr1, _ := address.ParseCIDR(subnet1)
+	cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
+	addr1, err := alloc.SimplyAllocate(container1, cidr1)
 	require.NoError(t, err)
 	require.Equal(t, testAddr1, addr1.String(), "address")
 
-	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
+	addr2, err := alloc.SimplyAllocate(container1, cidr2)
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
+	addrs, err := alloc.Lookup(container1, subnet.Range())
+	require.NoError(t, err)
+	require.Equal(t, []address.CIDR{address.MakeCIDR(cidr1, addr1), address.MakeCIDR(cidr2, addr2)}, addrs)
+
 	// Ask for another address for a different container and check it's different
-	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
+	addr1b, _ := alloc.SimplyAllocate(container2, cidr1)
 	if addr1b.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr1b.String())
 	}
 
 	// Ask for the first container again and we should get the same addresses again
-	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
+	addr1a, _ := alloc.SimplyAllocate(container1, cidr1)
 	require.Equal(t, testAddr1, addr1a.String(), "address")
-	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
+	addr2a, _ := alloc.SimplyAllocate(container1, cidr2)
 	require.Equal(t, testAddr2, addr2a.String(), "address")
 
 	// Now delete the first container, and we should get its addresses back
 	require.NoError(t, alloc.Delete(container1))
-	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), returnFalse)
+	addr3, _ := alloc.SimplyAllocate(container3, cidr1)
 	require.Equal(t, testAddr1, addr3.String(), "address")
-	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), returnFalse)
+	addr4, _ := alloc.SimplyAllocate(container3, cidr2)
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
+
+	// Resurrect
+	addr1c, err := alloc.SimplyAllocate(container2, cidr1)
+	require.NoError(t, err)
+	require.Equal(t, addr1b, addr1c, "address")
+
 	alloc.ContainerDied(container3)
-	require.Equal(t, address.Offset(spaceSize), alloc.NumFreeAddresses(subnet))
+	alloc.Encode() // sync up
+	// Move the clock forward and clear out the dead container
+	alloc.actionChan <- func() { alloc.now = func() time.Time { return time.Now().Add(containerDiedTimeout * 2) } }
+	alloc.actionChan <- func() { alloc.removeDeadContainers() }
+	require.Equal(t, address.Count(spaceSize+1), alloc.NumFreeAddresses(subnet.Range()))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -95,7 +117,7 @@ func TestBootstrap(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil) // alloc1 will try to form consensus
 	done := make(chan bool)
 	go func() {
-		alloc1.Allocate("somecontainer", subnet, returnFalse)
+		alloc1.Allocate("somecontainer", subnet, true, returnFalse)
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -103,6 +125,7 @@ func TestBootstrap(t *testing.T) {
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
+	// Check that tryPendingOps doesn't cause anything to happen here
 	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 	AssertNothingSent(t, done)
 
@@ -115,14 +138,24 @@ func TestBootstrap(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
-	// both nodes will get consensus now so initialize the ring
+	CheckAllExpectedMessagesSent(alloc1, alloc2)
+
+	// at this point, both nodes have seen each other, but don't have a valid proposal
+	// so there is another exchange of messages
 	ExpectBroadcastMessage(alloc2, nil)
-	ExpectBroadcastMessage(alloc2, nil)
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
+
+	// we have consensus now so alloc1 will initialize the ring
+	ExpectBroadcastMessage(alloc1, nil)
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
+
+	CheckAllExpectedMessagesSent(alloc1, alloc2)
+
+	// alloc2 receives the ring and does not reply
 	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 	// now alloc1 should have space
 
 	AssertSent(t, done)
@@ -135,42 +168,42 @@ func TestAllocatorClaim(t *testing.T) {
 		container1 = "abcdef"
 		container3 = "b01df00d"
 		universe   = "10.0.3.0/24"
-		testAddr1  = "10.0.3.2"
-		testAddr2  = "10.0.4.2"
+		testAddr1  = "10.0.3.2/24"
+		testAddr2  = "10.0.4.2/24"
 	)
 
-	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	allocs, router, subnet := makeNetworkOfAllocators(2, universe)
+	defer stopNetworkOfAllocators(allocs, router)
 	alloc := allocs[1]
-	defer alloc.Stop()
-	addr1, _ := address.ParseIP(testAddr1)
+	addr1, _ := address.ParseCIDR(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
-	err := alloc.Claim(container3, addr1, true)
+	err := alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 
-	// Do one allocate to ensure paxos is all done
-	alloc.Allocate("unused", subnet, returnFalse)
+	alloc.Prime()
 	// Do an allocate on the other peer, which we will try to claim later
-	addrx, err := allocs[0].Allocate(container1, subnet, returnFalse)
+	addrx, err := allocs[0].Allocate(container1, subnet, true, returnFalse)
+	router.Flush()
 
 	// Now try the claim again
-	err = alloc.Claim(container3, addr1, true)
+	err = alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
-	addr3, _ := alloc.Allocate(container3, subnet, returnFalse)
-	require.Equal(t, testAddr1, addr3.String(), "address")
+	addr3, _ := alloc.SimplyAllocate(container3, subnet)
+	require.Equal(t, testAddr1, address.MakeCIDR(subnet, addr3).String(), "address")
 	// one more claim should still work
-	err = alloc.Claim(container3, addr1, true)
+	err = alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 	// claim for a different container should fail
-	err = alloc.Claim(container1, addr1, true)
+	err = alloc.SimplyClaim(container1, addr1)
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
-	err = alloc.Claim(container1, addrx, true)
+	err = alloc.SimplyClaim(container1, address.MakeCIDR(subnet, addrx))
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
-	addr2, _ := address.ParseIP(testAddr2)
-	err = alloc.Claim(container1, addr2, true)
+	addr2, _ := address.ParseCIDR(testAddr2)
+	err = alloc.SimplyClaim(container1, addr2)
 	require.NoError(t, err)
 }
 
@@ -187,16 +220,13 @@ func (alloc *Allocator) pause() func() {
 }
 
 func TestCancel(t *testing.T) {
-	const (
-		CIDR = "10.0.1.7/26"
-	)
-
+	const cidr = "10.0.4.0/26"
 	router := gossip.NewTestRouter(0.0)
 
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", CIDR, 2)
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2)
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
@@ -208,9 +238,9 @@ func TestCancel(t *testing.T) {
 	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
-	res1, _ := alloc1.Allocate("foo", subnet, returnFalse)
+	res1, _ := alloc1.Allocate("foo", subnet, true, returnFalse)
 	common.Log.Debugf("res1 = %s", res1.String())
-	res2, _ := alloc2.Allocate("bar", subnet, returnFalse)
+	res2, _ := alloc2.Allocate("bar", subnet, true, returnFalse)
 	common.Log.Debugf("res2 = %s", res2.String())
 	if res1 == res2 {
 		require.FailNow(t, "Error: got same ips!")
@@ -221,13 +251,13 @@ func TestCancel(t *testing.T) {
 	unpause := alloc2.pause()
 
 	// Use up all the IPs that alloc1 owns, so the allocation after this will prompt a request to alloc2
-	for i := 0; alloc1.NumFreeAddresses(subnet) > 0; i++ {
-		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, returnFalse)
+	for i := 0; alloc1.NumFreeAddresses(subnet.HostRange()) > 0; i++ {
+		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, true, returnFalse)
 	}
 	cancelChan := make(chan bool, 1)
 	doneChan := make(chan bool)
 	go func() {
-		_, ok := alloc1.Allocate("baz", subnet,
+		_, ok := alloc1.Allocate("baz", subnet, true,
 			func() bool {
 				select {
 				case <-cancelChan:
@@ -251,18 +281,18 @@ func TestCancel(t *testing.T) {
 
 func TestCancelOnDied(t *testing.T) {
 	const (
-		CIDR       = "10.0.1.7/26"
+		cidr       = "10.0.4.0/26"
 		container1 = "abcdef"
 	)
 
 	router := gossip.NewTestRouter(0.0)
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 	alloc1.Start()
 
 	doneChan := make(chan bool)
 	f := func() {
-		_, ok := alloc1.Allocate(container1, subnet, returnFalse)
+		_, ok := alloc1.Allocate(container1, subnet, true, returnFalse)
 		doneChan <- ok == nil
 	}
 
@@ -293,62 +323,80 @@ func TestGossipShutdown(t *testing.T) {
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
-	alloc.Allocate(container1, subnet, returnFalse)
+	alloc.SimplyAllocate(container1, subnet)
 
 	alloc.Shutdown()
 
-	_, err := alloc.Allocate(container2, subnet, returnFalse) // trying to allocate after shutdown should fail
+	_, err := alloc.SimplyAllocate(container2, subnet) // trying to allocate after shutdown should fail
 	require.False(t, err == nil, "no address")
 
 	CheckAllExpectedMessagesSent(alloc)
 }
 
+func TestNoFrag(t *testing.T) {
+	const cidr = "10.0.4.0/22"
+	resultChan := make(chan int)
+	for i := 0; i < 100; i++ {
+		allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
+		allocs[1].Allocate("foo", subnet, true, returnFalse)
+		allocs[2].Allocate("bar", subnet, true, returnFalse)
+		allocs[2].actionChan <- func() {
+			resultChan <- len(allocs[2].ring.Entries)
+		}
+		require.True(t, <-resultChan < 6, "excessive ring fragmentation")
+		stopNetworkOfAllocators(allocs, router)
+	}
+}
+
 func TestTransfer(t *testing.T) {
-	const (
-		cidr = "10.0.1.7/22"
-	)
+	const cidr = "10.0.4.0/22"
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
-	alloc1 := allocs[0]
-	alloc2 := allocs[1]
-	alloc3 := allocs[2] // This will be 'master' and get the first range
+	defer stopNetworkOfAllocators(allocs, router)
+	alloc0 := allocs[0]
+	alloc1 := allocs[1]
+	alloc2 := allocs[2]
 
-	_, err := alloc2.Allocate("foo", subnet, returnFalse)
+	_, err := alloc1.Allocate("foo", subnet, true, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
-	_, err = alloc3.Allocate("bar", subnet, returnFalse)
+	_, err = alloc2.Allocate("bar", subnet, true, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
+	// simulation of periodic gossip
 	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
-	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
+	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
 	router.Flush()
+
+	free1 := alloc1.NumFreeAddresses(subnet.Range())
+	free2 := alloc2.NumFreeAddresses(subnet.Range())
+
+	router.RemovePeer(alloc1.ourName)
 	router.RemovePeer(alloc2.ourName)
-	router.RemovePeer(alloc3.ourName)
-	alloc2.Stop()
-	alloc3.Stop()
-	router.Flush()
-	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
-	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
-	router.Flush()
-
-	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
-
-	_, err = alloc1.Allocate("foo", subnet, returnFalse)
-	require.True(t, err == nil, "Failed to get address")
 	alloc1.Stop()
+	alloc2.Stop()
+	router.Flush()
+
+	require.Equal(t, free1+1, alloc0.AdminTakeoverRanges(alloc1.ourName.String()))
+	require.Equal(t, free2+1, alloc0.AdminTakeoverRanges(alloc2.ourName.String()))
+	router.Flush()
+
+	require.Equal(t, address.Count(1024), alloc0.NumFreeAddresses(subnet.Range()))
+
+	_, err = alloc0.Allocate("foo", subnet, true, returnFalse)
+	require.True(t, err == nil, "Failed to get address")
+	alloc0.Stop()
 }
 
 func TestFakeRouterSimple(t *testing.T) {
-	const (
-		cidr = "10.0.1.7/22"
-	)
-	allocs, _, subnet := makeNetworkOfAllocators(2, cidr)
-	defer stopNetworkOfAllocators(allocs)
+	const cidr = "10.0.4.0/22"
+	allocs, router, subnet := makeNetworkOfAllocators(2, cidr)
+	defer stopNetworkOfAllocators(allocs, router)
 
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	_, err := alloc1.Allocate("foo", subnet, returnFalse)
+	_, err := alloc1.Allocate("foo", subnet, true, returnFalse)
 	require.NoError(t, err, "Failed to get address")
 }
 
@@ -359,10 +407,10 @@ func TestAllocatorFuzz(t *testing.T) {
 		nodes        = 5
 		maxAddresses = 1000
 		concurrency  = 5
-		cidr         = "10.0.1.7/22"
+		cidr         = "10.0.4.0/22"
 	)
-	allocs, _, subnet := makeNetworkOfAllocators(nodes, cidr)
-	defer stopNetworkOfAllocators(allocs)
+	allocs, router, subnet := makeNetworkOfAllocators(nodes, cidr)
+	defer stopNetworkOfAllocators(allocs, router)
 
 	// Test state
 	// For each IP issued we store the allocator
@@ -429,7 +477,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
 		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, returnFalse)
+		addr, err := alloc.SimplyAllocate(name, subnet)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
@@ -486,7 +534,7 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		//common.Log.Infof("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
-		newAddr, _ := alloc.Allocate(res.name, subnet, returnFalse)
+		newAddr, _ := alloc.SimplyAllocate(res.name, subnet)
 		oldAddr, _ := address.ParseIP(addr)
 		if newAddr != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
@@ -506,8 +554,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		addressIndex := rand.Int31n(int32(subnet.Size()))
 		alloc := allocs[allocIndex]
-		addr := address.Add(subnet.Start, address.Offset(addressIndex))
-		err := alloc.Claim(name, addr, true)
+		addr := address.Add(subnet.Addr, address.Offset(addressIndex))
+		err := alloc.SimplyClaim(name, address.MakeCIDR(subnet, addr))
 		if err == nil {
 			noteAllocation(allocIndex, name, addr)
 		}
@@ -563,14 +611,36 @@ func TestAllocatorFuzz(t *testing.T) {
 	})
 }
 
-func TestGossipSkew(t *testing.T) {
-	alloc1, _ := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", "10.0.1.0/22", 2)
-	defer alloc1.Stop()
-	alloc2, _ := makeAllocatorWithMockGossip(t, "02:00:00:02:00:00", "10.0.1.0/22", 2)
-	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
-	defer alloc2.Stop()
+func TestSpaceRequest(t *testing.T) {
+	const (
+		container1 = "cont-1"
+		container2 = "cont-2"
+		universe   = "10.32.0.0/12"
+	)
+	allocs, router, subnet := makeNetworkOfAllocators(1, universe)
+	defer stopNetworkOfAllocators(allocs, router)
+	alloc1 := allocs[0]
 
-	if _, err := alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode()); err == nil {
-		t.Fail()
-	}
+	addr, err := alloc1.Allocate(container1, subnet, true, returnFalse)
+	require.Nil(t, err, "")
+	// free it again so the donation splits the range neatly
+	err = alloc1.Free(container1, addr)
+	require.Nil(t, err, "")
+	require.Equal(t, cidrRanges(universe), alloc1.OwnedRanges(), "")
+
+	// Start a new peer
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2)
+	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
+	alloc2.Start()
+	defer alloc2.Stop()
+	alloc2.Allocate(container2, subnet, true, returnFalse)
+
+	// Test whether the universe has been split into two equal halves (GH #2009)
+	require.Equal(t, cidrRanges("10.32.0.0/13"), alloc1.OwnedRanges(), "")
+	require.Equal(t, cidrRanges("10.40.0.0/13"), alloc2.OwnedRanges(), "")
+}
+
+func cidrRanges(s string) []address.Range {
+	c, _ := address.ParseCIDR(s)
+	return []address.Range{c.Range()}
 }

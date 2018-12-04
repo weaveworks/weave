@@ -3,10 +3,8 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 var (
@@ -22,6 +20,8 @@ var (
 	weaveWaitEntrypoint = []string{"/w/w"}
 	weaveEntrypoint     = "/home/weave/weaver"
 	weaveContainerName  = "/weave"
+
+	Log = common.Log
 )
 
 func callWeave(args ...string) ([]byte, []byte, error) {
@@ -29,7 +29,6 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	cmd := exec.Command("./weave", args...)
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"PROCFS=/hostproc",
 	}
 
 	propagateEnv := func(key string) {
@@ -38,14 +37,17 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 		}
 	}
 
-	propagateEnv("DOCKER_BRIDGE")
+	propagateEnv("DOCKER_HOST")
 
-	// Propogage WEAVE_DEBUG, to make debugging easier.
+	// Propagate WEAVE_DEBUG, to make debugging easier.
 	propagateEnv("WEAVE_DEBUG")
 
 	// This prevents the code coverage contortions in our
 	// integration test suite breaking things.
 	propagateEnv("COVERAGE")
+
+	// In case the router control endpoint address is non-standard.
+	propagateEnv("WEAVE_HTTP_ADDR")
 
 	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
 	var stdout, stderr bytes.Buffer
@@ -127,31 +129,24 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 	return container, err
 }
 
-func weaveContainerIPs(containerID string) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
-	stdout, stderr, err := callWeave("ps", containerID)
-	if err != nil || len(stderr) > 0 {
-		err = errors.New(string(stderr))
-		return
-	}
-	if len(stdout) <= 0 {
-		return
+func addVolume(hostConfig jsonObject, source, target, mode string) error {
+	configBinds, err := hostConfig.StringArray("Binds")
+	if err != nil {
+		return err
 	}
 
-	fields := strings.Fields(string(stdout))
-	if len(fields) < 2 {
-		return
-	}
-	mac = fields[1]
-
-	var ip net.IP
-	var ipnet *net.IPNet
-	for _, cidr := range fields[2:] {
-		ip, ipnet, err = net.ParseCIDR(cidr)
-		if err != nil {
-			return
+	var binds []string
+	for _, bind := range configBinds {
+		s := strings.Split(bind, ":")
+		if len(s) >= 2 && s[1] == target {
+			continue
 		}
-		ips = append(ips, ip)
-		nets = append(nets, ipnet)
+		binds = append(binds, bind)
 	}
-	return
+	bind := source + ":" + target
+	if mode != "" {
+		bind += ":" + mode
+	}
+	hostConfig["Binds"] = append(binds, bind)
+	return nil
 }

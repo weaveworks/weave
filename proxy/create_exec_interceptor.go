@@ -3,8 +3,6 @@ package proxy
 import (
 	"net/http"
 	"strings"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type createExecInterceptor struct{ proxy *Proxy }

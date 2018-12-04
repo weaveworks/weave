@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 func l(es Entries) Entries {
@@ -28,21 +28,21 @@ func TestAdd(t *testing.T) {
 	now = func() int64 { return 1234 }
 
 	entries := Entries{}
-	entries.add("A", "", router.UnknownPeerName, address.Address(0))
+	entries.add("A", "", mesh.UnknownPeerName, address.Address(0))
 	expected := l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0)},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0)},
 	})
 	require.Equal(t, entries, expected)
 
-	entries.tombstone(router.UnknownPeerName, func(e *Entry) bool { return e.Hostname == "A" })
+	entries.tombstone(mesh.UnknownPeerName, func(e *Entry) bool { return e.Hostname == "A" })
 	expected = l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0), Version: 1, Tombstone: 1234},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0), Version: 1, Tombstone: 1234},
 	})
 	require.Equal(t, entries, expected)
 
-	entries.add("A", "", router.UnknownPeerName, address.Address(0))
+	entries.add("A", "", mesh.UnknownPeerName, address.Address(0))
 	expected = l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0), Version: 2},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0), Version: 2},
 	})
 	require.Equal(t, entries, expected)
 }
@@ -78,7 +78,7 @@ func TestTombstone(t *testing.T) {
 
 	es := makeEntries("AB")
 
-	es.tombstone(router.UnknownPeerName, func(e *Entry) bool {
+	es.tombstone(mesh.UnknownPeerName, func(e *Entry) bool {
 		return e.Hostname == "B"
 	})
 	expected := l(Entries{
@@ -86,6 +86,21 @@ func TestTombstone(t *testing.T) {
 		Entry{Hostname: "B", Version: 1, Tombstone: 1234},
 	})
 	require.Equal(t, expected, es)
+
+	// Now try a merge including two entries which differ only in tombstone
+	e2 := make(Entries, len(es))
+	copy(e2, es)
+	e2[1].Tombstone = 5555
+
+	diff := es.merge(e2)
+
+	expected2 := l(Entries{
+		Entry{Hostname: "A"},
+		Entry{Hostname: "B", Version: 1, Tombstone: 5555},
+	})
+	require.Equal(t, expected2, es)
+	expectedDiff := l(Entries{Entry{Hostname: "B", Version: 1, Tombstone: 5555}})
+	require.Equal(t, expectedDiff, diff)
 }
 
 func TestDelete(t *testing.T) {
@@ -117,7 +132,7 @@ func TestGossipDataMerge(t *testing.T) {
 	g1 := GossipData{Entries: makeEntries("AcDf")}
 	g2 := GossipData{Entries: makeEntries("BEf")}
 
-	g1.Merge(&g2)
+	g3 := g1.Merge(&g2).(*GossipData)
 
-	require.Equal(t, GossipData{Entries: makeEntries("ABcDEf")}, g1)
+	require.Equal(t, GossipData{Entries: makeEntries("ABcDEf")}, *g3)
 }

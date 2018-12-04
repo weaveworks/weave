@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 C1=10.2.1.41
 C3=10.2.1.71
@@ -19,11 +19,11 @@ start_container $HOST1 $C1/24 --name=c1
 start_container $HOST3 $C3/24 --name=c3
 
 assert_raises "exec_on $HOST1 c1 $PING $C3"
-stop_router_on $HOST2
+stop_weave_on $HOST2
 assert_raises "exec_on $HOST1 c1 $PING $C3"
 
-stop_router_on $HOST1
-stop_router_on $HOST3
+stop_weave_on $HOST1
+stop_weave_on $HOST3
 
 launch_all --no-discovery
 
@@ -36,7 +36,7 @@ assert_raises "start_container $HOST1" # triggers IPAM initialisation
 # longer than the gossip interval (30s) before giving up.
 assert_raises "timeout 40 cat <( start_container $HOST3 )"
 
-stop_router_on $HOST2
+stop_weave_on $HOST2
 assert_raises "exec_on $HOST1 c1 sh -c '! $PING $C3'"
 
 end_suite

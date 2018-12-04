@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 C1=10.2.1.46
 C2=10.2.1.47
@@ -19,7 +19,7 @@ assert_raises "exec_on $HOST1 c1 sh -c 'ip link show ethwe | grep \ mtu\ 65535\ 
 # Pump some data over a TCP socket between the containers.  This
 # should cause PMTU discovery on the overlay network, and hence
 # exercise the sleeve code to generate an ICMP frag-needed.
-assert_raises "exec_on $HOST1 c1 sh -c 'nc -l -p 5555 >/tmp/foo'" &
+assert_raises "exec_on $HOST1 c1 sh -c 'nc -l -p 5555 </dev/null >/tmp/foo'" &
 sleep 5
 assert_raises "exec_on $HOST2 c2 sh -c 'dd if=/dev/zero bs=10k count=1 | nc $C1 5555'"
 assert_raises "exec_on $HOST1 c1 sh -c 'test \$(stat -c %s /tmp/foo) -eq 10240'"

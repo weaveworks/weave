@@ -5,7 +5,7 @@ require './vagrant-common.rb'
 vm_ip = "172.16.0.3" # arbitrary private IP
 
 pkgs = %w(
-  docker-engine
+  docker-engine=1.10.2-0~wily
   aufs-tools
   build-essential
   ethtool
@@ -14,21 +14,25 @@ pkgs = %w(
   git
   mercurial
   bc
+  jq
 )
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-  config.vm.box = "ubuntu/ubuntu-15.04-amd64"
-  config.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/vivid/current/vivid-server-cloudimg-amd64-vagrant-disk1.box"
+  config.vm.box = "ubuntu/wily64"
 
   config.vm.network "private_network", ip: vm_ip
   config.vm.provider :virtualbox do |vb|
+    vb.memory = 2048
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
   end
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder ".", "/home/vagrant/src/github.com/weaveworks/weave"
+
+  # Set SSH keys up to be able to run smoke tests straightaway:
+  config.vm.provision "file", source: "~/.vagrant.d/insecure_private_key", destination: "/home/vagrant/src/github.com/weaveworks/weave/test/insecure_private_key"
 
   install_build_deps config.vm, pkgs
   install_go_toochain config.vm

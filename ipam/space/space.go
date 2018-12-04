@@ -31,8 +31,8 @@ func (s *Space) Add(start address.Address, size address.Offset) {
 
 // Clear removes all spaces from this space set.  Used during node shutdown.
 func (s *Space) Clear() {
-	s.free = s.free[:0]
 	s.ours = s.ours[:0]
+	s.free = s.free[:0]
 }
 
 // Walk down the free list calling f() on the in-range portions, until
@@ -88,8 +88,24 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddressesInRange(r address.Range) address.Offset {
-	res := address.Offset(0)
+func (s *Space) NumOwnedAddresses() address.Count {
+	res := address.Count(0)
+	for i := 0; i < len(s.ours); i += 2 {
+		res += address.Length(s.ours[i+1], s.ours[i])
+	}
+	return res
+}
+
+func (s *Space) NumFreeAddresses() address.Count {
+	res := address.Count(0)
+	for i := 0; i < len(s.free); i += 2 {
+		res += address.Length(s.free[i+1], s.free[i])
+	}
+	return res
+}
+
+func (s *Space) NumFreeAddressesInRange(r address.Range) address.Count {
+	res := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		res += chunk.Size()
 		return false
@@ -111,11 +127,14 @@ func (s *Space) Free(addr address.Address) error {
 }
 
 func (s *Space) biggestFreeRange(r address.Range) (biggest address.Range) {
-	biggestSize := address.Offset(0)
+	biggestSize := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		if size := chunk.Size(); size >= biggestSize {
-			biggest = chunk
-			biggestSize = size
+			chunk = chunk.BiggestCIDRRange()
+			if size = chunk.Size(); size >= biggestSize {
+				biggest = chunk
+				biggestSize = size
+			}
 		}
 		return false
 	})
@@ -129,9 +148,12 @@ func (s *Space) Donate(r address.Range) (address.Range, bool) {
 		return address.Range{}, false
 	}
 
-	// Donate half of that biggest free range. Note size/2 rounds down, so
-	// the resulting donation size rounds up, and in particular can't be empty.
-	biggest.Start = address.Add(biggest.Start, biggest.Size()/2)
+	// Donate no more than half what we have available
+	if biggest.Size() > s.NumFreeAddressesInRange(r)/2 {
+		// Note size/2 rounds down, so the resulting donation size
+		// rounds up, and in particular can't be empty.
+		biggest.Start = address.Add(biggest.Start, address.Offset(biggest.Size()/2))
+	}
 
 	s.ours = subtract(s.ours, biggest.Start, biggest.End)
 	s.free = subtract(s.free, biggest.Start, biggest.End)

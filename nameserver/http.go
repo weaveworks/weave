@@ -40,16 +40,11 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			return
 		}
 
-		if err := n.AddEntry(hostname, container, n.ourName, ip); err != nil {
-			n.badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
-			return
-		}
+		n.AddEntry(hostname, container, n.ourName, ip)
 
 		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(container) {
 			n.infof("container '%s' is not running: removing", container)
-			if err := n.Delete(hostname, container, ipStr, ip); err != nil {
-				n.infof("failed to remove: %v", err)
-			}
+			n.Delete(hostname, container, ipStr, ip)
 		}
 
 		w.WriteHeader(204)
@@ -79,10 +74,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			ipStr = "*"
 		}
 
-		if err := n.Delete(hostname, container, ipStr, ip); err != nil {
-			n.badRequest(w, fmt.Errorf("Unable to delete entries: %v", err))
-			return
-		}
+		n.Delete(hostname, container, ipStr, ip)
 		w.WriteHeader(204)
 	}
 	router.Methods("DELETE").Path("/name/{container}/{ip}").HandlerFunc(deleteHandler)

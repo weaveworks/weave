@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"fmt"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/net/address"
 )
@@ -8,6 +9,8 @@ import (
 type Status struct {
 	Paxos            *paxos.Status
 	Range            string
+	RangeNumIPs      int
+	ActiveIPs        int
 	DefaultSubnet    string
 	Entries          []EntryStatus
 	PendingClaims    []ClaimStatus
@@ -15,14 +18,17 @@ type Status struct {
 }
 
 type EntryStatus struct {
-	Token   string
-	Peer    string
-	Version uint32
+	Token       string
+	Size        uint32
+	Peer        string
+	Nickname    string
+	IsKnownPeer bool
+	Version     uint32
 }
 
 type ClaimStatus struct {
-	Ident   string
-	Address address.Address
+	Ident string
+	CIDR  address.CIDR
 }
 
 func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
@@ -31,8 +37,14 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 	}
 
 	var paxosStatus *paxos.Status
-	if allocator.paxosTicker != nil {
-		paxosStatus = paxos.NewStatus(allocator.paxos)
+	if allocator.awaitingConsensus && allocator.paxos != nil {
+		if allocator.paxos.IsElector() {
+			if node, ok := allocator.paxos.(*paxos.Node); ok {
+				paxosStatus = paxos.NewStatus(node)
+			}
+		} else {
+			paxosStatus = &paxos.Status{Elector: false}
+		}
 	}
 
 	resultChan := make(chan *Status)
@@ -40,6 +52,8 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 		resultChan <- &Status{
 			paxosStatus,
 			allocator.universe.String(),
+			int(allocator.universe.Size()),
+			int(allocator.space.NumOwnedAddresses()),
 			defaultSubnet.String(),
 			newEntryStatusSlice(allocator),
 			newClaimStatusSlice(allocator),
@@ -56,8 +70,15 @@ func newEntryStatusSlice(allocator *Allocator) []EntryStatus {
 		return slice
 	}
 
-	for _, entry := range allocator.ring.Entries {
-		slice = append(slice, EntryStatus{entry.Token.String(), entry.Peer.String(), entry.Version})
+	for _, r := range allocator.ring.AllRangeInfo() {
+		slice = append(slice, EntryStatus{
+			Token:       r.Start.String(),
+			Size:        uint32(r.Size()),
+			Peer:        r.Peer.String(),
+			Nickname:    allocator.nicknames[r.Peer],
+			IsKnownPeer: allocator.isKnownPeer(r.Peer),
+			Version:     r.Version,
+		})
 	}
 
 	return slice
@@ -67,7 +88,7 @@ func newClaimStatusSlice(allocator *Allocator) []ClaimStatus {
 	var slice []ClaimStatus
 	for _, op := range allocator.pendingClaims {
 		claim := op.(*claim)
-		slice = append(slice, ClaimStatus{claim.ident, claim.addr})
+		slice = append(slice, ClaimStatus{claim.ident, claim.cidr})
 	}
 	return slice
 }
@@ -76,7 +97,7 @@ func newAllocateIdentSlice(allocator *Allocator) []string {
 	var slice []string
 	for _, op := range allocator.pendingAllocates {
 		allocate := op.(*allocate)
-		slice = append(slice, allocate.ident)
+		slice = append(slice, fmt.Sprintf("%s %s", allocate.ident, allocate.r.String()))
 	}
 	return slice
 }

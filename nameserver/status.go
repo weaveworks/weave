@@ -1,10 +1,11 @@
 package nameserver
 
 type Status struct {
-	Domain  string
-	Address string
-	TTL     uint32
-	Entries []EntryStatus
+	Domain   string
+	Upstream []string
+	Address  string
+	TTL      uint32
+	Entries  []EntryStatus
 }
 
 type EntryStatus struct {
@@ -35,8 +36,10 @@ func NewStatus(ns *Nameserver, dnsServer *DNSServer) *Status {
 			entry.Tombstone})
 	}
 
+	upstreamConfig, _ := dnsServer.upstream.Config()
 	return &Status{
 		dnsServer.domain,
+		upstreamConfig.Servers,
 		dnsServer.address,
 		dnsServer.ttl,
 		entryStatusSlice}

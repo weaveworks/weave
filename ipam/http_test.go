@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 func HTTPPost(t *testing.T, url string) string {
@@ -44,7 +43,7 @@ func listenHTTP(alloc *Allocator, subnet address.CIDR) int {
 	router.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHTTP(router, subnet, nil)
+	alloc.HandleHTTP(router, subnet, "", nil)
 
 	httpListener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -81,7 +80,7 @@ func TestHttp(t *testing.T) {
 	)
 
 	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
-	_, cidr, _ := address.ParseCIDR(universe)
+	cidr, _ := address.ParseCIDR(universe)
 	port := listenHTTP(alloc, cidr)
 	alloc.claimRingForTesting()
 
@@ -123,7 +122,7 @@ func TestBadHttp(t *testing.T) {
 
 	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
-	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	cidr, _ := address.ParseCIDR(testCIDR1)
 	port := listenHTTP(alloc, cidr)
 
 	alloc.claimRingForTesting()
@@ -145,40 +144,30 @@ func TestBadHttp(t *testing.T) {
 }
 
 func TestHTTPCancel(t *testing.T) {
-	wt.RunWithTimeout(t, 2*time.Second, func() {
-		impTestHTTPCancel(t)
-	})
-}
-
-func impTestHTTPCancel(t *testing.T) {
 	var (
 		containerID = "deadbeef"
 		testCIDR1   = "10.0.3.0/29"
 	)
 
-	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	// Say quorum=2, so the allocate won't go ahead
+	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 2)
 	defer alloc.Stop()
-	alloc.claimRingForTesting()
-	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	ExpectBroadcastMessage(alloc, nil) // trying to form consensus
+	cidr, _ := address.ParseCIDR(testCIDR1)
 	port := listenHTTP(alloc, cidr)
 
-	// Stop the alloc so nothing actually works
-	unpause := alloc.pause()
-
 	// Ask the http server for a new address
-	done := make(chan *http.Response)
 	req, _ := http.NewRequest("POST", allocURL(port, testCIDR1, containerID), nil)
+	// On another goroutine, wait for a bit then cancel the request
 	go func() {
-		res, _ := http.DefaultClient.Do(req)
-		done <- res
+		time.Sleep(100 * time.Millisecond)
+		common.Log.Debug("Cancelling allocate")
+		http.DefaultTransport.(*http.Transport).CancelRequest(req)
 	}()
 
-	time.Sleep(100 * time.Millisecond)
-	fmt.Println("Cancelling allocate")
-	http.DefaultTransport.(*http.Transport).CancelRequest(req)
-	unpause()
-	res := <-done
+	res, _ := http.DefaultClient.Do(req)
 	if res != nil {
-		require.FailNow(t, "Error: Allocate returned non-nil")
+		body, _ := ioutil.ReadAll(res.Body)
+		require.FailNow(t, "Error: Allocate returned non-nil", string(body))
 	}
 }

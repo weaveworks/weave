@@ -1,6 +1,10 @@
 package router
 
-import "net"
+import (
+	"net"
+
+	"github.com/weaveworks/mesh"
+)
 
 // Just enough flow machinery for the weave router
 
@@ -16,8 +20,8 @@ type PacketKey struct {
 }
 
 type ForwardPacketKey struct {
-	SrcPeer *Peer
-	DstPeer *Peer
+	SrcPeer *mesh.Peer
+	DstPeer *mesh.Peer
 	PacketKey
 }
 
@@ -64,8 +68,7 @@ func (mfop *MultiFlowOp) Add(op FlowOp) {
 	mfop.ops = append(mfop.ops, op)
 }
 
-func (mfop *MultiFlowOp) Process(frame []byte, dec *EthernetDecoder,
-	broadcast bool) {
+func (mfop *MultiFlowOp) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	for _, op := range mfop.ops {
 		op.Process(frame, dec, mfop.broadcast)
 	}
@@ -81,15 +84,12 @@ func (mfop *MultiFlowOp) Discards() bool {
 	return true
 }
 
+// Flatten out a FlowOp to eliminate any MultiFlowOps
 func FlattenFlowOp(fop FlowOp) []FlowOp {
 	return collectFlowOps(nil, fop)
 }
 
 func collectFlowOps(into []FlowOp, fop FlowOp) []FlowOp {
-	if fop == nil {
-		return into
-	}
-
 	if mfop, ok := fop.(*MultiFlowOp); ok {
 		for _, op := range mfop.ops {
 			into = collectFlowOps(into, op)

@@ -1,0 +1,8 @@
+# IMPORTANT: Please only use GLOBs to ignore files and directories.
+
+# Do not lint any bash script in Weave Net, in order to 
+# avoid breaking the build on make lint:
+*.sh
+bin/*
+prog/weaveexec/symlink
+weave

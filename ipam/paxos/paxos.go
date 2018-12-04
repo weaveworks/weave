@@ -1,7 +1,7 @@
 package paxos
 
 import (
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/mesh"
 )
 
 // The node identifier.  The use of the UID here is important: Paxos
@@ -9,8 +9,8 @@ import (
 // node does not restart and lose its Paxos state but claim to have
 // the same ID.
 type NodeID struct {
-	Name router.PeerName
-	UID  router.PeerUID
+	Name mesh.PeerName
+	UID  mesh.PeerUID
 }
 
 // note all fields exported in structs so we can Gob them
@@ -39,7 +39,7 @@ func (a ProposalID) valid() bool {
 }
 
 // For seeding IPAM, the value we want consensus on is a set of peer names
-type Value []router.PeerName
+type Value []mesh.PeerName
 
 // An AcceptedValue is a Value plus the proposal which originated that
 // Value.  The origin is not essential, but makes comparing
@@ -72,12 +72,16 @@ type Node struct {
 	knows  GossipState
 }
 
-func NewNode(name router.PeerName, uid router.PeerUID, quorum uint) *Node {
+func NewNode(name mesh.PeerName, uid mesh.PeerUID, quorum uint) *Node {
 	return &Node{
 		id:     NodeID{name, uid},
 		quorum: quorum,
 		knows:  map[NodeID]NodeClaims{},
 	}
+}
+
+func (node *Node) SetQuorum(quorum uint) {
+	node.quorum = quorum
 }
 
 func (node *Node) GossipState() GossipState {
@@ -124,6 +128,9 @@ func max(a uint, b uint) uint {
 // simply a matter of gossipping a new proposal that supersedes all
 // others.
 func (node *Node) Propose() {
+	if node.quorum == 0 {
+		panic("Paxos node.Propose() called with no quorum set")
+	}
 	// Find the highest round number around
 	round := uint(0)
 
@@ -223,7 +230,7 @@ func (node *Node) Think() bool {
 // about.  This is not necessarily all peer names, but it is at least
 // a quorum, and so good enough for seeding the ring.
 func (node *Node) pickValue() Value {
-	val := make([]router.PeerName, len(node.knows))
+	val := make([]mesh.PeerName, len(node.knows))
 	i := 0
 	for id := range node.knows {
 		val[i] = id.Name
@@ -234,6 +241,9 @@ func (node *Node) pickValue() Value {
 
 // Has a consensus been reached, based on the known claims of other nodes?
 func (node *Node) Consensus() (bool, AcceptedValue) {
+	if node.quorum == 0 {
+		return false, AcceptedValue{}
+	}
 	counts := map[ProposalID]uint{}
 
 	for _, claims := range node.knows {
@@ -250,14 +260,16 @@ func (node *Node) Consensus() (bool, AcceptedValue) {
 	return false, AcceptedValue{}
 }
 
+func (node *Node) IsElector() bool {
+	return true
+}
+
 type Status struct {
+	Elector    bool
 	KnownNodes int
 	Quorum     uint
 }
 
 func NewStatus(node *Node) *Status {
-	if node == nil {
-		return nil
-	}
-	return &Status{len(node.knows), node.quorum}
+	return &Status{true, len(node.knows), node.quorum}
 }

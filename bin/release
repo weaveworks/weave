@@ -157,6 +157,28 @@ draft() {
         --name "weave" \
         --file "./weave"
 
+    github-release release $RELEASE_ARGS \
+        --user $GITHUB_USER \
+        --repo weave-kube \
+        --tag $LATEST_TAG \
+        --name "$RELEASE_NAME $VERSION" \
+        --description "$RELEASE_DESCRIPTION"
+
+    sed -i -e s/:latest/:$VERSION/ -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave-kube \
+        --tag $LATEST_TAG \
+        --name "weave-daemonset.yaml" \
+        --file "./prog/weave-kube/weave-daemonset.yaml"
+
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "weave-daemonset.yaml" \
+        --file "./prog/weave-kube/weave-daemonset.yaml"
+
     echo "** Draft $TYPE $RELEASE_NAME $VERSION created at"
     echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
 }
@@ -165,14 +187,14 @@ publish() {
     setup
     cd $PWD/$RELEASE_DIR
 
-    UPDATE_LATEST=false
+    IS_MAINLINE=false
     if [ "$RELEASE_TYPE" = 'MAINLINE' ] ; then
-        UPDATE_LATEST=true
+        IS_MAINLINE=true
     fi
 
     if [ "$RELEASE_TYPE" = 'PRERELEASE' ] ; then
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing pre-release on GitHub"
@@ -204,7 +226,7 @@ publish() {
         echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make PUBLISH_WEAVEDB=$IS_MAINLINE UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing release on GitHub"
@@ -235,6 +257,40 @@ publish() {
             --tag latest_release \
             --name "weave" \
             --file "./weave"
+
+        github-release publish \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag $LATEST_TAG
+
+        if github-release info --user $GITHUB_USER --repo weave-kube \
+            --tag latest_release >/dev/null 2>&1; then
+            github-release delete \
+                --user $GITHUB_USER \
+                --repo weave-kube \
+                --tag latest_release
+        fi
+
+        github-release release \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag latest_release \
+            --name "$RELEASE_NAME latest ($VERSION)" \
+            --description "[Release Notes](https://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG)"
+
+        github-release upload \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag latest_release \
+            --name "weave-daemonset.yaml" \
+            --file "./prog/weave-kube/weave-daemonset.yaml"
+
+        github-release upload \
+            --user $GITHUB_USER \
+            --repo weave \
+            --tag latest_release \
+            --name "weave-daemonset.yaml" \
+            --file "./prog/weave-kube/weave-daemonset.yaml"
 
         echo "** Release $RELEASE_NAME $VERSION published at"
         echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"

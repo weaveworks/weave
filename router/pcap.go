@@ -104,6 +104,10 @@ func newPcapHandle(ifName string, promisc bool, snaplen int, bufSz int) (handle 
 	return
 }
 
+func (p *Pcap) Interface() *net.Interface {
+	return p.iface
+}
+
 func (p *Pcap) String() string {
 	return fmt.Sprint(p.iface.Name, " (via pcap)")
 }

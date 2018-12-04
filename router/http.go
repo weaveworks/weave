@@ -2,18 +2,19 @@ package router
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/weave/common"
-	"net/http"
 )
 
-func (router *Router) HandleHTTP(muxRouter *mux.Router) {
+func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
-		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
+		if errors := router.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
 			http.Error(w, common.ErrorMessages(errors), http.StatusBadRequest)
 		}
 	})
@@ -22,7 +23,7 @@ func (router *Router) HandleHTTP(muxRouter *mux.Router) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
-		router.ConnectionMaker.ForgetConnections(r.Form["peer"])
+		router.ForgetConnections(r.Form["peer"])
 	})
 
 }

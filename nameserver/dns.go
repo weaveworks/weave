@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -17,7 +19,6 @@ import (
 const (
 	topDomain        = "."
 	reverseDNSdomain = "in-addr.arpa."
-	etcResolvConf    = "/etc/resolv.conf"
 	udpBuffSize      = uint16(4096)
 	minUDPSize       = 512
 
@@ -26,16 +27,52 @@ const (
 	DefaultClientTimeout = 5 * time.Second
 )
 
-type DNSServer struct {
-	ns      *Nameserver
-	domain  string
-	ttl     uint32
-	address string
+type Upstream interface {
+	Config() (*dns.ClientConfig, error)
+}
 
-	servers   []*dns.Server
-	upstream  *dns.ClientConfig
-	tcpClient *dns.Client
-	udpClient *dns.Client
+func NewUpstream(resolvConf, filterAddress string) Upstream {
+	return &upstream{
+		resolvConf:    resolvConf,
+		filterAddress: filterAddress,
+		cachedConfig:  &dns.ClientConfig{}}
+}
+
+type upstream struct {
+	sync.Mutex
+
+	resolvConf    string
+	filterAddress string
+	cachedConfig  *dns.ClientConfig
+	lastStat      time.Time
+	lastModified  time.Time
+}
+
+func (u *upstream) Config() (*dns.ClientConfig, error) {
+	u.Lock()
+	defer u.Unlock()
+
+	// If we checked less than five seconds ago return what we already have
+	now := time.Now()
+	if now.Sub(u.lastStat) < 5*time.Second {
+		return u.cachedConfig, nil
+	}
+	u.lastStat = now
+
+	// Reread file if it has changed
+	if fi, err := os.Stat(u.resolvConf); err != nil {
+		return u.cachedConfig, err
+	} else if fi.ModTime() != u.lastModified {
+		if config, err := dns.ClientConfigFromFile(u.resolvConf); err == nil {
+			config.Servers = filter(config.Servers, u.filterAddress)
+			u.lastModified = fi.ModTime()
+			u.cachedConfig = config
+		} else {
+			return u.cachedConfig, err
+		}
+	}
+
+	return u.cachedConfig, nil
 }
 
 func filter(ss []string, s string) []string {
@@ -49,24 +86,30 @@ func filter(ss []string, s string) []string {
 	return ss
 }
 
-func NewDNSServer(ns *Nameserver, domain, address, effectiveAddress string, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
+type DNSServer struct {
+	ns      *Nameserver
+	domain  string
+	ttl     uint32
+	address string
+
+	servers   []*dns.Server
+	upstream  Upstream
+	tcpClient *dns.Client
+	udpClient *dns.Client
+}
+
+func NewDNSServer(ns *Nameserver, domain, address string, upstream Upstream, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
 	s := &DNSServer{
 		ns:        ns,
 		domain:    dns.Fqdn(domain),
 		ttl:       ttl,
 		address:   address,
+		upstream:  upstream,
 		tcpClient: &dns.Client{Net: "tcp", ReadTimeout: clientTimeout},
 		udpClient: &dns.Client{Net: "udp", ReadTimeout: clientTimeout, UDPSize: udpBuffSize},
 	}
-	var err error
-	if s.upstream, err = dns.ClientConfigFromFile(etcResolvConf); err != nil {
-		return nil, err
-	}
-	if s.upstream != nil {
-		s.upstream.Servers = filter(s.upstream.Servers, effectiveAddress)
-	}
 
-	err = s.listen(address)
+	err := s.listen(address)
 	return s, err
 }
 
@@ -134,7 +177,7 @@ func (d *DNSServer) createMux(client *dns.Client, defaultMaxResponseSize int) *d
 
 func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 	h.ns.debugf("local request: %+v", *req)
-	if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypeA {
+	if len(req.Question) != 1 {
 		h.nameError(w, req)
 		return
 	}
@@ -147,6 +190,12 @@ func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 	addrs := h.ns.Lookup(hostname)
 	if len(addrs) == 0 {
 		h.nameError(w, req)
+		return
+	}
+	// Per RFC4074, if we have an A but another type was requested,
+	// return 'no error' with empty answer section
+	if req.Question[0].Qtype != dns.TypeA {
+		h.respond(w, h.makeResponse(req, nil))
 		return
 	}
 
@@ -204,7 +253,7 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 	h.ns.debugf("recursive request: %+v", *req)
 
 	// Resolve unqualified names locally
-	if len(req.Question) == 1 && req.Question[0].Qtype == dns.TypeA {
+	if len(req.Question) == 1 {
 		hostname := dns.Fqdn(req.Question[0].Name)
 		if strings.Count(hostname, ".") == 1 {
 			h.handleLocal(w, req)
@@ -212,10 +261,14 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
-	for _, server := range h.upstream.Servers {
+	upstreamConfig, err := h.upstream.Config()
+	if err != nil {
+		h.ns.errorf("unable to read upstream config: %s", err)
+	}
+	for _, server := range upstreamConfig.Servers {
 		reqCopy := req.Copy()
 		reqCopy.Id = dns.Id()
-		response, _, err := h.client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, h.upstream.Port))
+		response, _, err := h.client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, upstreamConfig.Port))
 		if (err != nil && err != dns.ErrTruncated) || response == nil {
 			h.ns.debugf("error trying %s: %v", server, err)
 			continue

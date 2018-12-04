@@ -1,8 +1,6 @@
 package common
 
-import (
-	"strings"
-)
+import "strings"
 
 // Assert test is true, panic otherwise
 func Assert(test bool) {

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 C1=10.2.1.4
 C2=10.2.1.7
@@ -11,7 +11,7 @@ direct_peers() {
 }
 
 assert_peers() {
-  assert "direct_peers $1 | sort" "$(echo "$2" | sort)"
+  assert "direct_peers $1 | sort" "$(echo -e "$2" | sort)"
 }
 
 start_suite "Connecting and forgetting routers after launch"
@@ -34,7 +34,7 @@ assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 # Forget everyone and disconnect
 assert_raises "weave_on $HOST2 forget $HOST1 $HOST2"
-assert_raises "stop_router_on $HOST1"
+assert_raises "stop_weave_on $HOST1"
 assert_raises "weave_on $HOST1 launch-router"
 assert_peers $HOST2 ""
 assert_raises "exec_on $HOST1 c1 sh -c '! $PING $C2'"

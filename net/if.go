@@ -5,28 +5,35 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/vishvananda/netlink/nl"
+	"github.com/vishvananda/netlink"
 )
 
 // Wait for an interface to come up.
 func EnsureInterface(ifaceName string) (*net.Interface, error) {
-	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK)
-	if err != nil {
-		return nil, err
-	}
-	defer s.Close()
-	iface, err := ensureInterface(s, ifaceName)
+	iface, err := ensureInterface(ifaceName)
 	if err != nil {
 		return nil, err
 	}
 	return iface, err
 }
 
-func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, error) {
+func ensureInterface(ifaceName string) (*net.Interface, error) {
+	ch := make(chan netlink.LinkUpdate)
+	// NB: We do not supply (and eventually close) a 'done' channel
+	// here since that can cause incorrect file descriptor
+	// re-usage. See https://github.com/weaveworks/weave/issues/2120
+	if err := netlink.LinkSubscribe(ch, nil); err != nil {
+		return nil, err
+	}
+	// check for currently-existing interface after subscribing, to avoid race
 	if iface, err := findInterface(ifaceName); err == nil {
 		return iface, nil
 	}
-	netlinkReceiveUntil(s, matchIfName(ifaceName))
+	for update := range ch {
+		if ifaceName == update.Link.Attrs().Name && update.IfInfomsg.Flags&syscall.IFF_UP != 0 {
+			break
+		}
+	}
 	iface, err := findInterface(ifaceName)
 	return iface, err
 }
@@ -35,21 +42,35 @@ func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, err
 // This matches the behaviour in 'weave attach', which is the only context in which
 // we expect this to be called.  If you change one, change the other to match.
 func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
-	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK, syscall.RTNLGRP_IPV4_ROUTE)
+	iface, err := ensureInterface(ifaceName)
 	if err != nil {
 		return nil, err
 	}
-	defer s.Close()
-	iface, err := ensureInterface(s, ifaceName)
-	if err != nil {
+	ch := make(chan netlink.RouteUpdate)
+	if err := netlink.RouteSubscribe(ch, nil); err != nil {
 		return nil, err
 	}
 	dest := net.IPv4(224, 0, 0, 0)
-	if CheckRouteExists(ifaceName, dest) {
-		return iface, err
+	check := func(route netlink.Route) bool {
+		return route.Dst != nil && route.Dst.IP.Equal(dest)
 	}
-	netlinkReceiveUntil(s, matchRoute(ifaceName, dest))
-	return iface, err
+	// check for currently-existing route after subscribing, to avoid race
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range routes {
+		if check(route) {
+			return iface, nil
+		}
+	}
+	for update := range ch {
+		if check(update.Route) {
+			return iface, nil
+		}
+	}
+	// should never get here
+	return iface, nil
 }
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
@@ -60,41 +81,4 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
 	}
 	return
-}
-
-func netlinkReceiveUntil(s *nl.NetlinkSocket, f func(syscall.NetlinkMessage) (bool, error)) error {
-	for {
-		msgs, err := s.Receive()
-		if err != nil {
-			return err
-		}
-		for _, m := range msgs {
-			if done, err := f(m); done {
-				return err
-			}
-		}
-	}
-}
-
-func matchIfName(ifaceName string) func(m syscall.NetlinkMessage) (bool, error) {
-	return func(m syscall.NetlinkMessage) (bool, error) {
-		switch m.Header.Type {
-		case syscall.RTM_NEWLINK: // receive this type for link 'up'
-			ifmsg := nl.DeserializeIfInfomsg(m.Data)
-			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
-			if err != nil {
-				return true, err
-			}
-			name := ""
-			for _, attr := range attrs {
-				if attr.Attr.Type == syscall.IFA_LABEL {
-					name = string(attr.Value[:len(attr.Value)-1])
-				}
-			}
-			if ifaceName == name && ifmsg.Flags&syscall.IFF_UP != 0 {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
 }

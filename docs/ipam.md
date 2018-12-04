@@ -210,11 +210,3 @@ reached the peer that does the `rmpeer`, then we get an inconsistent
 ring.  We could make it safe, up to partitions, by inquiring of every
 live peer what its view of the dead peer is, and making sure we use
 the latest info.)
-
-## Limitations
-
-Nothing is persisted. If one peer restarts it should receive gossip
-from other peers showing what it used to own, and in that case it can
-recover quite well. If, however, there are no peers left alive, or
-this peer cannot establish network communication with those that are,
-then it cannot recover.

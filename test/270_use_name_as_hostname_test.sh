@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 NAME=c1
 DOMAIN=weave.local
@@ -8,7 +8,8 @@ HOSTNAME=$NAME-hostname.$DOMAIN
 
 # Docker inspect hostname + domainname of container $2 on host $1
 docker_inspect_fqdn() {
-    docker_on $1 inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $2
+    FQDN=$(docker_on $1 inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $2)
+    echo ${FQDN%.}
 }
 
 # Start container with args $2.. and assert fqdn of $1

@@ -10,7 +10,7 @@ if ! bash "$DIR/sanity_check.sh"; then
 fi
 whitely echo ...ok
 
-TESTS="${@:-$(find . -name '*_test.sh')}"
+TESTS="${@:-$(find "$DIR" -name '*_test.sh')}"
 RUNNER_ARGS=""
 
 # If running on circle, use the scheduler to work out what tests to run
@@ -23,4 +23,4 @@ if [ -n "$CIRCLECI" -o -n "$PARALLEL" ]; then
     RUNNER_ARGS="$RUNNER_ARGS -parallel"
 fi
 
-HOSTS="$HOSTS" "${DIR}/../testing/runner/runner" $RUNNER_ARGS $TESTS
+HOSTS="$HOSTS" "${DIR}/../tools/runner/runner" $RUNNER_ARGS $TESTS

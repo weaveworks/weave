@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/weaveworks/mesh"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 const (
@@ -34,15 +34,15 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName     router.PeerName
+	ourName     mesh.PeerName
 	domain      string
-	gossip      router.Gossip
+	gossip      mesh.Gossip
 	entries     Entries
-	isKnownPeer func(router.PeerName) bool
+	isKnownPeer func(mesh.PeerName) bool
 	quit        chan struct{}
 }
 
-func New(ourName router.PeerName, domain string, isKnownPeer func(router.PeerName) bool) *Nameserver {
+func New(ourName mesh.PeerName, domain string, isKnownPeer func(mesh.PeerName) bool) *Nameserver {
 	return &Nameserver{
 		ourName:     ourName,
 		domain:      dns.Fqdn(domain),
@@ -51,7 +51,7 @@ func New(ourName router.PeerName, domain string, isKnownPeer func(router.PeerNam
 	}
 }
 
-func (n *Nameserver) SetGossip(gossip router.Gossip) {
+func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 	n.gossip = gossip
 }
 
@@ -73,22 +73,22 @@ func (n *Nameserver) Stop() {
 	n.quit <- struct{}{}
 }
 
-func (n *Nameserver) broadcastEntries(es ...Entry) error {
-	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(&GossipData{
-			Entries:   Entries(es),
-			Timestamp: now(),
-		})
+func (n *Nameserver) broadcastEntries(es ...Entry) {
+	if n.gossip == nil || len(es) == 0 {
+		return
 	}
-	return nil
+	n.gossip.GossipBroadcast(&GossipData{
+		Entries:   Entries(es),
+		Timestamp: now(),
+	})
 }
 
-func (n *Nameserver) AddEntry(hostname, containerid string, origin router.PeerName, addr address.Address) error {
-	n.infof("adding entry %s -> %s", hostname, addr.String())
+func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) {
 	n.Lock()
+	n.infof("adding entry for %s: %s -> %s", containerid, hostname, addr.String())
 	entry := n.entries.add(hostname, containerid, origin, addr)
 	n.Unlock()
-	return n.broadcastEntries(entry)
+	n.broadcastEntries(entry)
 }
 
 func (n *Nameserver) Lookup(hostname string) []address.Address {
@@ -121,7 +121,8 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	return match.Hostname, nil
 }
 
-func (n *Nameserver) ContainerStarted(ident string) {}
+func (n *Nameserver) ContainerStarted(ident string)   {}
+func (n *Nameserver) ContainerDestroyed(ident string) {}
 
 func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
@@ -133,14 +134,10 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
-	if len(entries) > 0 {
-		if err := n.broadcastEntries(entries...); err != nil {
-			n.errorf("failed to broadcast container %s death: %v", ident, err)
-		}
-	}
+	n.broadcastEntries(entries...)
 }
 
-func (n *Nameserver) PeerGone(peer router.PeerName) {
+func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()
 	defer n.Unlock()
@@ -149,7 +146,7 @@ func (n *Nameserver) PeerGone(peer router.PeerName) {
 	})
 }
 
-func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Address) error {
+func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Address) {
 	n.Lock()
 	n.infof("tombstoning hostname=%s, container=%s, ip=%s", hostname, containerid, ipStr)
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
@@ -169,7 +166,7 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		return true
 	})
 	n.Unlock()
-	return n.broadcastEntries(entries...)
+	n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) deleteTombstones() {
@@ -181,7 +178,7 @@ func (n *Nameserver) deleteTombstones() {
 	})
 }
 
-func (n *Nameserver) Gossip() router.GossipData {
+func (n *Nameserver) Gossip() mesh.GossipData {
 	n.RLock()
 	defer n.RUnlock()
 	gossip := &GossipData{
@@ -192,27 +189,56 @@ func (n *Nameserver) Gossip() router.GossipData {
 	return gossip
 }
 
-func (n *Nameserver) OnGossipUnicast(sender router.PeerName, msg []byte) error {
+func (n *Nameserver) OnGossipUnicast(sender mesh.PeerName, msg []byte) error {
 	return nil
 }
 
-func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.GossipData, error) {
+func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData, error) {
 	var gossip GossipData
 	if err := gossip.Decode(msg); err != nil {
 		return nil, nil, err
 	}
 	if delta := gossip.Timestamp - now(); delta > gossipWindow || delta < -gossipWindow {
-		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
+		return nil, nil, fmt.Errorf("host clock skew of %ds exceeds %ds limit", delta, gossipWindow)
 	}
 
-	n.Lock()
-	defer n.Unlock()
-
+	// Filter to remove entries from unknown peers, done before we take
+	// the nameserver lock, so we don't have to worry what isKnownPeer locks.
 	gossip.Entries.filter(func(e *Entry) bool {
 		return n.isKnownPeer(e.Origin)
 	})
 
+	var overriddenEntries []Entry
+	n.Lock()
+
+	// Check entries claiming to originate from us against our current data
+	gossip.Entries.filter(func(e *Entry) bool {
+		if e.Origin == n.ourName {
+			if ourEntry, ok := n.entries.findEqual(e); ok {
+				if ourEntry.Version < e.Version ||
+					(ourEntry.Version == e.Version && ourEntry.Tombstone != e.Tombstone) {
+					// Take our version of the data, but make the version higher than the incoming
+					nextVersion := e.Version + 1
+					*e = *ourEntry
+					e.Version = nextVersion
+					overriddenEntries = append(overriddenEntries, *e)
+				}
+			} else { // We have no entry matching the one that came in with us as Origin
+				if e.tombstone() {
+					overriddenEntries = append(overriddenEntries, *e)
+				}
+			}
+		}
+		return true
+	})
+
 	newEntries := n.entries.merge(gossip.Entries)
+	n.Unlock() // unlock before attempting to broadcast
+
+	// Note that all overriddenEntries have been merged into our entries, either
+	// because we forced the version higher or because they were missing before.
+	n.broadcastEntries(overriddenEntries...)
+
 	if len(newEntries) > 0 {
 		return &GossipData{Entries: newEntries, Timestamp: now()}, &gossip, nil
 	}
@@ -221,24 +247,29 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 
 // merge received data into state and return "everything new I've
 // just learnt", or nil if nothing in the received data was new
-func (n *Nameserver) OnGossip(msg []byte) (router.GossipData, error) {
+func (n *Nameserver) OnGossip(msg []byte) (mesh.GossipData, error) {
 	newEntries, _, err := n.receiveGossip(msg)
 	return newEntries, err
 }
 
 // merge received data into state and return a representation of
 // the received data, for further propagation
-func (n *Nameserver) OnGossipBroadcast(_ router.PeerName, msg []byte) (router.GossipData, error) {
+func (n *Nameserver) OnGossipBroadcast(_ mesh.PeerName, msg []byte) (mesh.GossipData, error) {
 	_, entries, err := n.receiveGossip(msg)
 	return entries, err
 }
 
+// Logging
+
 func (n *Nameserver) infof(fmt string, args ...interface{}) {
-	Log.Infof("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Infof, fmt, args...)
 }
 func (n *Nameserver) debugf(fmt string, args ...interface{}) {
-	Log.Debugf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Debugf, fmt, args...)
 }
 func (n *Nameserver) errorf(fmt string, args ...interface{}) {
-	Log.Errorf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Errorf, fmt, args...)
+}
+func (n *Nameserver) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
+	f("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
 }
