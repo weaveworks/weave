@@ -84,7 +84,7 @@ function relaunch_weave_pod {
 # Suite
 #
 function main {
-    local IPAM_RECOVER_DELAY=15
+    local IPAM_RECOVER_DELAY=90
 
     start_suite "Test weave-net deallocates from IPAM on node failure";
 
@@ -99,8 +99,6 @@ function main {
     assert "unreachable_ip_addresses_count $HOST3" "0";
 
     force_drop_node $HOST2;
-
-    relaunch_weave_pod $HOST3;
 
     sleep $IPAM_RECOVER_DELAY;
 

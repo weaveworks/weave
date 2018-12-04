@@ -68,6 +68,10 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
+**Note:** Installing on GKE
+Please note that you must grant the user the ability to create roles in Kubernetes before launching Weave Net.
+This is a prerequisite to use use role-based access control on GKE. Please see the GKE [instructions](https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control).
+
 ### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 
 The DaemonSet definition specifies [Rolling

@@ -169,10 +169,6 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	if ns.checkLocalPod(obj) {
-		ns.ips.AddEntry(obj.ObjectMeta.UID, LocalIpset, obj.Status.PodIP, podComment(obj))
-	}
-
 	foundIngress, foundEgress, err := ns.podSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, obj.Status.PodIP, podComment(obj))
 	if err != nil {
 		return err
@@ -201,10 +197,6 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if hasIP(oldObj) && !hasIP(newObj) {
-		if ns.checkLocalPod(oldObj) {
-			ns.ips.DelEntry(oldObj.ObjectMeta.UID, LocalIpset, oldObj.Status.PodIP)
-		}
-
 		if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, oldObj.Status.PodIP); err != nil {
 			return err
 		}
@@ -216,9 +208,6 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
-		if ns.checkLocalPod(newObj) {
-			ns.ips.AddEntry(newObj.ObjectMeta.UID, LocalIpset, newObj.Status.PodIP, podComment(newObj))
-		}
 		foundIngress, foundEgress, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
 		if err != nil {
 			return err
@@ -301,10 +290,6 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 
 	if !hasIP(obj) {
 		return nil
-	}
-
-	if ns.checkLocalPod(obj) {
-		ns.ips.DelEntry(obj.ObjectMeta.UID, LocalIpset, obj.Status.PodIP)
 	}
 
 	if err := ns.ips.DelEntry(obj.ObjectMeta.UID, ns.ingressDefaultAllowIPSet, obj.Status.PodIP); err != nil {

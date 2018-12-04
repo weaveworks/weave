@@ -89,9 +89,15 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      # Rebuild without coverage and push to dockerhub
+      # Register qemu hooks, rebuild without coverage and push to dockerhub
       - deploy:
-          command: bin/circle-deploy-master
+          command: |
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker run --rm --privileged multiarch/qemu-user-static:register --reset
+            wget https://github.com/estesp/manifest-tool/releases/download/v0.8.0/manifest-tool-linux-amd64
+            chmod +x manifest-tool-linux-amd64
+            make clean-bin
+            make publish MANIFEST_TOOL_CMD=./manifest-tool-linux-amd64 UPDATE_LATEST=latest-only SUDO= BUILD_IN_CONTAINER=false
 
 workflows:
   version: 2

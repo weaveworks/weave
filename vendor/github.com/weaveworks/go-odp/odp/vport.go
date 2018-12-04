@@ -242,7 +242,7 @@ func lookupVport(dpif *Dpif, dpifindex DatapathID, name string) (DatapathID, Vpo
 		return 0, Vport{}, err
 	}
 
-	_, ovshdr, err := dpif.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_NEW)
+	_, ovshdr, err := dpif.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_GET)
 	if err != nil {
 		return 0, Vport{}, err
 	}
@@ -276,7 +276,7 @@ func (dp DatapathHandle) LookupVport(id VportID) (Vport, error) {
 		return Vport{}, err
 	}
 
-	err = dp.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_NEW)
+	err = dp.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_GET)
 	if err != nil {
 		return Vport{}, err
 	}
@@ -311,7 +311,7 @@ func (dp DatapathHandle) EnumerateVports() ([]Vport, error) {
 
 	var res []Vport
 	consumer := func(resp *NlMsgParser) error {
-		err := dp.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_NEW)
+		err := dp.checkNlMsgHeaders(resp, VPORT, OVS_VPORT_CMD_GET)
 		if err != nil {
 			return err
 		}

@@ -25,12 +25,13 @@ import (
 )
 
 var (
-	version     = "unreleased"
-	metricsAddr string
-	logLevel    string
-	allowMcast  bool
-	nodeName    string
-	maxList     int
+	version        = "unreleased"
+	metricsAddr    string
+	logLevel       string
+	allowMcast     bool
+	nodeName       string
+	maxList        int
+	bridgePortName string
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -125,6 +126,12 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		}
 	}
 
+	// If the destination address is not any of the local pods, let it through
+	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		"-m", "physdev", "--physdev-is-bridged", "--physdev-out="+bridgePortName, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
 		return err
@@ -132,21 +139,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
-		return err
-	}
-
-	// If the destination address is not any of the local pods, let it through
-	found, err := ipsetExist(ips, npc.LocalIpset)
-	if err != nil {
-		return err
-	}
-	if !found {
-		if err := ips.Create(npc.LocalIpset, ipset.HashIP); err != nil {
-			return err
-		}
-	}
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "set", "!", "--match-set", npc.LocalIpset, "dst", "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
@@ -158,8 +150,8 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// Egress rules:
 	//
 	// -A WEAVE-NPC-EGRESS -m state --state RELATED,ESTABLISHED -j ACCEPT
-	// -A WEAVE-NPC-EGRESS -m set ! --match-set weave-local-pods src -j RETURN
-	// -A WEAVE-NPC-EGRESS -d 224.0.0.0/4 -j RETURN
+	// -A WEAVE-NPC-EGRESS -m physdev --physdev-in vethwe-bridge --physdev-is-bridged -j RETURN
+	// -A WEAVE-NPC-EGRESS -m addrtype --dst-type LOCAL -j RETURN
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -j WEAVE-NPC-EGRESS-DEFAULT
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j WEAVE-NPC-EGRESS-CUSTOM
 	// -A WEAVE-NPC-EGRESS -m state --state NEW -m mark ! --mark 0x40000/0x40000 -j NFLOG --nflog-group 86
@@ -179,7 +171,10 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 
 	ruleSpecs := [][]string{
 		{"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
-		{"-m", "state", "--state", "NEW", "-m", "set", "!", "--match-set", npc.LocalIpset, "src", "-j", "RETURN"},
+		// skip running through egress network policies for the traffic not coming from local pods
+		{"-m", "physdev", "--physdev-is-bridged", "--physdev-in=" + bridgePortName, "-j", "RETURN"},
+		// skip running through egress network policies for the traffic bound for IP address assigned for the bridge
+		{"-m", "addrtype", "--dst-type", "LOCAL", "-j", "RETURN"},
 	}
 	if allowMcast {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
@@ -192,6 +187,17 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}...)
 	if err := net.AddChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
 		return err
+	}
+
+	// delete `weave-local-pods` ipset which is no longer used by weave-npc
+	weaveLocalPodExist, err := ipsetExist(ips, npc.LocalIpset)
+	if err != nil {
+		common.Log.Errorf("Failed to look if ipset '%s' exists", npc.LocalIpset)
+	} else if weaveLocalPodExist {
+		common.Log.Debugf("Destroying ipset '%s'", npc.LocalIpset)
+		if err := ips.Destroy(npc.LocalIpset); err != nil {
+			common.Log.Errorf("Failed to destroy ipset '%s'", npc.LocalIpset)
+		}
 	}
 
 	return nil
@@ -332,6 +338,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
+	rootCmd.PersistentFlags().StringVar(&bridgePortName, "bridge-port-name", "vethwe-bridge", "name of the brige port on which packets are received and sent")
 
 	handleError(rootCmd.Execute())
 }

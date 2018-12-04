@@ -18,15 +18,16 @@ func (nlmsg *NlMsgBuilder) PutGenlMsghdr(cmd uint8, version uint8) *GenlMsghdr {
 	return res
 }
 
-func (nlmsg *NlMsgParser) CheckGenlMsghdr(cmd int) (*GenlMsghdr, error) {
+func (nlmsg *NlMsgParser) CheckGenlMsghdr(cmd int, fallbackCmd int) (*GenlMsghdr, error) {
 	pos, err := nlmsg.AlignAdvance(syscall.NLMSG_ALIGNTO, SizeofGenlMsghdr)
 	if err != nil {
 		return nil, err
 	}
 
 	gh := genlMsghdrAt(nlmsg.data, pos)
-	if cmd >= 0 && gh.Cmd != uint8(cmd) {
-		return nil, fmt.Errorf("generic netlink response has wrong cmd (got %d, expected %d)", gh.Cmd, cmd)
+	if cmd >= 0 && gh.Cmd != uint8(cmd) && (fallbackCmd < 0 || gh.Cmd != uint8(fallbackCmd)) {
+		return nil, fmt.Errorf("generic netlink response has wrong cmd (got %d, expected %d (or fallback: %d))",
+			gh.Cmd, cmd, fallbackCmd)
 	}
 
 	// Deliberately ignore the version field in the genl header.
@@ -57,7 +58,9 @@ func (s *NetlinkSocket) LookupGenlFamily(name string) (family GenlFamily, err er
 		return
 	}
 
-	_, err = resp.CheckGenlMsghdr(CTRL_CMD_NEWFAMILY)
+	// For now response command is always CTRL_CMD_NEWFAMILY, though it should have
+	// been CTRL_CMD_GETFAMILY. For stability forever, we utilize fallbacking here.
+	_, err = resp.CheckGenlMsghdr(CTRL_CMD_GETFAMILY, CTRL_CMD_NEWFAMILY)
 	if err != nil {
 		return
 	}
