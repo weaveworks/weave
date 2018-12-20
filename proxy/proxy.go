@@ -16,6 +16,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/pkg/errors"
+	"github.com/vishvananda/netlink"
 
 	weaveapi "github.com/weaveworks/weave/api"
 	weavedocker "github.com/weaveworks/weave/common/docker"
@@ -463,7 +464,13 @@ func (proxy *Proxy) waitForStartByIdent(ident string) error {
 	return nil
 }
 
-func (proxy *Proxy) ContainerDied(ident string)      {}
+func (proxy *Proxy) ContainerDied(ident string) {
+	err := proxy.detach(ident)
+	if err != nil {
+		Log.Errorf("error removing veth pairs created for deleted container: " + err.Error())
+	}
+}
+
 func (proxy *Proxy) ContainerDestroyed(ident string) {}
 
 // Check if this container needs to be attached, if so then attach it,
@@ -505,7 +512,7 @@ func (proxy *Proxy) attach(containerID string) error {
 
 	pid := container.State.Pid
 	// Passing 0 for mtu means it will be taken from the bridge
-	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, proxy.KeepTXOn, true)
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), containerID, weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, proxy.KeepTXOn, true)
 	if err != nil {
 		return err
 	}
@@ -519,6 +526,17 @@ func (proxy *Proxy) attach(containerID string) error {
 	}
 
 	return err
+}
+
+// Check if this container needs to be detached, if so then detach it,
+// and return nil on success or not needed.
+func (proxy *Proxy) detach(containerID string) error {
+	name, _ := weavenet.GenerateVethPair(containerID)
+	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	if err := netlink.LinkDel(veth); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IPNet, error) {

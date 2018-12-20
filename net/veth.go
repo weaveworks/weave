@@ -10,6 +10,7 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+	"golang.org/x/sys/unix"
 )
 
 // create and attach a veth to the Weave bridge
@@ -111,6 +112,14 @@ func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
 	return err == nil
 }
 
+func GenerateVethPair(id string) (string, string) {
+	maxIDLen := unix.IFNAMSIZ - 1 - len(vethPrefix+"pl")
+	if len(id) > maxIDLen {
+		id = id[:maxIDLen]
+	}
+	return vethPrefix + "pl" + id, vethPrefix + "pg" + id
+}
+
 func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool, hairpinMode bool) error {
 	ns, err := netns.GetFromPath(netNSPath)
 	if err != nil {
@@ -119,11 +128,7 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 	defer ns.Close()
 
 	if !interfaceExistsInNamespace(netNSPath, ifName) {
-		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
-		if len(id) > maxIDLen {
-			id = id[:maxIDLen] // trim passed ID if too long
-		}
-		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
+		name, peerName := GenerateVethPair(id)
 		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
