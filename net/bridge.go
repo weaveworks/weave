@@ -333,12 +333,6 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	if err = LinkAddIfNotExist(dummy); err != nil {
 		return errors.Wrap(err, "creating dummy interface")
 	}
-	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
-		return errors.Wrapf(err, "setting dummy interface mtu to %d", config.MTU)
-	}
-	if err := netlink.LinkSetMasterByIndex(dummy, b.bridge.Attrs().Index); err != nil {
-		return errors.Wrap(err, "setting dummy interface master")
-	}
 	defer func() {
 		var dummyIf netlink.Link
 		dummyIf, err = netlink.LinkByName(WeaveDummyIfName)
@@ -348,6 +342,12 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 			}
 		}
 	}()
+	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
+		return errors.Wrapf(err, "setting dummy interface mtu to %d", config.MTU)
+	}
+	if err := netlink.LinkSetMasterByIndex(dummy, b.bridge.Attrs().Index); err != nil {
+		return errors.Wrap(err, "setting dummy interface master")
+	}
 	return err
 }
 
