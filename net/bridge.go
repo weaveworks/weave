@@ -334,10 +334,10 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 		return errors.Wrap(err, "creating dummy interface")
 	}
 	defer func() {
-		var dummyIf netlink.Link
-		dummyIf, err = netlink.LinkByName(WeaveDummyIfName)
+		var dummy netlink.Link
+		dummy, err = netlink.LinkByName(WeaveDummyIfName)
 		if err == nil {
-			if err = netlink.LinkDel(dummyIf); err != nil {
+			if err = netlink.LinkDel(dummy); err != nil {
 				err = errors.Wrap(err, "deleting dummy interface")
 			}
 		}
