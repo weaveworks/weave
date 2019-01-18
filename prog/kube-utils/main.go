@@ -103,6 +103,9 @@ func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, m
 			return err
 		}
 		nodes, err := getKubePeers(kube, true)
+		if err != nil {
+			return err
+		}
 		nodeSet := make(map[string]struct{}, len(nodes))
 		for _, node := range nodes {
 			nodeSet[node.name] = struct{}{}
@@ -314,9 +317,6 @@ func main() {
 		}
 		return
 	}
-	if err != nil {
-		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
-	}
 	if justReclaim {
 		cml := newConfigMapAnnotations(configMapNamespace, configMapName, c)
 
@@ -333,6 +333,9 @@ func main() {
 		return
 	}
 	peers, err := getKubePeers(c, false)
+	if err != nil {
+		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
+	}
 	for _, node := range peers {
 		fmt.Println(node.addr)
 	}
