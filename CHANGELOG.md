@@ -1,3 +1,23 @@
+## Release 2.5.1
+
+This release fixes bugs reported for 2.5 release and small improvements.
+
+### Bug fixes
+
+* prevent warnings in kernal logs due to use of physdev model for
+  non-bridged traffic #3449, #3453
+* Check and report the error occurred while getting the list of Kubernetes 
+  peers #3581, #3582
+
+### Other improvements
+
+* Update Ruby version to match Weaveworks website #3458
+* Fix the link to "Troubleshooting the Kubernetes Addon" section in the docs #3461
+* Document concept of connection limit in Weave #3395, #3413
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/77?closed=1)
+
+
 ## Release 2.5.0
 
 This release adds support for Kubernetes `hostPort` mapping (#3016,#3356)
