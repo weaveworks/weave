@@ -328,13 +328,13 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	// fails. Bridges take the lowest MTU of their interfaces. So
 	// instead we create a temporary interface with the desired MTU,
 	// attach that to the bridge, and then remove it again.
-	dummy := &netlink.Dummy{LinkAttrs: netlink.NewLinkAttrs()}
-	dummy.LinkAttrs.Name = WeaveDummyIfName
+	var dummy netlink.Link
+	dummy = &netlink.Dummy{LinkAttrs: netlink.NewLinkAttrs()}
+	dummy.Attrs().Name = WeaveDummyIfName
 	if err = LinkAddIfNotExist(dummy); err != nil {
 		return errors.Wrap(err, "creating dummy interface")
 	}
 	defer func() {
-		var dummy netlink.Link
 		dummy, err = netlink.LinkByName(WeaveDummyIfName)
 		if err == nil {
 			if err = netlink.LinkDel(dummy); err != nil {
