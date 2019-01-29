@@ -3,6 +3,7 @@
 
 * Up-to-date versions of `git`, `go` etc
 * Install GitHub release tool `go get github.com/weaveworks/github-release`
+* Install manifest tool `go get github.com/estesp/manifest-tool`
 * Create a [github token for
   github-release](https://help.github.com/articles/creating-an-access-token-for-command-line-use/); select the `repo` OAuth scope; set and export `$GITHUB_TOKEN` with this value
 
@@ -135,7 +136,7 @@ Now, you can validate whether images were published for all platforms:
     # Published platforms per image:
     for img in $(grep '^PUBLISH=' Makefile); do
         img="weaveworks/$(echo $img | cut -d_ -f2):${TAG#v}"
-        platforms=$(vendor/github.com/estesp/manifest-tool/manifest-tool \
+        platforms=$(manifest-tool \
                 inspect --raw "$img" | \
                 jq '.[].Platform | .os + "/" +.architecture' | \
                 tr '\n' ' ')
