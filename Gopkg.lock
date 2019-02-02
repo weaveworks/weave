@@ -316,7 +316,7 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
-  digest = "1:a1b2a09d080e0229db471efc7f030b6d3931cd54989f6a1a4d676e085139cc2d"
+  digest = "1:b23296076e13a960263285b98907623e5d45f12fc405b14da19c6afa2a113deb"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -325,8 +325,8 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
-  version = "v1.1.14"
+  revision = "7f3fc6cbbb499248dca53da7fe3ed6c25a78d22f"
+  version = "v1.1.16"
 
 [[projects]]
   digest = "1:5e031a35b76ee001fa9ca9d598298054a123d080e00d13a8dafcfc5e3ecd5b58"
@@ -440,6 +440,14 @@
   pruneopts = "UT"
   revision = "3247c84500bff8d9fb6d579d800f20b3e091582c"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:450f3a64f7a76d3f229ff33a30f0a889629dde46b0f82ece7c53404528316665"
+  name = "github.com/mdlayher/raw"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "fa5ef3332ca961deab5782da07b1616fea8a9dd8"
 
 [[projects]]
   branch = "master"
@@ -728,14 +736,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5045bd5ed8083958e27c933e665c38b4de5d7d966146a074d541f691a56d8bc4"
+  digest = "1:653cc9ff57cf744d21f74e811af4f330415284bfc291d28f716833618c02c876"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "13d03a9a82fba647c21a0ef8fba44a795d0f0835"
+  revision = "afcc84fd7533758f95a6e93ae710aa945a0b7e73"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
