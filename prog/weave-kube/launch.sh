@@ -85,7 +85,7 @@ router_bridge_opts() {
 }
 
 if [ -z "$KUBE_PEERS" ]; then
-    if ! KUBE_PEERS=$(/home/weave/kube-utils) || [ -z "$KUBE_PEERS" ]; then
+    if ! KUBE_PEERS=$(/home/weave/kube-utils); then
         echo Failed to get peers >&2
         exit 1
     fi
