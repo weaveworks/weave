@@ -209,10 +209,10 @@ ask for the logs like this:
 $ kubectl logs -n kube-system weave-net-1jkl6 weave
 ```
 
-For easier viewing, pipe the output into a file , especially if
+For easier viewing, pipe the output into a file, especially if
 it is long.
 
-By default log level of `weave` container is set to `info` level. If you wish to see more detailed logs you can set the desired log level for the `-log-level` flag through the `EXTRA_ARGS` environment variable for the `weave` container in the weave-net daemon set. Add environment variable as below.
+By default log level of `weave` container is set to `info` level. If you wish to see more detailed logs you can set the desired log level for the `--log-level` flag through the `EXTRA_ARGS` environment variable for the `weave` container in the weave-net daemon set. Add environment variable as below.
 
 ```yaml
       containers:
@@ -223,6 +223,9 @@ By default log level of `weave` container is set to `info` level. If you wish to
         - name: EXTRA_ARGS
           value: --log-level=debug
 ```
+
+You may also set the `--log-level` flag to `warning` or `error` if you
+prefer to only log exceptional conditions.
 
 Many Kubernetes network issues occur at a higher level than Weave Net.
 The [Kubernetes Service Debugging Guide]
