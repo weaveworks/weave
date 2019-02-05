@@ -46,13 +46,13 @@ var (
 )
 
 func errInconsistentEntry(mine, theirs *entry) error {
-	return fmt.Errorf("Inconsistent entries for %s: owned by %s but incoming message says %s", mine.Token, mine.Peer, theirs.Peer)
+	return fmt.Errorf("inconsistent entries for %s: owned by %s but incoming message says %s", mine.Token, mine.Peer, theirs.Peer)
 }
 func errEntryInMyRange(theirs *entry) error {
-	return fmt.Errorf("Peer %s says it owns the IP range from %s, which I think I own", theirs.Peer, theirs.Token)
+	return fmt.Errorf("peer %s says it owns the IP range from %s, which I think I own", theirs.Peer, theirs.Token)
 }
 func errNewerVersion(mine, theirs *entry) error {
-	return fmt.Errorf("Received update for IP range I own at %s v%d: incoming message says owner %s v%d", mine.Token, mine.Version, theirs.Peer, theirs.Version)
+	return fmt.Errorf("received update for IP range I own at %s v%d: incoming message says owner %s v%d", mine.Token, mine.Version, theirs.Peer, theirs.Version)
 }
 
 func (r *Ring) checkInvariants() error {
@@ -90,7 +90,7 @@ func (r *Ring) checkEntries(entries entries) error {
 		distance := r.distance(entry.Token, next.Token)
 
 		if entry.Free > distance {
-			return fmt.Errorf("Entry %s-%s reporting too much free space: %d > %d", entry.Token, next.Token, entry.Free, distance)
+			return fmt.Errorf("entry %s-%s reporting too much free space: %d > %d", entry.Token, next.Token, entry.Free, distance)
 		}
 	}
 
@@ -245,7 +245,7 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 	}
 
 	if err := r.checkEntries(result); err != nil {
-		return false, fmt.Errorf("Merge of incoming data causes: %s", err)
+		return false, fmt.Errorf("merge of incoming data causes: %s", err)
 	}
 
 	if len(r.Seeds) == 0 {

@@ -80,7 +80,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 		n.RLock()
 		defer n.RUnlock()
 		if err := json.NewEncoder(w).Encode(n.entries); err != nil {
-			n.badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
+			n.badRequest(w, fmt.Errorf("error marshalling response: %v", err))
 		}
 	})
 }

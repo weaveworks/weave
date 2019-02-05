@@ -406,7 +406,7 @@ func (alloc *Allocator) Delete(ident string) error {
 func (alloc *Allocator) delete(ident string) error {
 	cidrs := alloc.removeAllOwned(ident)
 	if len(cidrs) == 0 {
-		return fmt.Errorf("Delete: no addresses for %s", ident)
+		return fmt.Errorf("delete: no addresses for %s", ident)
 	}
 	for _, cidr := range cidrs {
 		alloc.space.Free(cidr.Addr)
@@ -425,7 +425,7 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 			return
 		}
 
-		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
+		errChan <- fmt.Errorf("free: address %s not found for %s", addrToFree, ident)
 	}
 	return <-errChan
 }
@@ -840,10 +840,10 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 				alloc.ringUpdated()
 			}
 		case ring.ErrDifferentSeeds:
-			return fmt.Errorf("IP allocation was seeded by different peers (received: %v, ours: %v)",
+			return fmt.Errorf("iP allocation was seeded by different peers (received: %v, ours: %v)",
 				alloc.annotatePeernames(data.Ring.Seeds), alloc.annotatePeernames(alloc.ring.Seeds))
 		case ring.ErrDifferentRange:
-			return fmt.Errorf("Incompatible IP allocation ranges (received: %s, ours: %s)",
+			return fmt.Errorf("incompatible IP allocation ranges (received: %s, ours: %s)",
 				data.Ring.Range().AsCIDRString(), alloc.ring.Range().AsCIDRString())
 		default:
 			return err

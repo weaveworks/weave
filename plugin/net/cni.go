@@ -54,12 +54,12 @@ func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (newResult *curre
 		return nil, err
 	}
 	if result == nil {
-		return nil, fmt.Errorf("Received no usable result from IPAM plugin")
+		return nil, fmt.Errorf("received no usable result from IPAM plugin")
 	}
 	newResult, err = current.NewResultFromResult(result)
 	// Check if ipam returned no results without error
 	if err == nil && len(newResult.IPs) == 0 {
-		return nil, fmt.Errorf("IPAM plugin failed to allocate IP address")
+		return nil, fmt.Errorf("iPAM plugin failed to allocate IP address")
 	}
 	return newResult, err
 }
@@ -71,10 +71,10 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if conf.IsGW {
-		return fmt.Errorf("Gateway functionality not supported")
+		return fmt.Errorf("gateway functionality not supported")
 	}
 	if conf.IPMasq {
-		return fmt.Errorf("IP Masquerading functionality not supported")
+		return fmt.Errorf("iP Masquerading functionality not supported")
 	}
 
 	result, err := c.getIP(conf.IPAM.Type, args)

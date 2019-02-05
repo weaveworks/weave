@@ -243,7 +243,7 @@ func (fastdp fastDatapathInjectorConsumer) StartConsumingPackets(consumer Consum
 	defer fastdp.lock.Unlock()
 
 	if fastdp.sendToPort[routerBridgePortID] != nil {
-		return fmt.Errorf("FastDatapath already has a Consumer")
+		return fmt.Errorf("fastDatapath already has a Consumer")
 	}
 
 	// set up delivery to the weave router port on the bridge
@@ -435,7 +435,7 @@ func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *mesh.Peer, pe
 	defer fastdp.lock.Unlock()
 
 	if fastdp.overlayConsumer != nil {
-		return fmt.Errorf("FastDatapath already has an OverlayConsumer")
+		return fmt.Errorf("fastDatapath already has an OverlayConsumer")
 	}
 
 	fastdp.localPeer = localPeer
@@ -643,7 +643,7 @@ func ipv4Bytes(ip net.IP) (res [4]byte, err error) {
 	if ipv4 != nil {
 		copy(res[:], ipv4)
 	} else {
-		err = fmt.Errorf("IP address %s is not IPv4", ip)
+		err = fmt.Errorf("iP address %s is not IPv4", ip)
 	}
 	return
 }

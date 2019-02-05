@@ -177,7 +177,7 @@ func (t *AWSVPCTracker) detectRouteTableID() (*string, error) {
 	}
 	instancesResp, err := t.ec2.DescribeInstances(instancesParams)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeInstances failed: %s", err)
+		return nil, fmt.Errorf("describeInstances failed: %s", err)
 	}
 	if len(instancesResp.Reservations) == 0 ||
 		len(instancesResp.Reservations[0].Instances) == 0 {
@@ -197,7 +197,7 @@ func (t *AWSVPCTracker) detectRouteTableID() (*string, error) {
 	}
 	tablesResp, err := t.ec2.DescribeRouteTables(tablesParams)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeRouteTables failed: %s", err)
+		return nil, fmt.Errorf("describeRouteTables failed: %s", err)
 	}
 	if len(tablesResp.RouteTables) != 0 {
 		return tablesResp.RouteTables[0].RouteTableId, nil
@@ -217,7 +217,7 @@ func (t *AWSVPCTracker) detectRouteTableID() (*string, error) {
 	}
 	tablesResp, err = t.ec2.DescribeRouteTables(tablesParams)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeRouteTables failed: %s", err)
+		return nil, fmt.Errorf("describeRouteTables failed: %s", err)
 	}
 	if len(tablesResp.RouteTables) != 0 {
 		return tablesResp.RouteTables[0].RouteTableId, nil

@@ -49,7 +49,7 @@ func attach(args []string) error {
 	if nsHost, err := netns.GetFromPid(1); err != nil {
 		return fmt.Errorf("unable to open host namespace: %s", err)
 	} else if nsHost.Equal(nsContainer) {
-		return fmt.Errorf("Container is running in the host network namespace, and therefore cannot be\nconnected to weave - perhaps the container was started with --net=host")
+		return fmt.Errorf("container is running in the host network namespace, and therefore cannot be\nconnected to weave - perhaps the container was started with --net=host")
 	}
 	cidrs, err := parseCIDRs(args[2:])
 	if err != nil {
@@ -59,7 +59,7 @@ func attach(args []string) error {
 	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], 0, withMulticastRoute, cidrs, keepTXOn, hairpinMode)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
-		err = fmt.Errorf("Container %s died", args[0])
+		err = fmt.Errorf("container %s died", args[0])
 	}
 	return err
 }

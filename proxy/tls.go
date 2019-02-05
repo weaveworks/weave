@@ -56,7 +56,7 @@ func (c *TLSConfig) LoadCerts() error {
 		certPool := x509.NewCertPool()
 		file, err := ioutil.ReadFile(c.CACert)
 		if err != nil {
-			return fmt.Errorf("Couldn't read CA certificate: %v", err)
+			return fmt.Errorf("couldn't read CA certificate: %v", err)
 		}
 		certPool.AppendCertsFromPEM(file)
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
@@ -68,7 +68,7 @@ func (c *TLSConfig) LoadCerts() error {
 	if errCert == nil && errKey == nil {
 		cert, err := tls.LoadX509KeyPair(c.Cert, c.Key)
 		if err != nil {
-			return fmt.Errorf("Couldn't load X509 key pair: %q. Make sure the key is encrypted", err)
+			return fmt.Errorf("couldn't load X509 key pair: %q. Make sure the key is encrypted", err)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}

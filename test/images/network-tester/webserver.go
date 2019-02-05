@@ -308,10 +308,10 @@ func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err erro
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
 	if iface, err = net.InterfaceByName(ifaceName); err != nil {
-		return iface, fmt.Errorf("Unable to find interface %s", ifaceName)
+		return iface, fmt.Errorf("unable to find interface %s", ifaceName)
 	}
 	if 0 == (net.FlagUp & iface.Flags) {
-		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
+		return iface, fmt.Errorf("interface %s is not up", ifaceName)
 	}
 	return
 }

@@ -214,7 +214,7 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 	}
 
 	if driver.docker == nil {
-		return network, fmt.Errorf("Docker client disabled; unable to get network info")
+		return network, fmt.Errorf("docker client disabled; unable to get network info")
 	}
 
 	info, err := driver.docker.NetworkInfo(id)

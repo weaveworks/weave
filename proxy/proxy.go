@@ -161,7 +161,7 @@ func NewProxy(c Config) (*Proxy, error) {
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
 	if err != nil {
-		err := fmt.Errorf("Incorrect hostname match '%s': %s", c.HostnameMatch, err.Error())
+		err := fmt.Errorf("incorrect hostname match '%s': %s", c.HostnameMatch, err.Error())
 		return nil, err
 	}
 
@@ -209,16 +209,16 @@ func (proxy *Proxy) findWeaveWaitVolumes() error {
 func (proxy *Proxy) findVolume(v string) (string, error) {
 	container, err := proxy.client.InspectContainer("weave")
 	if err != nil {
-		return "", fmt.Errorf("Could not find the weavewait volume: %s", err)
+		return "", fmt.Errorf("could not find the weavewait volume: %s", err)
 	}
 
 	if container.Volumes == nil {
-		return "", fmt.Errorf("Could not find the weavewait volume")
+		return "", fmt.Errorf("could not find the weavewait volume")
 	}
 
 	volume, ok := container.Volumes[v]
 	if !ok {
-		return "", fmt.Errorf("Could not find the weavewait volume")
+		return "", fmt.Errorf("could not find the weavewait volume")
 	}
 
 	return volume, nil

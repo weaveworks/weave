@@ -82,7 +82,7 @@ func marshalResponseBody(r *http.Response, body interface{}) error {
 func inspectContainerInPath(client *weavedocker.Client, path string) (*docker.Container, error) {
 	subs := containerIDRegexp.FindStringSubmatch(path)
 	if subs == nil {
-		err := fmt.Errorf("No container id found in request with path %s", path)
+		err := fmt.Errorf("no container id found in request with path %s", path)
 		Log.Warningln(err)
 		return nil, err
 	}

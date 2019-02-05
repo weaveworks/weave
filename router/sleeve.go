@@ -111,7 +111,7 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *mesh.Peer, peers *
 
 	if sleeve.localPeer != nil {
 		conn.Close()
-		return fmt.Errorf("StartConsumingPackets already called")
+		return fmt.Errorf("startConsumingPackets already called")
 	}
 
 	sleeve.localPeer = localPeer

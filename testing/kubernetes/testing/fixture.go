@@ -308,7 +308,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
 			if replaceExisting {
 				if oldMeta.GetResourceVersion() != inputResourceVersion {
-					return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("Resource version mismatch"))
+					return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("resource version mismatch"))
 				}
 				t.objects[gvr][i] = obj
 				return nil

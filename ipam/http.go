@@ -80,7 +80,7 @@ func (alloc *Allocator) handleHTTPClaim(dockerCli *docker.Client, w http.Respons
 		hasBeenCancelled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
 	if err != nil {
 		if !cancellationErr(w, err) {
-			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
+			badRequest(w, fmt.Errorf("unable to claim: %s", err))
 		}
 		return
 	}
@@ -181,7 +181,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			badRequest(w, err)
 			return
 		} else if err := alloc.Free(ident, ip); err != nil {
-			badRequest(w, fmt.Errorf("Unable to free: %s", err))
+			badRequest(w, fmt.Errorf("unable to free: %s", err))
 			return
 		}
 

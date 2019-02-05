@@ -120,11 +120,11 @@ func (e1 *Entry) tombstone() bool {
 
 func check(es SortableEntries) error {
 	if !sort.IsSorted(es) {
-		return fmt.Errorf("Not sorted")
+		return fmt.Errorf("not sorted")
 	}
 	for i := 1; i < es.Len(); i++ {
 		if es.Get(i).equal(es.Get(i - 1)) {
-			return fmt.Errorf("Duplicate entry: %d:%v and %d:%v", i-1, es.Get(i-1), i, es.Get(i))
+			return fmt.Errorf("duplicate entry: %d:%v and %d:%v", i-1, es.Get(i-1), i, es.Get(i))
 		}
 	}
 	return nil
@@ -253,7 +253,7 @@ func (es Entries) first(f func(*Entry) bool) (*Entry, error) {
 			return &e, nil
 		}
 	}
-	return nil, fmt.Errorf("Not found")
+	return nil, fmt.Errorf("not found")
 }
 
 func (es Entries) addLowercase() {

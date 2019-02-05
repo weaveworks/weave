@@ -80,7 +80,7 @@ func (s *Space) Allocate(r address.Range) (bool, address.Address) {
 
 func (s *Space) Claim(addr address.Address) error {
 	if !contains(s.free, addr) {
-		return fmt.Errorf("Address %v is not free to claim", addr)
+		return fmt.Errorf("address %v is not free to claim", addr)
 	}
 
 	s.ours = add(s.ours, addr, addr+1)
@@ -115,10 +115,10 @@ func (s *Space) NumFreeAddressesInRange(r address.Range) address.Count {
 
 func (s *Space) Free(addr address.Address) error {
 	if !contains(s.ours, addr) {
-		return fmt.Errorf("Address %v is not ours", addr)
+		return fmt.Errorf("address %v is not ours", addr)
 	}
 	if contains(s.free, addr) {
-		return fmt.Errorf("Address %v is already free", addr)
+		return fmt.Errorf("address %v is already free", addr)
 	}
 
 	s.ours = subtract(s.ours, addr, addr+1)

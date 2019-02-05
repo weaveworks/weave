@@ -160,21 +160,21 @@ func isDatapath(link netlink.Link) bool {
 func DetectHairpin(portIfName string, log *logrus.Logger) error {
 	link, err := netlink.LinkByName(portIfName)
 	if err != nil {
-		return fmt.Errorf("Unable to find link %q: %s", portIfName, err)
+		return fmt.Errorf("unable to find link %q: %s", portIfName, err)
 	}
 
 	ch := make(chan netlink.LinkUpdate)
 	// See EnsureInterface for why done channel is not passed
 	if err := netlink.LinkSubscribe(ch, nil); err != nil {
-		return fmt.Errorf("Unable to subscribe to netlink updates: %s", err)
+		return fmt.Errorf("unable to subscribe to netlink updates: %s", err)
 	}
 
 	pi, err := netlink.LinkGetProtinfo(link)
 	if err != nil {
-		return fmt.Errorf("Unable to get link protinfo %q: %s", portIfName, err)
+		return fmt.Errorf("unable to get link protinfo %q: %s", portIfName, err)
 	}
 	if pi.Hairpin {
-		return fmt.Errorf("Hairpin mode enabled on %q", portIfName)
+		return fmt.Errorf("hairpin mode enabled on %q", portIfName)
 	}
 
 	go func() {
@@ -189,12 +189,12 @@ func DetectHairpin(portIfName string, log *logrus.Logger) error {
 	return nil
 }
 
-var ErrBridgeNoIP = fmt.Errorf("Bridge has no IP address")
+var ErrBridgeNoIP = fmt.Errorf("bridge has no IP address")
 
 func FindBridgeIP(bridgeName string, subnet *net.IPNet) (net.IP, error) {
 	netdev, err := GetBridgeNetDev(bridgeName)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
+		return nil, fmt.Errorf("failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
 	if len(netdev.CIDRs) == 0 {
 		return nil, ErrBridgeNoIP
@@ -245,7 +245,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 
 	if existingBridgeType != nil && bridgeType.String() != existingBridgeType.String() {
 		return nil,
-			fmt.Errorf("Existing bridge type %q is different than requested %q. Please do 'weave reset' and try again",
+			fmt.Errorf("existing bridge type %q is different than requested %q. Please do 'weave reset' and try again",
 				existingBridgeType, bridgeType)
 	}
 
@@ -621,7 +621,7 @@ func reexpose(config *BridgeConfig, log *logrus.Logger) error {
 func monitorInterface(ifaceName string, log *logrus.Logger) error {
 	_, err := netlink.LinkByName(ifaceName)
 	if err != nil {
-		return fmt.Errorf("Unable to find link %q: %s", ifaceName, err)
+		return fmt.Errorf("unable to find link %q: %s", ifaceName, err)
 	}
 
 	updatesChannel := make(chan netlink.LinkUpdate)

@@ -62,7 +62,7 @@ func (i *Ipam) ReleasePool(poolID string) error {
 func splitPoolID(poolID string) (subnet, iprange *net.IPNet, err error) {
 	parts := strings.Split(poolID, "-")
 	if len(parts) != 3 || parts[0] != "weave" {
-		err = fmt.Errorf("Unrecognized pool ID: %s", poolID)
+		err = fmt.Errorf("unrecognized pool ID: %s", poolID)
 		return
 	}
 	if _, subnet, err = net.ParseCIDR(parts[1]); err != nil {

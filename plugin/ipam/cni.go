@@ -33,7 +33,7 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 	}
 	containerID := args.ContainerID
 	if containerID == "" {
-		return nil, fmt.Errorf("Weave CNI Allocate: blank container name")
+		return nil, fmt.Errorf("weave CNI Allocate: blank container name")
 	}
 	var ipnet *net.IPNet
 
