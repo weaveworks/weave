@@ -335,11 +335,8 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 		return errors.Wrap(err, "creating dummy interface")
 	}
 	defer func() {
-		dummy, err = netlink.LinkByName(WeaveDummyIfName)
-		if err == nil {
-			if err = netlink.LinkDel(dummy); err != nil {
-				err = errors.Wrap(err, "deleting dummy interface")
-			}
+		if err = netlink.LinkDel(dummy); err != nil {
+			err = errors.Wrap(err, "deleting dummy interface")
 		}
 	}()
 	if err := netlink.LinkSetMTU(dummy, config.MTU); err != nil {
