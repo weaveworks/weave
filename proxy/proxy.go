@@ -532,7 +532,13 @@ func (proxy *Proxy) attach(containerID string) error {
 // and return nil on success or not needed.
 func (proxy *Proxy) detach(containerID string) error {
 	name, _ := weavenet.GenerateVethPair(containerID)
-	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	veth, err := netlink.LinkByName(name)
+	if err != nil {
+		if err.Error() == weavenet.ErrLinkNotFound.Error() {
+			return nil
+		}
+		return err
+	}
 	if err := netlink.LinkDel(veth); err != nil {
 		return err
 	}
