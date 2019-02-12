@@ -9,7 +9,7 @@
 
 [Weaveworks](https://www.weave.works) is the company that delivers the most productive way for developers to connect, observe and control Docker containers.
 
-This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, and with over 8 million downloads to date, enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
+This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, with over 8 million downloads to date. Weave Net enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
 
 ## Weave Cloud:
 
