@@ -12,7 +12,7 @@ Docker containers.
 
 This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, and with over 8 million downloads to date, enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
 
-## Weave Cloud: 
+## Weave Cloud:
 
 [Weave Cloud](https://www.weave.works/product/cloud/) is software-as-a-service that simplifies deployment, monitoring and management for containers and microservices. It extends and complements popular orchestrators, and enables developers and DevOps to realize faster deployments, insightful monitoring, visualization and networking.
 
