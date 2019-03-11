@@ -95,29 +95,37 @@ func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
 	return value, ok
 }
 
-func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error) {
+func (cml *configMapAnnotations) UpdateAnnotation(key, value string) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
 	// from Update(), which will be the latest on the server whatever happened
 	cml.cm.Annotations[cleanKey(key)] = value
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	return err
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err != nil {
+		return err
+	}
+	cml.cm = cm
+	return nil
 }
 
-func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
+func (cml *configMapAnnotations) RemoveAnnotation(key string) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
 	// from Update(), which will be the latest on the server whatever happened
 	delete(cml.cm.Annotations, cleanKey(key))
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	return err
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err != nil {
+		return err
+	}
+	cml.cm = cm
+	return nil
 }
 
-func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) (err error) {
+func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
@@ -128,8 +136,12 @@ func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string
 			delete(cml.cm.Annotations, key) // don't need to clean this key as it came from the map
 		}
 	}
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
-	return err
+	cm, err := cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	if err != nil {
+		return err
+	}
+	cml.cm = cm
+	return nil
 }
 
 // Loop with jitter, fetching the cml data and calling f() until it
