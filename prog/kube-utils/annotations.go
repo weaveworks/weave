@@ -96,7 +96,7 @@ func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
 }
 
 func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
@@ -107,7 +107,7 @@ func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error)
 }
 
 func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
@@ -118,7 +118,7 @@ func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
 }
 
 func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
