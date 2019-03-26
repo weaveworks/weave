@@ -110,10 +110,6 @@ func ObjectReaction(tracker ObjectTracker) testing.ReactionFunc {
 			}
 			err = tracker.Update(gvr, action.GetObject(), ns)
 			if err != nil {
-				if errors.IsConflict(err) { // return the currently-stored version of the object
-					obj, _ := tracker.Get(gvr, ns, objMeta.GetName())
-					return true, obj, err
-				}
 				return true, nil, err
 			}
 			obj, err := tracker.Get(gvr, ns, objMeta.GetName())
