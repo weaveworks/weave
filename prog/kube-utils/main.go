@@ -140,6 +140,11 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, storedPeerList *p
 	okToRemove := false
 	nonExistentPeer := false
 
+	// Re-read status from Kubernetes; speculative updates may leave it un-set
+	if err := cml.Init(); err != nil {
+		return false, err
+	}
+
 	// 3. Check if there is an existing annotation with key X
 	existingAnnotation, found := cml.GetAnnotation(KubePeersPrefix + peerName)
 	if found {
