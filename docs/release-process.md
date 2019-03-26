@@ -155,6 +155,7 @@ Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-
 * Go to "_Plans & Pricing_" > "_Free Tier_".
 * Under "_Source Repositories & Tags_", click on "_Add Source_", select "_net-plugin_" under "_Repository_" and the version to release under "_Tag_".
 * Under "_Resources_" > "_Installation Instructions_", update the lines containing `export NET_VERSION=<version>`.
+* Click "_Save_"
 * Click "_Submit For Review_". You should see a message like: "_Your product has been submitted for approval. [...] We'll be in touch with next steps soon!_".
 * You should receive an email saying:
 
@@ -178,6 +179,8 @@ Weave Net is [available in Docker Store](https://store.docker.com/plugins/weave-
   https://checkpoint-api.weave.works/admin
 * File a PR to update the version of the daemonset at
   https://github.com/kubernetes/kops/tree/master/upup/models/cloudup/resources/addons/networking.weave
+  and kops/upup/pkg/fi/cloudup/bootstrapchannelbuilder.go
+  and kops/upup/pkg/fi/cloudup/tests/bootstrapchannelbuilder/weave/manifest.yaml
 
 ## Troubleshooting
 
