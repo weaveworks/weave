@@ -297,12 +297,14 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
+				common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			case mine.Version < theirs.Version:
 				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
 					err = errNewerVersion(mine, theirs)
 					return
 				}
 				addTheirs(*theirs)
+				common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			}
 			i++
 			j++
@@ -485,6 +487,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated 
 
 		entries[i].Free = free
 		entries[i].Version++
+		common.Log.Debugln(fmt.Sprintf("[ring %s]: ReportFree token=%s peer=%s version=%s", r.Peer, entries[i].Token, entries[i].Peer, fmt.Sprint(entries[i].Version)))
 		updated = true
 	}
 	return
@@ -566,6 +569,7 @@ func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 		if entry.Peer == from {
 			entry.Peer = to
 			entry.Version++
+			common.Log.Debugln(fmt.Sprintf("[ring %s]: Transfer token=%s from=%s to=%s version=%s", r.Peer, entry.Token, from, to, fmt.Sprint(entry.Version)))
 			newRanges = append(newRanges, address.Range{Start: entry.Token, End: r.Entries.entry(i + 1).Token})
 		}
 	}
