@@ -86,7 +86,7 @@ func (peer *Peer) String() string {
 //
 // NB: This function should generally be invoked while holding a read lock on
 // Peers and LocalPeer.
-func (peer *Peer) routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
+func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
 	routes := make(unicastRoutes)
 	routes[peer.Name] = UnknownPeerName
 	nextWorklist := []*Peer{peer}
@@ -98,7 +98,7 @@ func (peer *Peer) routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 			if curPeer == stopAt {
 				return true, routes
 			}
-			curPeer.forEachConnectedPeer(establishedAndSymmetric, routes,
+			curPeer.ForEachConnectedPeer(establishedAndSymmetric, routes,
 				func(remotePeer *Peer) {
 					nextWorklist = append(nextWorklist, remotePeer)
 					remoteName := remotePeer.Name
@@ -120,7 +120,7 @@ func (peer *Peer) routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 // Apply f to all peers reachable by peer. If establishedAndSymmetric is true,
 // only peers with established bidirectional connections will be selected. The
 // exclude maps is treated as a set of remote peers to blacklist.
-func (peer *Peer) forEachConnectedPeer(establishedAndSymmetric bool, exclude map[PeerName]PeerName, f func(*Peer)) {
+func (peer *Peer) ForEachConnectedPeer(establishedAndSymmetric bool, exclude map[PeerName]PeerName, f func(*Peer)) {
 	for remoteName, conn := range peer.connections {
 		if establishedAndSymmetric && !conn.isEstablished() {
 			continue

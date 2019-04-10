@@ -9,15 +9,15 @@ import (
 // gossipChannel is a logical communication channel within a physical mesh.
 type gossipChannel struct {
 	name     string
-	ourself  *localPeer
-	routes   *routes
+	ourself  *LocalPeer
+	routes   routes
 	gossiper Gossiper
 	logger   Logger
 }
 
 // newGossipChannel returns a named, usable channel.
 // It delegates receiving duties to the passed Gossiper.
-func newGossipChannel(channelName string, ourself *localPeer, r *routes, g Gossiper, logger Logger) *gossipChannel {
+func newGossipChannel(channelName string, ourself *LocalPeer, r routes, g Gossiper, logger Logger) *gossipChannel {
 	return &gossipChannel{
 		name:     channelName,
 		ourself:  ourself,

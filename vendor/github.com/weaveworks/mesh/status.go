@@ -113,12 +113,12 @@ type unicastRouteStatus struct {
 }
 
 // makeUnicastRouteStatusSlice takes a snapshot of the unicast routes in routes.
-func makeUnicastRouteStatusSlice(r *routes) []unicastRouteStatus {
+func makeUnicastRouteStatusSlice(r routes) []unicastRouteStatus {
 	r.RLock()
 	defer r.RUnlock()
 
 	var slice []unicastRouteStatus
-	for dest, via := range r.unicast {
+	for dest, via := range r.UnicastRoutes() {
 		slice = append(slice, unicastRouteStatus{dest.String(), via.String()})
 	}
 	return slice
@@ -131,12 +131,12 @@ type broadcastRouteStatus struct {
 }
 
 // makeBroadcastRouteStatusSlice takes a snapshot of the broadcast routes in routes.
-func makeBroadcastRouteStatusSlice(r *routes) []broadcastRouteStatus {
+func makeBroadcastRouteStatusSlice(r routes) []broadcastRouteStatus {
 	r.RLock()
 	defer r.RUnlock()
 
 	var slice []broadcastRouteStatus
-	for source, via := range r.broadcast {
+	for source, via := range r.BroadcastRoutes() {
 		var hops []string
 		for _, hop := range via {
 			hops = append(hops, hop.String())

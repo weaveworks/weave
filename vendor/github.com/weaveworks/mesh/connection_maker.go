@@ -18,7 +18,7 @@ type peerAddrs map[string]*net.TCPAddr
 
 // ConnectionMaker initiates and manages connections to peers.
 type connectionMaker struct {
-	ourself          *localPeer
+	ourself          *LocalPeer
 	peers            *Peers
 	localAddr        string
 	port             int
@@ -58,7 +58,7 @@ type connectionMakerAction func() bool
 // peers, making outbound connections from localAddr, and listening on
 // port. If discovery is true, ConnectionMaker will attempt to
 // initiate new connections with peers it's not directly connected to.
-func newConnectionMaker(ourself *localPeer, peers *Peers, localAddr string, port int, discovery bool, logger Logger) *connectionMaker {
+func newConnectionMaker(ourself *LocalPeer, peers *Peers, localAddr string, port int, discovery bool, logger Logger) *connectionMaker {
 	actionChan := make(chan connectionMakerAction, ChannelSize)
 	cm := &connectionMaker{
 		ourself:     ourself,
@@ -288,9 +288,9 @@ func (cm *connectionMaker) checkStateAndAttemptConnections() time.Duration {
 	return cm.connectToTargets(validTarget, directTarget)
 }
 
-func (cm *connectionMaker) ourConnections() (peerNameSet, map[string]struct{}, map[string]struct{}) {
+func (cm *connectionMaker) ourConnections() (PeerNameSet, map[string]struct{}, map[string]struct{}) {
 	var (
-		ourConnectedPeers   = make(peerNameSet)
+		ourConnectedPeers   = make(PeerNameSet)
 		ourConnectedTargets = make(map[string]struct{})
 		ourInboundIPs       = make(map[string]struct{})
 	)
@@ -308,7 +308,7 @@ func (cm *connectionMaker) ourConnections() (peerNameSet, map[string]struct{}, m
 	return ourConnectedPeers, ourConnectedTargets, ourInboundIPs
 }
 
-func (cm *connectionMaker) addPeerTargets(ourConnectedPeers peerNameSet, addTarget func(string)) {
+func (cm *connectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarget func(string)) {
 	cm.peers.forEach(func(peer *Peer) {
 		if peer == cm.ourself.Peer {
 			return

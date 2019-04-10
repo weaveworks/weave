@@ -44,9 +44,9 @@ type Config struct {
 type Router struct {
 	Config
 	Overlay         Overlay
-	Ourself         *localPeer
+	Ourself         *LocalPeer
 	Peers           *Peers
-	Routes          *routes
+	Routes          routes
 	ConnectionMaker *connectionMaker
 	gossipLock      sync.RWMutex
 	gossipChannels  gossipChannels
@@ -222,7 +222,7 @@ func (router *Router) sendPendingGossip() bool {
 // BroadcastTopologyUpdate is invoked whenever there is a change to the mesh
 // topology, and broadcasts the new set of peers to the mesh.
 func (router *Router) broadcastTopologyUpdate(update []*Peer) {
-	names := make(peerNameSet)
+	names := make(PeerNameSet)
 	for _, p := range update {
 		names[p.Name] = struct{}{}
 	}
@@ -247,7 +247,7 @@ func (router *Router) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, 
 
 // Gossip yields the current topology as GossipData.
 func (router *Router) Gossip() GossipData {
-	return &topologyGossipData{peers: router.Peers, update: router.Peers.names()}
+	return &topologyGossipData{peers: router.Peers, update: router.Peers.Names()}
 }
 
 // OnGossip receives broadcasts of TopologyGossipData.
@@ -261,7 +261,7 @@ func (router *Router) OnGossip(update []byte) (GossipData, error) {
 	return &topologyGossipData{peers: router.Peers, update: newUpdate}, nil
 }
 
-func (router *Router) applyTopologyUpdate(update []byte) (peerNameSet, peerNameSet, error) {
+func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	origUpdate, newUpdate, err := router.Peers.applyUpdate(update)
 	if err != nil {
 		return nil, nil, err
@@ -291,12 +291,12 @@ func (router *Router) trusts(remote *remoteConnection) bool {
 // Gossiped just like anything else.
 type topologyGossipData struct {
 	peers  *Peers
-	update peerNameSet
+	update PeerNameSet
 }
 
 // Merge implements GossipData.
 func (d *topologyGossipData) Merge(other GossipData) GossipData {
-	names := make(peerNameSet)
+	names := make(PeerNameSet)
 	for name := range d.update {
 		names[name] = struct{}{}
 	}

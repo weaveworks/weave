@@ -11,8 +11,8 @@ import (
 // Peers collects all of the known peers in the mesh, including ourself.
 type Peers struct {
 	sync.RWMutex
-	ourself   *localPeer
-	byName    map[PeerName]*Peer
+	ourself   *LocalPeer
+	ByName    map[PeerName]*Peer
 	byShortID map[PeerShortID]shortIDPeers
 	onGC      []func(*Peer)
 
@@ -30,7 +30,7 @@ type shortIDPeers struct {
 	others []*Peer
 }
 
-type peerNameSet map[PeerName]struct{}
+type PeerNameSet map[PeerName]struct{}
 
 type connectionSummary struct {
 	NameByte      []byte
@@ -55,10 +55,10 @@ type peersPendingNotifications struct {
 	localPeerModified bool
 }
 
-func newPeers(ourself *localPeer) *Peers {
+func newPeers(ourself *LocalPeer) *Peers {
 	peers := &Peers{
 		ourself:   ourself,
-		byName:    make(map[PeerName]*Peer),
+		ByName:    make(map[PeerName]*Peer),
 		byShortID: make(map[PeerShortID]shortIDPeers),
 	}
 	peers.fetchWithDefault(ourself.Peer)
@@ -69,8 +69,8 @@ func newPeers(ourself *localPeer) *Peers {
 func (peers *Peers) Descriptions() []PeerDescription {
 	peers.RLock()
 	defer peers.RUnlock()
-	descriptions := make([]PeerDescription, 0, len(peers.byName))
-	for _, peer := range peers.byName {
+	descriptions := make([]PeerDescription, 0, len(peers.ByName))
+	for _, peer := range peers.ByName {
 		descriptions = append(descriptions, PeerDescription{
 			Name:           peer.Name,
 			NickName:       peer.peerSummary.NickName,
@@ -285,12 +285,12 @@ func (peers *Peers) fetchWithDefault(peer *Peer) *Peer {
 	var pending peersPendingNotifications
 	defer peers.unlockAndNotify(&pending)
 
-	if existingPeer, found := peers.byName[peer.Name]; found {
+	if existingPeer, found := peers.ByName[peer.Name]; found {
 		existingPeer.localRefCount++
 		return existingPeer
 	}
 
-	peers.byName[peer.Name] = peer
+	peers.ByName[peer.Name] = peer
 	peers.addByShortID(peer, &pending)
 	peer.localRefCount++
 	return peer
@@ -301,14 +301,14 @@ func (peers *Peers) fetchWithDefault(peer *Peer) *Peer {
 func (peers *Peers) Fetch(name PeerName) *Peer {
 	peers.RLock()
 	defer peers.RUnlock()
-	return peers.byName[name]
+	return peers.ByName[name]
 }
 
 // Like fetch, but increments local refcount.
 func (peers *Peers) fetchAndAddRef(name PeerName) *Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	peer := peers.byName[name]
+	peer := peers.ByName[name]
 	if peer != nil {
 		peer.localRefCount++
 	}
@@ -334,7 +334,7 @@ func (peers *Peers) dereference(peer *Peer) {
 func (peers *Peers) forEach(fun func(*Peer)) {
 	peers.RLock()
 	defer peers.RUnlock()
-	for _, peer := range peers.byName {
+	for _, peer := range peers.ByName {
 		fun(peer)
 	}
 }
@@ -345,7 +345,7 @@ func (peers *Peers) forEach(fun func(*Peer)) {
 // update contains a more recent version than known to us. The return
 // value is a) a representation of the received update, and b) an
 // "improved" update containing just these new/updated elements.
-func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error) {
+func (peers *Peers) applyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	peers.Lock()
 	var pending peersPendingNotifications
 	defer peers.unlockAndNotify(&pending)
@@ -357,7 +357,7 @@ func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error)
 
 	// Add new peers
 	for name, newPeer := range newPeers {
-		peers.byName[name] = newPeer
+		peers.ByName[name] = newPeer
 		peers.addByShortID(newPeer, &pending)
 	}
 
@@ -368,7 +368,7 @@ func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error)
 		delete(newUpdate, peerRemoved.Name)
 	}
 
-	updateNames := make(peerNameSet)
+	updateNames := make(PeerNameSet)
 	for _, peer := range decodedUpdate {
 		updateNames[peer.Name] = struct{}{}
 	}
@@ -376,24 +376,24 @@ func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error)
 	return updateNames, newUpdate, nil
 }
 
-func (peers *Peers) names() peerNameSet {
+func (peers *Peers) Names() PeerNameSet {
 	peers.RLock()
 	defer peers.RUnlock()
 
-	names := make(peerNameSet)
-	for name := range peers.byName {
+	names := make(PeerNameSet)
+	for name := range peers.ByName {
 		names[name] = struct{}{}
 	}
 	return names
 }
 
-func (peers *Peers) encodePeers(names peerNameSet) []byte {
+func (peers *Peers) encodePeers(names PeerNameSet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	peers.RLock()
 	defer peers.RUnlock()
 	for name := range names {
-		if peer, found := peers.byName[name]; found {
+		if peer, found := peers.ByName[name]; found {
 			if peer == peers.ourself.Peer {
 				peers.ourself.encode(enc)
 			} else {
@@ -416,12 +416,12 @@ func (peers *Peers) GarbageCollect() {
 
 func (peers *Peers) garbageCollect(pending *peersPendingNotifications) {
 	peers.ourself.RLock()
-	_, reached := peers.ourself.routes(nil, false)
+	_, reached := peers.ourself.Routes(nil, false)
 	peers.ourself.RUnlock()
 
-	for name, peer := range peers.byName {
+	for name, peer := range peers.ByName {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
-			delete(peers.byName, name)
+			delete(peers.ByName, name)
 			peers.deleteByShortID(peer, pending)
 			pending.removed = append(pending.removed, peer)
 		}
@@ -453,7 +453,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		newPeer := newPeerFromSummary(summary)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connSummaries)
-		if _, found := peers.byName[newPeer.Name]; !found {
+		if _, found := peers.ByName[newPeer.Name]; !found {
 			newPeers[newPeer.Name] = newPeer
 		}
 	}
@@ -464,7 +464,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			if _, found := newPeers[remoteName]; found {
 				continue
 			}
-			if _, found := peers.byName[remoteName]; found {
+			if _, found := peers.ByName[remoteName]; found {
 				continue
 			}
 			// Update refers to a peer which we have no knowledge of.
@@ -474,13 +474,13 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	return
 }
 
-func (peers *Peers) applyDecodedUpdate(decodedUpdate []*Peer, decodedConns [][]connectionSummary, pending *peersPendingNotifications) peerNameSet {
-	newUpdate := make(peerNameSet)
+func (peers *Peers) applyDecodedUpdate(decodedUpdate []*Peer, decodedConns [][]connectionSummary, pending *peersPendingNotifications) PeerNameSet {
+	newUpdate := make(PeerNameSet)
 	for idx, newPeer := range decodedUpdate {
 		connSummaries := decodedConns[idx]
 		name := newPeer.Name
 		// guaranteed to find peer in the peers.byName
-		switch peer := peers.byName[name]; peer {
+		switch peer := peers.ByName[name]; peer {
 		case peers.ourself.Peer:
 			if newPeer.UID != peer.UID {
 				// The update contains information about an old
@@ -491,7 +491,7 @@ func (peers *Peers) applyDecodedUpdate(decodedUpdate []*Peer, decodedConns [][]c
 				pending.localPeerModified = peers.ourself.setVersionBeyond(newPeer.Version)
 			}
 		case newPeer:
-			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
+			peer.connections = makeConnsMap(peer, connSummaries, peers.ByName)
 			newUpdate[name] = struct{}{}
 		default: // existing peer
 			if newPeer.Version < peer.Version ||
@@ -504,7 +504,7 @@ func (peers *Peers) applyDecodedUpdate(decodedUpdate []*Peer, decodedConns [][]c
 			peer.Version = newPeer.Version
 			peer.UID = newPeer.UID
 			peer.NickName = newPeer.NickName
-			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
+			peer.connections = makeConnsMap(peer, connSummaries, peers.ByName)
 
 			if newPeer.ShortID != peer.ShortID || newPeer.HasShortID != peer.HasShortID {
 				peers.deleteByShortID(peer, pending)
