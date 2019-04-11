@@ -10,14 +10,14 @@ import (
 type gossipChannel struct {
 	name     string
 	ourself  *LocalPeer
-	routes   routes
+	routes   Routes
 	gossiper Gossiper
 	logger   Logger
 }
 
 // newGossipChannel returns a named, usable channel.
 // It delegates receiving duties to the passed Gossiper.
-func newGossipChannel(channelName string, ourself *LocalPeer, r routes, g Gossiper, logger Logger) *gossipChannel {
+func newGossipChannel(channelName string, ourself *LocalPeer, r Routes, g Gossiper, logger Logger) *gossipChannel {
 	return &gossipChannel{
 		name:     channelName,
 		ourself:  ourself,
@@ -105,15 +105,15 @@ func (c *gossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 }
 
 func (c *gossipChannel) relayBroadcast(srcName PeerName, update GossipData) {
-	c.routes.ensureRecalculated()
+	c.routes.EnsureRecalculated()
 	for _, conn := range c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName)) {
 		c.senderFor(conn).Broadcast(srcName, update)
 	}
 }
 
 func (c *gossipChannel) relay(srcName PeerName, data GossipData) {
-	c.routes.ensureRecalculated()
-	for _, conn := range c.ourself.ConnectionsTo(c.routes.randomNeighbours(srcName)) {
+	c.routes.EnsureRecalculated()
+	for _, conn := range c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)) {
 		c.senderFor(conn).Send(data)
 	}
 }

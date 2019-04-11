@@ -191,7 +191,7 @@ func (peer *LocalPeer) handleAddConnection(conn ourConnection, isRestartedPeer b
 		peer.router.sendAllGossipDown(conn)
 	}
 
-	peer.router.Routes.recalculate()
+	peer.router.Routes.Recalculate()
 	peer.broadcastPeerUpdate(conn.Remote())
 
 	return nil
@@ -208,7 +208,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn ourConnection) {
 	peer.connectionEstablished(conn)
 	conn.logf("connection fully established")
 
-	peer.router.Routes.recalculate()
+	peer.router.Routes.Recalculate()
 	peer.broadcastPeerUpdate()
 }
 
@@ -228,7 +228,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn ourConnection) {
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.router.Peers.GarbageCollect()
-	peer.router.Routes.recalculate()
+	peer.router.Routes.Recalculate()
 	peer.broadcastPeerUpdate()
 }
 

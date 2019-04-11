@@ -7,19 +7,16 @@ import (
 	"github.com/weaveworks/mesh"
 )
 
-type unicastRoutes map[mesh.PeerName]mesh.PeerName
-type broadcastRoutes map[mesh.PeerName][]mesh.PeerName
-
 // routes aggregates unicast and broadcast routes for our peer.
 type advancedRoutes struct {
 	sync.RWMutex
 	ourself      *mesh.LocalPeer
 	peers        *mesh.Peers
 	onChange     []func()
-	unicast      unicastRoutes
-	unicastAll   unicastRoutes // [1]
-	broadcast    broadcastRoutes
-	broadcastAll broadcastRoutes // [1]
+	unicast      mesh.UnicastRoutes
+	unicastAll   mesh.UnicastRoutes // [1]
+	broadcast    mesh.BroadcastRoutes
+	broadcastAll mesh.BroadcastRoutes // [1]
 	recalc       chan<- *struct{}
 	wait         chan<- chan struct{}
 	action       chan<- func()
@@ -27,11 +24,31 @@ type advancedRoutes struct {
 	// symmetric ones
 }
 
-func (r *advancedRoutes) UnicastRoutes() unicastRoutes {
+// newRoutes returns a usable Routes based on the LocalPeer and existing Peers.
+func newRoutes(ourself *mesh.LocalPeer, peers *mesh.Peers) mesh.Routes {
+	recalculate := make(chan *struct{}, 1)
+	wait := make(chan chan struct{})
+	action := make(chan func())
+	r := &advancedRoutes{
+		ourself:      ourself,
+		peers:        peers,
+		unicast:      mesh.UnicastRoutes{ourself.Name: mesh.UnknownPeerName},
+		unicastAll:   mesh.UnicastRoutes{ourself.Name: mesh.UnknownPeerName},
+		broadcast:    mesh.BroadcastRoutes{ourself.Name: []mesh.PeerName{}},
+		broadcastAll: mesh.BroadcastRoutes{ourself.Name: []mesh.PeerName{}},
+		recalc:       recalculate,
+		wait:         wait,
+		action:       action,
+	}
+	go r.Run(recalculate, wait, action)
+	return r
+}
+
+func (r *advancedRoutes) UnicastRoutes() mesh.UnicastRoutes {
 	return r.unicast
 }
 
-func (r *advancedRoutes) BroadcastRoutes() broadcastRoutes {
+func (r *advancedRoutes) BroadcastRoutes() mesh.BroadcastRoutes {
 	return r.broadcast
 }
 
@@ -70,17 +87,17 @@ func (r *advancedRoutes) UnicastAll(name mesh.PeerName) (mesh.PeerName, bool) {
 // when we receive a broadcast message originating from the named peer
 // based on established and symmetric connections.
 func (r *advancedRoutes) Broadcast(name mesh.PeerName) []mesh.PeerName {
-	return r.lookupOrCalculate(name, &r.broadcast, true)
+	return r.LookupOrCalculate(name, &r.broadcast, true)
 }
 
 // BroadcastAll returns the set of peer names that should be notified
 // when we receive a broadcast message originating from the named peer
 // based on all connections.
 func (r *advancedRoutes) BroadcastAll(name mesh.PeerName) []mesh.PeerName {
-	return r.lookupOrCalculate(name, &r.broadcastAll, false)
+	return r.LookupOrCalculate(name, &r.broadcastAll, false)
 }
 
-func (r *advancedRoutes) lookupOrCalculate(name mesh.PeerName, broadcast *broadcastRoutes, establishedAndSymmetric bool) []mesh.PeerName {
+func (r *advancedRoutes) LookupOrCalculate(name mesh.PeerName, broadcast *mesh.BroadcastRoutes, establishedAndSymmetric bool) []mesh.PeerName {
 	r.RLock()
 	hops, found := (*broadcast)[name]
 	r.RUnlock()
@@ -98,7 +115,7 @@ func (r *advancedRoutes) lookupOrCalculate(name mesh.PeerName, broadcast *broadc
 		}
 		r.peers.RLock()
 		r.ourself.RLock()
-		hops = r.calculateBroadcast(name, establishedAndSymmetric)
+		hops = r.CalculateBroadcast(name, establishedAndSymmetric)
 		r.ourself.RUnlock()
 		r.peers.RUnlock()
 		res <- hops
@@ -121,7 +138,7 @@ func (r *advancedRoutes) lookupOrCalculate(name mesh.PeerName, broadcast *broadc
 // sparsely connected peers this function returns a higher proportion of
 // neighbours than elsewhere. In extremis, on peers with fewer than
 // log2(n_peers) neighbours, all neighbours are returned.
-func (r *advancedRoutes) randomNeighbours(except mesh.PeerName) []mesh.PeerName {
+func (r *advancedRoutes) RandomNeighbours(except mesh.PeerName) []mesh.PeerName {
 	destinations := make(mesh.PeerNameSet)
 	r.RLock()
 	defer r.RUnlock()
@@ -145,7 +162,7 @@ func (r *advancedRoutes) randomNeighbours(except mesh.PeerName) []mesh.PeerName 
 // Recalculate requests recalculation of the routing table. This is async but
 // can effectively be made synchronous with a subsequent call to
 // EnsureRecalculated.
-func (r *advancedRoutes) recalculate() {
+func (r *advancedRoutes) Recalculate() {
 	// The use of a 1-capacity channel in combination with the
 	// non-blocking send is an optimisation that results in multiple
 	// requests being coalesced.
@@ -156,21 +173,21 @@ func (r *advancedRoutes) recalculate() {
 }
 
 // EnsureRecalculated waits for any preceding Recalculate requests to finish.
-func (r *advancedRoutes) ensureRecalculated() {
+func (r *advancedRoutes) EnsureRecalculated() {
 	done := make(chan struct{})
 	r.wait <- done
 	<-done
 }
 
-func (r *advancedRoutes) run(recalculate <-chan *struct{}, wait <-chan chan struct{}, action <-chan func()) {
+func (r *advancedRoutes) Run(recalculate <-chan *struct{}, wait <-chan chan struct{}, action <-chan func()) {
 	for {
 		select {
 		case <-recalculate:
-			r.calculate()
+			r.Calculate()
 		case done := <-wait:
 			select {
 			case <-recalculate:
-				r.calculate()
+				r.Calculate()
 			default:
 			}
 			close(done)
@@ -180,17 +197,17 @@ func (r *advancedRoutes) run(recalculate <-chan *struct{}, wait <-chan chan stru
 	}
 }
 
-func (r *advancedRoutes) calculate() {
+func (r *advancedRoutes) Calculate() {
 	r.peers.RLock()
 	r.ourself.RLock()
 	var (
-		unicast      = r.calculateUnicast(true)
-		unicastAll   = r.calculateUnicast(false)
-		broadcast    = make(broadcastRoutes)
-		broadcastAll = make(broadcastRoutes)
+		unicast      = r.CalculateUnicast(true)
+		unicastAll   = r.CalculateUnicast(false)
+		broadcast    = make(mesh.BroadcastRoutes)
+		broadcastAll = make(mesh.BroadcastRoutes)
 	)
-	broadcast[r.ourself.Name] = r.calculateBroadcast(r.ourself.Name, true)
-	broadcastAll[r.ourself.Name] = r.calculateBroadcast(r.ourself.Name, false)
+	broadcast[r.ourself.Name] = r.CalculateBroadcast(r.ourself.Name, true)
+	broadcastAll[r.ourself.Name] = r.CalculateBroadcast(r.ourself.Name, false)
 	r.ourself.RUnlock()
 	r.peers.RUnlock()
 
@@ -216,7 +233,7 @@ func (r *advancedRoutes) calculate() {
 // any knowledge of the MAC address at all. Thus there's no need
 // to exchange knowledge of MAC addresses, nor any constraints on
 // the routes that we construct.
-func (r *advancedRoutes) calculateUnicast(establishedAndSymmetric bool) unicastRoutes {
+func (r *advancedRoutes) CalculateUnicast(establishedAndSymmetric bool) mesh.UnicastRoutes {
 	_, unicast := r.ourself.Routes(nil, establishedAndSymmetric)
 	return unicast
 }
@@ -239,7 +256,7 @@ func (r *advancedRoutes) calculateUnicast(establishedAndSymmetric bool) unicastR
 //     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
 //     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
 // where <= is the subset relationship on keys of the returned map.
-func (r *advancedRoutes) calculateBroadcast(name mesh.PeerName, establishedAndSymmetric bool) []mesh.PeerName {
+func (r *advancedRoutes) CalculateBroadcast(name mesh.PeerName, establishedAndSymmetric bool) []mesh.PeerName {
 	hops := []mesh.PeerName{}
 	peer, found := r.peers.ByName[name]
 	if !found {

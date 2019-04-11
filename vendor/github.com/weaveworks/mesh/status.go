@@ -113,7 +113,7 @@ type unicastRouteStatus struct {
 }
 
 // makeUnicastRouteStatusSlice takes a snapshot of the unicast routes in routes.
-func makeUnicastRouteStatusSlice(r routes) []unicastRouteStatus {
+func makeUnicastRouteStatusSlice(r Routes) []unicastRouteStatus {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -131,7 +131,7 @@ type broadcastRouteStatus struct {
 }
 
 // makeBroadcastRouteStatusSlice takes a snapshot of the broadcast routes in routes.
-func makeBroadcastRouteStatusSlice(r routes) []broadcastRouteStatus {
+func makeBroadcastRouteStatusSlice(r Routes) []broadcastRouteStatus {
 	r.RLock()
 	defer r.RUnlock()
 

@@ -214,6 +214,7 @@ ifeq ($(COVERAGE),true)
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
+	go build -buildmode=plugin -o prog/weaver/routes.so addons/routes.go
 endif
 	$(NETGO_CHECK)
 

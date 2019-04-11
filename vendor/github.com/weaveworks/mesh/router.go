@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"plugin"
 	"sync"
 	"time"
 )
@@ -46,7 +47,7 @@ type Router struct {
 	Overlay         Overlay
 	Ourself         *LocalPeer
 	Peers           *Peers
-	Routes          routes
+	Routes          Routes
 	ConnectionMaker *connectionMaker
 	gossipLock      sync.RWMutex
 	gossipChannels  gossipChannels
@@ -69,7 +70,27 @@ func NewRouter(config Config, name PeerName, nickName string, overlay Overlay, l
 	router.Peers.OnGC(func(peer *Peer) {
 		logger.Printf("Removed unreachable peer %s", peer)
 	})
-	router.Routes = newRoutes(router.Ourself, router.Peers)
+
+	type routesFn func(ourself *LocalPeer, peers *Peers) Routes
+
+	pluginsEnabled := true
+
+	if pluginsEnabled {
+		p, err := plugin.Open("/home/weave/routes.so")
+
+		if err != nil {
+			panic(err)
+		}
+		newRoutesSym, err := p.Lookup("newRoutes")
+		if err != nil {
+			panic(err)
+		}
+		newRoutesAdvanced := newRoutesSym.(routesFn)
+		router.Routes = newRoutesAdvanced(router.Ourself, router.Peers)
+	} else {
+		router.Routes = newRoutes(router.Ourself, router.Peers)
+	}
+
 	router.ConnectionMaker = newConnectionMaker(router.Ourself, router.Peers, net.JoinHostPort(router.Host, "0"), router.Port, router.PeerDiscovery, logger)
 	router.logger = logger
 	gossip, err := router.NewGossip("topology", router)
@@ -268,7 +289,7 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 	}
 	if len(newUpdate) > 0 {
 		router.ConnectionMaker.refresh()
-		router.Routes.recalculate()
+		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
 }
