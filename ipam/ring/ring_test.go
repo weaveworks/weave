@@ -231,7 +231,7 @@ func TestMergeWithConflicts(t *testing.T) {
 	require.NoError(t, merge(ring1, ring2))
 
 	// received update to entry with a token and version identical to an entry we have
-	// but but holding different content, if there are allocations, then reject the recieved
+	// but but holding different content, if there are allocations, then reject the received
 	// entry
 	ring1 = NewRing(start, end, peer1name)
 	ring2 = NewRing(start, end, peer2name)
