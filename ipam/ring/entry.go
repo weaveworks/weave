@@ -1,6 +1,7 @@
 package ring
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/weaveworks/mesh"
@@ -25,6 +26,7 @@ func (e *entry) Equal(e2 *entry) bool {
 func (e *entry) update(peername mesh.PeerName, free address.Count) {
 	e.Peer = peername
 	e.Version++
+	common.Log.Debugln(fmt.Sprintf("Updating ring token=%s current peer=%s updated peer=%s new version=%s", e.Token, e.Peer, peername, fmt.Sprint(e.Version)))
 	e.Free = free
 }
 
