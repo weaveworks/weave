@@ -6,6 +6,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	goplugin "plugin"
 	"runtime"
 	"strconv"
 	"strings"
@@ -171,6 +172,7 @@ func main() {
 		advertiseAddress   string
 		pluginConfig       plugin.Config
 		defaultDockerHost  = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
+		addOnsEnabled      bool
 	)
 
 	mflag.BoolVar(&justVersion, []string{"-version"}, false, "print version and exit")
@@ -223,6 +225,7 @@ func main() {
 	mflag.StringVar(&pluginConfig.Socket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginConfig.MeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
 	mflag.BoolVar(&bridgeConfig.NoMasqLocal, []string{"-no-masq-local"}, false, "do not SNAT external traffic sent to containers running on this node")
+	mflag.BoolVar(&addOnsEnabled, []string{"---addons"}, false, "enable weave-net addons")
 
 	proxyConfig := newProxyConfig()
 
@@ -346,6 +349,19 @@ func main() {
 	db, err := db.NewBoltDB(dbPrefix)
 	checkFatal(err)
 	defer db.Close()
+
+	if addOnsEnabled {
+		p, err := goplugin.Open("/home/weave/routes.so")
+
+		if err != nil {
+			panic(err)
+		}
+		newRoutesSym, err := p.Lookup("newRoutes")
+		if err != nil {
+			panic(err)
+		}
+		config.RoutesHandler = newRoutesSym.(*mesh.RoutesFn)
+	}
 
 	router, err := weave.NewNetworkRouter(config, networkConfig, bridgeConfig, name, nickName, overlay, db)
 	checkFatal(err)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"plugin"
 	"sync"
 	"time"
 )
@@ -38,6 +37,7 @@ type Config struct {
 	ConnLimit          int
 	PeerDiscovery      bool
 	TrustedSubnets     []*net.IPNet
+	RoutesHandler      *RoutesFn
 }
 
 // Router manages communication between this peer and the rest of the mesh.
@@ -56,6 +56,8 @@ type Router struct {
 	logger          Logger
 }
 
+type RoutesFn = func(ourself *LocalPeer, peers *Peers) Routes
+
 // NewRouter returns a new router. It must be started.
 func NewRouter(config Config, name PeerName, nickName string, overlay Overlay, logger Logger) (*Router, error) {
 	router := &Router{Config: config, gossipChannels: make(gossipChannels)}
@@ -71,22 +73,8 @@ func NewRouter(config Config, name PeerName, nickName string, overlay Overlay, l
 		logger.Printf("Removed unreachable peer %s", peer)
 	})
 
-	type routesFn func(ourself *LocalPeer, peers *Peers) Routes
-
-	pluginsEnabled := true
-
-	if pluginsEnabled {
-		p, err := plugin.Open("/home/weave/routes.so")
-
-		if err != nil {
-			panic(err)
-		}
-		newRoutesSym, err := p.Lookup("newRoutes")
-		if err != nil {
-			panic(err)
-		}
-		newRoutesAdvanced := newRoutesSym.(routesFn)
-		router.Routes = newRoutesAdvanced(router.Ourself, router.Peers)
+	if config.RoutesHandler != nil {
+		router.Routes = (*config.RoutesHandler)(router.Ourself, router.Peers)
 	} else {
 		router.Routes = newRoutes(router.Ourself, router.Peers)
 	}
