@@ -140,6 +140,7 @@ func TestPeerListFuzz(t *testing.T) {
 		_, err = reclaimPeer(mockWeave{}, cml, peerName(i), fmt.Sprintf("deleter-%d", i))
 		require.NoError(t, err)
 
+		require.NoError(t, cml.Init())
 		storedPeerList, err = cml.GetPeerList()
 		require.NoError(t, err)
 		stateLock.Lock()
