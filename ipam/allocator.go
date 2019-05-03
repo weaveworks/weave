@@ -910,6 +910,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 	alloc.persistRing()
+	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
 func (alloc *Allocator) assertInvariants() {
