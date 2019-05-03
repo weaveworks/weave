@@ -3,6 +3,8 @@ package npc
 import (
 	"sync"
 
+	goiptables "github.com/coreos/go-iptables/iptables"
+
 	"github.com/pkg/errors"
 	coreapi "k8s.io/api/core/v1"
 	extnapi "k8s.io/api/extensions/v1beta1"
@@ -35,8 +37,9 @@ type controller struct {
 	ipt iptables.Interface
 	ips ipset.Interface
 
-	nss         map[string]*ns // ns name -> ns struct
-	nsSelectors *selectorSet   // selector string -> nsSelector
+	nss               map[string]*ns // ns name -> ns struct
+	nsSelectors       *selectorSet   // selector string -> nsSelector
+	defaultEgressDrop bool
 }
 
 func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
@@ -121,11 +124,24 @@ func (npc *controller) AddNetworkPolicy(obj interface{}) error {
 	npc.Lock()
 	defer npc.Unlock()
 
+	// lazily add default rule to drop egress traffic only when network policies are applied
+	if !npc.defaultEgressDrop {
+		npc.defaultEgressDrop = true
+		ipt, err := goiptables.New()
+		if err != nil {
+			common.Log.Fatalf("Failed to create iptables handler %v", err.Error())
+		}
+		if err := ipt.Append(TableFilter, EgressChain,
+			"-m", "mark", "!", "--mark", EgressMark, "-j", "DROP"); err != nil {
+			common.Log.Errorf("Failed to add iptable rule to drop egress traffic from the pods by default due to %s", err.Error())
+			npc.defaultEgressDrop = false
+		}
+	}
+
 	nsName, err := nsName(obj)
 	if err != nil {
 		return err
 	}
-
 	common.Log.Infof("EVENT AddNetworkPolicy %s", js(obj))
 	return npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.addNetworkPolicy(obj), "add network policy")
