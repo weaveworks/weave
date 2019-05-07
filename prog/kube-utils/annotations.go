@@ -96,33 +96,33 @@ func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
 }
 
 func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
-	// from Update(), which will be the latest on the server whatever happened
+	// from Update(), which will be the latest on the server, or nil if error
 	cml.cm.Annotations[cleanKey(key)] = value
 	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	return err
 }
 
 func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
-	// from Update(), which will be the latest on the server whatever happened
+	// from Update(), which will be the latest on the server, or nil if error
 	delete(cml.cm.Annotations, cleanKey(key))
 	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
 	return err
 }
 
 func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) (err error) {
-	if cml.cm == nil {
+	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
-	// from Update(), which will be the latest on the server whatever happened
+	// from Update(), which will be the latest on the server, or nil if error
 	for key, value := range cml.cm.Annotations {
 		if value == valueToRemove {
 			delete(cml.cm.Annotations, key) // don't need to clean this key as it came from the map
