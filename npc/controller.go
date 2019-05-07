@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -35,8 +36,9 @@ type controller struct {
 	ipt iptables.Interface
 	ips ipset.Interface
 
-	nss         map[string]*ns // ns name -> ns struct
-	nsSelectors *selectorSet   // selector string -> nsSelector
+	nss               map[string]*ns // ns name -> ns struct
+	nsSelectors       *selectorSet   // selector string -> nsSelector
+	defaultEgressDrop bool           // flag to track if base iptable rule to drop egress traffic is added or not
 }
 
 func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
@@ -121,11 +123,26 @@ func (npc *controller) AddNetworkPolicy(obj interface{}) error {
 	npc.Lock()
 	defer npc.Unlock()
 
+	// lazily add default rule to drop egress traffic only when network policies are applied
+	if !npc.defaultEgressDrop {
+		egressNetworkPolicy, err := isEgressNetworkPolicy(obj)
+		if err != nil {
+			return err
+		}
+		if egressNetworkPolicy {
+			npc.defaultEgressDrop = true
+			if err := npc.ipt.Append(TableFilter, EgressChain,
+				"-m", "mark", "!", "--mark", EgressMark, "-j", "DROP"); err != nil {
+				npc.defaultEgressDrop = false
+				return fmt.Errorf("Failed to add iptable rule to drop egress traffic from the pods by default due to %s", err.Error())
+			}
+		}
+	}
+
 	nsName, err := nsName(obj)
 	if err != nil {
 		return err
 	}
-
 	common.Log.Infof("EVENT AddNetworkPolicy %s", js(obj))
 	return npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.addNetworkPolicy(obj), "add network policy")
@@ -201,4 +218,21 @@ func nsName(obj interface{}) (string, error) {
 	}
 
 	return "", errInvalidNetworkPolicyObjType
+}
+
+func isEgressNetworkPolicy(obj interface{}) (bool, error) {
+	if policy, ok := obj.(*networkingv1.NetworkPolicy); ok {
+		if len(policy.Spec.PolicyTypes) > 0 {
+			for _, policyType := range policy.Spec.PolicyTypes {
+				if policyType == networkingv1.PolicyTypeEgress {
+					return true, nil
+				}
+			}
+		}
+		if policy.Spec.Egress != nil {
+			return true, nil
+		}
+		return false, nil
+	}
+	return false, errInvalidNetworkPolicyObjType
 }
