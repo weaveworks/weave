@@ -568,7 +568,9 @@ func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	for i, entry := range r.Entries {
 		if entry.Peer == from {
 			entry.Peer = to
-			entry.Version++
+			// bump version by large value so that transfer of range takes precedence (if there is any conflict in merging entry)
+			// over other opertaions on the entry that increments the version
+			entry.Version = entry.Version + 100
 			common.Log.Debugln(fmt.Sprintf("[ring %s]: Transfer token=%s from=%s to=%s version=%s", r.Peer, entry.Token, from, to, fmt.Sprint(entry.Version)))
 			newRanges = append(newRanges, address.Range{Start: entry.Token, End: r.Entries.entry(i + 1).Token})
 		}
