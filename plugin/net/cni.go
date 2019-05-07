@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -206,7 +207,13 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
 	}
 	if err != nil {
+		if strings.Contains(err.Error(), fmt.Sprintf("Delete: no addresses for %s", args.ContainerID)) {
+			// ignore the error in the case where there are no IP addresses associated with container
+			fmt.Fprintln(os.Stderr, "weave-cni:", fmt.Sprintf("Delete: no addresses for %s", args.ContainerID))
+			return nil
+		}
 		logOnStderr(fmt.Errorf("unable to release IP address: %s", err))
+		return err
 	}
 	return nil
 }
