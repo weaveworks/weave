@@ -1092,7 +1092,7 @@ func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 	}
 	defer f.Close()
 
-	log.Print("EMSGSIZE on send, expecting PMTU update (IP packet was ", len(packet), " bytes, payload was ", len(msg), " bytes)")
+	log.Debug("sleeve ->[", sender, "] expecting PMTU update (IP packet was ", len(packet), " bytes, payload was ", len(msg), " bytes)")
 	pmtu, err := syscall.GetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP, syscall.IP_MTU)
 	if err != nil {
 		return err
