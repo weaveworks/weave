@@ -326,9 +326,14 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 				if mine.Peer == ourPeer {
 					// We received update to our own tokens accept the received entry
 					// if either it belongs to a different peer and we do not have allocations
-					// in the range effectively given away, or it belongs to our own peer
-					if theirs.Peer != ourPeer && !checkEntryHasAllocations(mine, es.entry(i+1)) || theirs.Peer == ourPeer {
+					// in the range effectively given away, or it belongs to our own peer, in
+					// which case we should set our version to the one received plus one,
+					// effectively imposing our existing entry.
+					if theirs.Peer != ourPeer && !checkEntryHasAllocations(mine, es.entry(i+1)) {
 						addTheirs(*theirs)
+					} else if theirs.Peer == ourPeer {
+						mine.Version = theirs.Version + 1
+						addToResult(*mine)
 					} else {
 						err = errNewerVersion(mine, theirs)
 						return
@@ -357,6 +362,16 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 			return
 		}
 		addTheirs(*theirs)
+	}
+
+	// reset the free space for entries if there is invalid free space
+	// due to accepting an unexpected update from the peers
+	for i := 0; i < len(result); i++ {
+		distance := r.distance(result.entry(i).Token, result.entry(i+1).Token)
+		if result.entry(i).Peer == r.Peer && result.entry(i).Free > distance {
+			// case that can arise when a range that we own that got split and had no allocations
+			result.entry(i).Free = distance
+		}
 	}
 
 	return
