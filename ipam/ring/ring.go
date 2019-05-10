@@ -244,6 +244,16 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 		return false, err
 	}
 
+	// reset the free space for entries if there is invalid free space
+	// due to accepting an unexpected update from the peers
+	for i := 0; i < len(result); i++ {
+		distance := r.distance(result.entry(i).Token, result.entry(i+1).Token)
+		if result.entry(i).Peer == r.Peer && result.entry(i).Free > distance {
+			// case that can arise when a range that we own that got split and had no allocations
+			result.entry(i).Free = distance
+		}
+	}
+
 	if err := r.checkEntries(result); err != nil {
 		return false, fmt.Errorf("Merge of incoming data causes: %s", err)
 	}
@@ -362,16 +372,6 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 			return
 		}
 		addTheirs(*theirs)
-	}
-
-	// reset the free space for entries if there is invalid free space
-	// due to accepting an unexpected update from the peers
-	for i := 0; i < len(result); i++ {
-		distance := r.distance(result.entry(i).Token, result.entry(i+1).Token)
-		if result.entry(i).Peer == r.Peer && result.entry(i).Free > distance {
-			// case that can arise when a range that we own that got split and had no allocations
-			result.entry(i).Free = distance
-		}
 	}
 
 	return
