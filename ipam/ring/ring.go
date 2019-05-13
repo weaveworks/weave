@@ -302,7 +302,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
 				// check we have no allocations in the range that got split
-				if checkEntryHasAllocations(es.entry(i-1), mine) {
+				if checkEntryHasAllocations(theirs, mine) {
 					err = errEntryInMyRange(theirs)
 					return
 				}
