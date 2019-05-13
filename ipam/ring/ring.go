@@ -292,6 +292,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 	var i, j int
 	for i < len(es) && j < len(other) {
 		mine, theirs = es[i], other[j]
+		common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
