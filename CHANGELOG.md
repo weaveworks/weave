@@ -1,3 +1,20 @@
+
+## Release 2.5.2
+
+This release fixes several bugs causing inconsistencies in IPAM and fixes a 
+panic in daemon that reclaims and forgets deleted nodes in Kubernetes clusters.
+
+### Bug fixes
+
+* leaking IP addresses in IPAM when weave-net hangs or restarting #3587, #3638
+* Panic in kube-utils after config map update error resulting in reclaim daemon
+  not performing weave forget on deleted node #3613, #3623
+* preventing inconsistent IPAM entries and resolving the conflict in case of
+  conflict during IPAM ring merge #3629, #3635, #3632, #3444
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/79?closed=1)
+
+
 ## Release 2.5.1
 
 This release fixes bugs reported for 2.5 release and small improvements.
