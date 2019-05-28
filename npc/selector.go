@@ -12,25 +12,39 @@ import (
 )
 
 type selectorSpec struct {
-	key         string          // string representation (for hash keying/equality comparison)
-	selector    labels.Selector // k8s Selector object (for matching)
-	policyTypes []policyType    // If non-empty, then selectorSpec is a target selector for given policyTypes.
+	key               string          // string representation (for hash keying/equality comparison)
+	podSelector       labels.Selector // k8s Selector object (for matching pods)
+	namespaceSelector labels.Selector // k8s Selector object (for matching namespaces)
+	policyTypes       []policyType    // If non-empty, then selectorSpec is a target selector for given policyTypes.
 
 	ipsetType ipset.Type // type of ipset to provision
 	ipsetName ipset.Name // generated ipset name
 	nsName    string     // Namespace name
 }
 
-func newSelectorSpec(json *metav1.LabelSelector, policyType []policyType, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
-	selector, err := metav1.LabelSelectorAsSelector(json)
-	if err != nil {
-		return nil, err
+func newSelectorSpec(podJSON *metav1.LabelSelector, namespaceJSON *metav1.LabelSelector, policyType []policyType, nsName string, ipsetType ipset.Type) (*selectorSpec, error) {
+	var podSelector, namespaceSelector labels.Selector
+	var err error
+	var key string
+	if namespaceJSON != nil {
+		namespaceSelector, err = metav1.LabelSelectorAsSelector(namespaceJSON)
+		if err != nil {
+			return nil, err
+		}
+		key = namespaceSelector.String()
 	}
-	key := selector.String()
+	if podJSON != nil {
+		podSelector, err = metav1.LabelSelectorAsSelector(podJSON)
+		if err != nil {
+			return nil, err
+		}
+		key = key + podSelector.String()
+	}
 	return &selectorSpec{
-		key:         key,
-		selector:    selector,
-		policyTypes: policyType,
+		key:               key,
+		podSelector:       podSelector,
+		namespaceSelector: namespaceSelector,
+		policyTypes:       policyType,
 		// We prefix the selector string with the namespace name when generating
 		// the shortname because you can specify the same selector in multiple
 		// namespaces - we need those to map to distinct ipsets
@@ -61,8 +75,15 @@ type selector struct {
 	spec *selectorSpec
 }
 
-func (s *selector) matches(labelMap map[string]string) bool {
-	return s.spec.selector.Matches(labels.Set(labelMap))
+func (s *selector) matches(podsLabelMap *map[string]string, namespaceLabelMap *map[string]string) bool {
+	if podsLabelMap != nil && namespaceLabelMap != nil {
+		return s.spec.podSelector.Matches(labels.Set(*podsLabelMap)) && s.spec.namespaceSelector.Matches(labels.Set(*namespaceLabelMap))
+	} else if podsLabelMap != nil {
+		return s.spec.podSelector.Matches(labels.Set(*podsLabelMap))
+	} else if namespaceLabelMap != nil {
+		return s.spec.namespaceSelector.Matches(labels.Set(*namespaceLabelMap))
+	}
+	return false
 }
 
 func (s *selector) addEntry(user types.UID, entry string, comment string) error {
@@ -105,11 +126,11 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewTargetSe
 		targetSelectorsCount: make(map[string]map[policyType]int)}
 }
 
-func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string, entry string, comment string) (bool, bool, error) {
+func (ss *selectorSet) addToMatching(user types.UID, podLabelsMap *map[string]string, namespaceLabelsMap *map[string]string, entry string, comment string) (bool, bool, error) {
 	foundIngress := false
 	foundEgress := false
 	for _, s := range ss.entries {
-		if s.matches(labelMap) {
+		if s.matches(podLabelsMap, namespaceLabelsMap) {
 			if ss.targetSelectorExist(s, policyTypeIngress) {
 				foundIngress = true
 			}
@@ -124,9 +145,9 @@ func (ss *selectorSet) addToMatching(user types.UID, labelMap map[string]string,
 	return foundIngress, foundEgress, nil
 }
 
-func (ss *selectorSet) delFromMatching(user types.UID, labelMap map[string]string, entry string) error {
+func (ss *selectorSet) delFromMatching(user types.UID, podLabelsMap *map[string]string, namespaceLabelsMap *map[string]string, entry string) error {
 	for _, s := range ss.entries {
-		if s.matches(labelMap) {
+		if s.matches(podLabelsMap, namespaceLabelsMap) {
 			if err := s.delEntry(user, entry); err != nil {
 				return err
 			}

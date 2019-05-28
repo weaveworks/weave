@@ -44,7 +44,7 @@ type ns struct {
 }
 
 func newNS(name, nodeName string, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet) (*ns, error) {
-	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, nil, name, ipset.HashIP)
+	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, nil, nil, name, ipset.HashIP)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (ns *ns) destroy() error {
 func (ns *ns) onNewPodSelector(selector *selector) error {
 	for _, pod := range ns.pods {
 		if hasIP(pod) {
-			if selector.matches(pod.ObjectMeta.Labels) {
+			if selector.matches(&pod.ObjectMeta.Labels, nil) {
 				if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
 					return err
 				}
@@ -111,7 +111,7 @@ func (ns *ns) onNewTargetPodSelector(selector *selector, policyType policyType) 
 		if hasIP(pod) {
 			// Remove the pod from default-allow if dst podselector matches the pod
 			ipset := ns.defaultAllowIPSetName(policyType)
-			if selector.matches(pod.ObjectMeta.Labels) {
+			if selector.matches(&pod.ObjectMeta.Labels, nil) {
 				if err := ns.ips.DelEntry(pod.ObjectMeta.UID, ipset, pod.Status.PodIP); err != nil {
 					return err
 				}
@@ -125,7 +125,7 @@ func (ns *ns) onNewTargetPodSelector(selector *selector, policyType policyType) 
 func (ns *ns) onDestroyTargetPodSelector(selector *selector, policyType policyType) error {
 	for _, pod := range ns.pods {
 		if hasIP(pod) {
-			if selector.matches(pod.ObjectMeta.Labels) {
+			if selector.matches(&pod.ObjectMeta.Labels, nil) {
 				if err := ns.addToDefaultAllowIfNoMatching(pod, policyType); err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ func (ns *ns) addToDefaultAllowIfNoMatching(pod *coreapi.Pod, policyType policyT
 	found := false
 	// TODO(mp) optimize (avoid iterating over selectors) by ref counting IP addrs.
 	for _, s := range ns.podSelectors.entries {
-		if ns.podSelectors.targetSelectorExist(s, policyType) && s.matches(pod.ObjectMeta.Labels) {
+		if ns.podSelectors.targetSelectorExist(s, policyType) && s.matches(&pod.ObjectMeta.Labels, nil) {
 			found = true
 			break
 		}
@@ -169,7 +169,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
-	foundIngress, foundEgress, err := ns.podSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, obj.Status.PodIP, podComment(obj))
+	foundIngress, foundEgress, err := ns.podSelectors.addToMatching(obj.ObjectMeta.UID, &obj.ObjectMeta.Labels, nil, obj.Status.PodIP, podComment(obj))
 	if err != nil {
 		return err
 	}
@@ -204,11 +204,11 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 			return err
 		}
 
-		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.UID, oldObj.ObjectMeta.Labels, oldObj.Status.PodIP)
+		return ns.podSelectors.delFromMatching(oldObj.ObjectMeta.UID, &oldObj.ObjectMeta.Labels, nil, oldObj.Status.PodIP)
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
-		foundIngress, foundEgress, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, newObj.ObjectMeta.Labels, newObj.Status.PodIP, podComment(newObj))
+		foundIngress, foundEgress, err := ns.podSelectors.addToMatching(newObj.ObjectMeta.UID, &newObj.ObjectMeta.Labels, nil, newObj.Status.PodIP, podComment(newObj))
 		if err != nil {
 			return err
 		}
@@ -240,8 +240,8 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 		oldObj.Status.PodIP != newObj.Status.PodIP {
 
 		for _, ps := range ns.podSelectors.entries {
-			oldMatch := ps.matches(oldObj.ObjectMeta.Labels)
-			newMatch := ps.matches(newObj.ObjectMeta.Labels)
+			oldMatch := ps.matches(&oldObj.ObjectMeta.Labels, nil)
+			newMatch := ps.matches(&newObj.ObjectMeta.Labels, nil)
 			if oldMatch == newMatch && oldObj.Status.PodIP == newObj.Status.PodIP {
 				continue
 			}
@@ -299,7 +299,7 @@ func (ns *ns) deletePod(obj *coreapi.Pod) error {
 		return err
 	}
 
-	return ns.podSelectors.delFromMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, obj.Status.PodIP)
+	return ns.podSelectors.delFromMatching(obj.ObjectMeta.UID, &obj.ObjectMeta.Labels, nil, obj.Status.PodIP)
 }
 
 func (ns *ns) addNetworkPolicy(obj interface{}) error {
@@ -454,7 +454,7 @@ func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 	}
 
 	// Add namespace ipset to matching namespace selectors
-	_, _, err := ns.nsSelectors.addToMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName), namespaceComment(ns))
+	_, _, err := ns.nsSelectors.addToMatching(obj.ObjectMeta.UID, nil, &obj.ObjectMeta.Labels, string(ns.allPods.ipsetName), namespaceComment(ns))
 	return err
 }
 
@@ -464,8 +464,8 @@ func (ns *ns) updateNamespace(oldObj, newObj *coreapi.Namespace) error {
 	// Re-evaluate namespace selector membership if labels have changed
 	if !equals(oldObj.ObjectMeta.Labels, newObj.ObjectMeta.Labels) {
 		for _, selector := range ns.nsSelectors.entries {
-			oldMatch := selector.matches(oldObj.ObjectMeta.Labels)
-			newMatch := selector.matches(newObj.ObjectMeta.Labels)
+			oldMatch := selector.matches(nil, &oldObj.ObjectMeta.Labels)
+			newMatch := selector.matches(nil, &newObj.ObjectMeta.Labels)
 			if oldMatch == newMatch {
 				continue
 			}
@@ -494,7 +494,7 @@ func (ns *ns) deleteNamespace(obj *coreapi.Namespace) error {
 	}
 
 	// Remove namespace ipset from any matching namespace selectors
-	err := ns.nsSelectors.delFromMatching(obj.ObjectMeta.UID, obj.ObjectMeta.Labels, string(ns.allPods.ipsetName))
+	err := ns.nsSelectors.delFromMatching(obj.ObjectMeta.UID, nil, &obj.ObjectMeta.Labels, string(ns.allPods.ipsetName))
 	if err != nil {
 		return err
 	}
