@@ -20,6 +20,9 @@ NetworkPolicy object updates from the k8s API server:
   containing network policy's namespace) pod selector mentioned in a
   network policy, containing the IP addresses of all pods in the
   namespace whose labels match that selector
+* A `hash:net` set for each distinct (within the scope of the
+  containing network policy's namespace) `except` list of CIDR's mentioned in
+  the network policies
 
 IPsets are implemented by the kernel module `xt_set`, without which
 weave-npc will not work.
