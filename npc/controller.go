@@ -36,9 +36,10 @@ type controller struct {
 	ipt iptables.Interface
 	ips ipset.Interface
 
-	nss               map[string]*ns // ns name -> ns struct
-	nsSelectors       *selectorSet   // selector string -> nsSelector
-	defaultEgressDrop bool           // flag to track if base iptable rule to drop egress traffic is added or not
+	nss                    map[string]*ns // ns name -> ns struct
+	nsSelectors            *selectorSet   // selector string -> nsSelector
+	namespacedPodSelectors *selectorSet
+	defaultEgressDrop      bool // flag to track if base iptable rule to drop egress traffic is added or not
 }
 
 func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
@@ -50,7 +51,7 @@ func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPo
 
 	doNothing := func(*selector, policyType) error { return nil }
 	c.nsSelectors = newSelectorSet(ips, c.onNewNsSelector, doNothing, doNothing)
-
+	c.namespacedPodSelectors = newSelectorSet(ips, c.onNewNamespacePodsSelector, doNothing, doNothing)
 	return c
 }
 
@@ -67,10 +68,28 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 	return nil
 }
 
+func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
+	for _, ns := range npc.nss {
+		if ns.namespace != nil && len(ns.pods) > 0 {
+			for _, pod := range ns.pods {
+				if hasIP(pod) {
+					if selector.matches(&pod.ObjectMeta.Labels, &ns.namespace.ObjectMeta.Labels) {
+						if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
+							return err
+						}
+
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors)
+		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors, npc.namespacedPodSelectors)
 		if err != nil {
 			return err
 		}

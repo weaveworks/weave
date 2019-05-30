@@ -12,12 +12,14 @@ import (
 
 func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	rules map[string]*ruleSpec,
-	nsSelectors, podSelectors map[string]*selectorSpec,
+	nsSelectors, podSelectors, namespacedPodSelectors map[string]*selectorSpec,
 	ipBlocks map[string]*ipBlockSpec,
 	err error) {
 
 	nsSelectors = make(map[string]*selectorSpec)
 	podSelectors = make(map[string]*selectorSpec)
+	namespacedPodSelectors = make(map[string]*selectorSpec)
+
 	ipBlocks = make(map[string]*ipBlockSpec)
 	rules = make(map[string]*ruleSpec)
 	policyTypes := make([]policyType, 0)
@@ -33,7 +35,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 	// If empty, matches all pods in a namespace
 	targetSelector, err := newSelectorSpec(&policy.Spec.PodSelector, nil, policyTypes, ns.name, ipset.HashIP)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// To prevent targetSelector being overwritten by a subsequent selector with
@@ -52,7 +54,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 			if !allPorts {
 				if err = checkForNamedPorts(ingressRule.Ports); err != nil {
-					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+					return nil, nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
 						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
 				}
 			}
@@ -73,23 +75,23 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 					// NetworkPolicyPeer describes a peer to allow traffic from.
 					if peer.PodSelector != nil && peer.NamespaceSelector != nil {
-						srcSelector, err = newSelectorSpec(peer.PodSelector, peer.NamespaceSelector, nil, ns.name, ipset.HashIP)
+						srcSelector, err = newSelectorSpec(peer.PodSelector, peer.NamespaceSelector, nil, "", ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
-						addIfNotExist(srcSelector, podSelectors)
+						addIfNotExist(srcSelector, namespacedPodSelectors)
 						srcRuleHost = srcSelector
 					} else if peer.PodSelector != nil {
 						srcSelector, err = newSelectorSpec(peer.PodSelector, nil, nil, ns.name, ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
 						addIfNotExist(srcSelector, podSelectors)
 						srcRuleHost = srcSelector
 					} else if peer.NamespaceSelector != nil {
 						srcSelector, err = newSelectorSpec(nil, peer.NamespaceSelector, nil, "", ipset.ListSet)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
 						nsSelectors[srcSelector.key] = srcSelector
 						srcRuleHost = srcSelector
@@ -123,7 +125,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 			if !allPorts {
 				if err = checkForNamedPorts(egressRule.Ports); err != nil {
-					return nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
+					return nil, nil, nil, nil, nil, fmt.Errorf("named ports in network policies is not supported yet. "+
 						"Rejecting network policy: %s from further processing. "+err.Error(), policy.Name)
 				}
 			}
@@ -144,24 +146,24 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 
 					// NetworkPolicyPeer describes a peer to allow traffic to.
 					if peer.PodSelector != nil && peer.NamespaceSelector != nil {
-						dstSelector, err = newSelectorSpec(peer.PodSelector, peer.NamespaceSelector, nil, ns.name, ipset.HashIP)
+						dstSelector, err = newSelectorSpec(peer.PodSelector, peer.NamespaceSelector, nil, "", ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
-						addIfNotExist(dstSelector, podSelectors)
+						addIfNotExist(dstSelector, namespacedPodSelectors)
 						dstRuleHost = dstSelector
 					} else if peer.PodSelector != nil {
 						dstSelector, err = newSelectorSpec(peer.PodSelector, nil, nil, ns.name, ipset.HashIP)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
 						addIfNotExist(dstSelector, podSelectors)
 						dstRuleHost = dstSelector
 
 					} else if peer.NamespaceSelector != nil {
-						dstSelector, err = newSelectorSpec(peer.NamespaceSelector, nil, nil, "", ipset.ListSet)
+						dstSelector, err = newSelectorSpec(nil, peer.NamespaceSelector, nil, "", ipset.ListSet)
 						if err != nil {
-							return nil, nil, nil, nil, err
+							return nil, nil, nil, nil, nil, err
 						}
 						nsSelectors[dstSelector.key] = dstSelector
 						dstRuleHost = dstSelector
@@ -185,7 +187,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 		}
 	}
 
-	return rules, nsSelectors, podSelectors, ipBlocks, nil
+	return rules, nsSelectors, podSelectors, namespacedPodSelectors, ipBlocks, nil
 }
 
 func addIfNotExist(s *selectorSpec, ss map[string]*selectorSpec) {
