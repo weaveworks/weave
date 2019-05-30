@@ -10,8 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/ipset"
@@ -46,23 +44,8 @@ type ns struct {
 	rules                   *ruleSet
 }
 
-func newNS(name, nodeName string, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet, namespacedPodsSelectors *selectorSet) (*ns, error) {
+func newNS(name, nodeName string, ipt iptables.Interface, ips ipset.Interface, nsSelectors *selectorSet, namespacedPodsSelectors *selectorSet, namespaceObj *coreapi.Namespace) (*ns, error) {
 	allPods, err := newSelectorSpec(&metav1.LabelSelector{}, nil, nil, name, ipset.HashIP)
-	if err != nil {
-		return nil, err
-	}
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	namespace, err := client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +54,7 @@ func newNS(name, nodeName string, ipt iptables.Interface, ips ipset.Interface, n
 		ipt:                     ipt,
 		ips:                     ips,
 		name:                    name,
-		namespace:               namespace,
+		namespace:               namespaceObj,
 		nodeName:                nodeName,
 		pods:                    make(map[types.UID]*coreapi.Pod),
 		policies:                make(map[types.UID]interface{}),

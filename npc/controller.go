@@ -5,13 +5,14 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	coreapi "k8s.io/api/core/v1"
-	extnapi "k8s.io/api/extensions/v1beta1"
-	networkingv1 "k8s.io/api/networking/v1"
-
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
+	coreapi "k8s.io/api/core/v1"
+	extnapi "k8s.io/api/extensions/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type NetworkPolicyController interface {
@@ -33,21 +34,22 @@ type controller struct {
 
 	nodeName string // my node name
 
-	ipt iptables.Interface
-	ips ipset.Interface
-
+	ipt                    iptables.Interface
+	ips                    ipset.Interface
+	clientset              kubernetes.Interface
 	nss                    map[string]*ns // ns name -> ns struct
 	nsSelectors            *selectorSet   // selector string -> nsSelector
 	namespacedPodSelectors *selectorSet
 	defaultEgressDrop      bool // flag to track if base iptable rule to drop egress traffic is added or not
 }
 
-func New(nodeName string, ipt iptables.Interface, ips ipset.Interface) NetworkPolicyController {
+func New(nodeName string, ipt iptables.Interface, ips ipset.Interface, clientset kubernetes.Interface) NetworkPolicyController {
 	c := &controller{
-		nodeName: nodeName,
-		ipt:      ipt,
-		ips:      ips,
-		nss:      make(map[string]*ns)}
+		nodeName:  nodeName,
+		ipt:       ipt,
+		ips:       ips,
+		clientset: clientset,
+		nss:       make(map[string]*ns)}
 
 	doNothing := func(*selector, policyType) error { return nil }
 	c.nsSelectors = newSelectorSet(ips, c.onNewNsSelector, doNothing, doNothing)
@@ -89,7 +91,11 @@ func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors, npc.namespacedPodSelectors)
+		namespace, err := npc.clientset.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newNs, err := newNS(name, npc.nodeName, npc.ipt, npc.ips, npc.nsSelectors, npc.namespacedPodSelectors, namespace)
 		if err != nil {
 			return err
 		}

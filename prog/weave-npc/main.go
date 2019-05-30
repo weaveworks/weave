@@ -254,7 +254,7 @@ func root(cmd *cobra.Command, args []string) {
 	handleError(resetIPSets(ips))
 	handleError(createBaseRules(ipt, ips))
 
-	npc := npc.New(nodeName, ipt, ips)
+	npc := npc.New(nodeName, ipt, ips, client)
 
 	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
