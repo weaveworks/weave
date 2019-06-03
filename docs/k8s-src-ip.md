@@ -14,7 +14,7 @@
 1  | Pod_h1      | ip(Pod_h2)        | Pod_h2 | ip(Pod_h1)       | OK
 2  | h1          | ClusterIP         | Pod_h1 | ip(weave_h1)     | **NOK**
 3  | h1          | ClusterIP         | Pod_h2 | ip(weave_h1)     | OK
-4  | Pod_h1      | ClusterIP         | Pod_h1 | ip(weave_h1)     | **NOK**
+4  | Pod_h1      | ClusterIP         | Pod_h1 | ip(Pod_h1)       | OK
 5  | Pod_h1      | ClusterIP         | Pod_h2 | ip(weave_h1)     | OK
 6  | h1          | ip(h1):NodePort   | Pod_h1 | ip(weave_h1)     | **NOK**
 7  | h1          | ip(h1):NodePort   | Pod_h2 | ip(weave_h1)     | OK
