@@ -4,7 +4,7 @@
 
 * Weave Net: v2.2.1.
 * Kubernetes: v1.10.0.
-* kube-proxy: iptables mode (default kubeadm options).
+* kube-proxy: iptables/ipvs mode with `--masquerade-all=false` and `--cluster-cidr` unspecified(default kubeadm options).
 * Hosts: `h1` and `h2`.
 
 ## Source IP
