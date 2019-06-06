@@ -4,7 +4,7 @@
 
 * Weave Net: v2.2.1.
 * Kubernetes: v1.10.0.
-* kube-proxy: iptables mode (default kubeadm options).
+* kube-proxy: iptables/ipvs mode with `--masquerade-all=false` and `--cluster-cidr` unspecified(default kubeadm options).
 * Hosts: `h1` and `h2`.
 
 ## Source IP
@@ -14,7 +14,7 @@
 1  | Pod_h1      | ip(Pod_h2)        | Pod_h2 | ip(Pod_h1)       | OK
 2  | h1          | ClusterIP         | Pod_h1 | ip(weave_h1)     | **NOK**
 3  | h1          | ClusterIP         | Pod_h2 | ip(weave_h1)     | OK
-4  | Pod_h1      | ClusterIP         | Pod_h1 | ip(weave_h1)     | **NOK**
+4  | Pod_h1      | ClusterIP         | Pod_h1 | ip(Pod_h1)       | OK
 5  | Pod_h1      | ClusterIP         | Pod_h2 | ip(weave_h1)     | OK
 6  | h1          | ip(h1):NodePort   | Pod_h1 | ip(weave_h1)     | **NOK**
 7  | h1          | ip(h1):NodePort   | Pod_h2 | ip(weave_h1)     | OK
