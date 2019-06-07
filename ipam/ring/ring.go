@@ -213,7 +213,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 
 // Merge the given ring into this ring and indicate whether this ring
 // got updated as a result.
-func (r *Ring) Merge(gossip Ring) (bool, error) {
+func (r *Ring) Merge(gossip Ring, checkRangeHasAllocations func(r address.Range) bool) (bool, error) {
 	r.assertInvariants()
 	defer r.trackUpdates()()
 
@@ -238,7 +238,7 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 		return false, ErrDifferentRange
 	}
 
-	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer, r)
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer, r, checkRangeHasAllocations)
 
 	if err != nil {
 		return false, err
@@ -270,7 +270,7 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 // entries belonging to ourPeer. Returns the merged entries and an
 // indication whether the merge resulted in any changes, i.e. the
 // result differs from the original.
-func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result entries, updated bool, err error) {
+func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRangeHasAllocations func(r address.Range) bool) (result entries, updated bool, err error) {
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
 	addToResult := func(e entry) { result = append(result, &e) }
@@ -278,14 +278,6 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 		addToResult(e)
 		updated = true
 		previousOwner = nil
-	}
-
-	checkEntryHasAllocations := func(current, next *entry) bool {
-		size := r.distance(current.Token, next.Token)
-		if current.Free < size {
-			return true
-		}
-		return false
 	}
 
 	// i is index into es; j is index into other
@@ -302,7 +294,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
 				// check we have no allocations in the range that got split
-				if checkEntryHasAllocations(theirs, mine) {
+				if checkRangeHasAllocations(address.Range{Start: theirs.Token, End: mine.Token}) {
 					err = errEntryInMyRange(theirs)
 					return
 				}
@@ -317,7 +309,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
 					if mine.Peer == ourPeer {
 						// if we own the entry and has allocations
-						if checkEntryHasAllocations(mine, es.entry(i+1)) {
+						if checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
 							err = errInconsistentEntry(mine, theirs)
 							return
 						}
@@ -340,7 +332,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring) (result e
 					// in the range effectively given away, or it belongs to our own peer, in
 					// which case we should set our version to the one received plus one,
 					// effectively imposing our existing entry.
-					if theirs.Peer != ourPeer && !checkEntryHasAllocations(mine, es.entry(i+1)) {
+					if theirs.Peer != ourPeer && !checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
 						addTheirs(*theirs)
 					} else if theirs.Peer == ourPeer {
 						mine.Version = theirs.Version + 1

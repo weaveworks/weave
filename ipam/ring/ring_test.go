@@ -32,7 +32,25 @@ func ParseIP(s string) address.Address {
 }
 
 func merge(r1, r2 *Ring) error {
-	_, err := r1.Merge(*r2)
+	distance := func(start, end address.Address) address.Count {
+		if end > start {
+			return address.Count(end - start)
+		}
+		return address.Count((r1.End - start) + (end - r1.Start))
+	}
+	checkEntryHasAllocations := func(r address.Range) bool {
+		size := distance(r.Start, r.End)
+		entry, found := r1.Entries.get(r.Start)
+		if !found {
+			return false
+		}
+		if entry.Free < size {
+			return true
+		}
+		return false
+	}
+
+	_, err := r1.Merge(*r2, checkEntryHasAllocations)
 	return err
 }
 
