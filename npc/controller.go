@@ -5,14 +5,15 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/ipset"
-	"github.com/weaveworks/weave/npc/iptables"
 	coreapi "k8s.io/api/core/v1"
 	extnapi "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net/ipset"
+	"github.com/weaveworks/weave/npc/iptables"
 )
 
 type NetworkPolicyController interface {
@@ -60,7 +61,7 @@ func New(nodeName string, ipt iptables.Interface, ips ipset.Interface, clientset
 func (npc *controller) onNewNsSelector(selector *selector) error {
 	for _, ns := range npc.nss {
 		if ns.namespace != nil {
-			if selector.matches(nil, &ns.namespace.ObjectMeta.Labels) {
+			if selector.matchesNamespaceSelector(ns.namespace.ObjectMeta.Labels) {
 				if err := selector.addEntry(ns.namespace.ObjectMeta.UID, string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
 					return err
 				}
@@ -75,7 +76,7 @@ func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 		if ns.namespace != nil && len(ns.pods) > 0 {
 			for _, pod := range ns.pods {
 				if hasIP(pod) {
-					if selector.matches(&pod.ObjectMeta.Labels, &ns.namespace.ObjectMeta.Labels) {
+					if selector.matchesNamespacedPodSelector(pod.ObjectMeta.Labels, ns.namespace.ObjectMeta.Labels) {
 						if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
 							return err
 						}

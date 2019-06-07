@@ -75,15 +75,16 @@ type selector struct {
 	spec *selectorSpec
 }
 
-func (s *selector) matches(podsLabelMap *map[string]string, namespaceLabelMap *map[string]string) bool {
-	if podsLabelMap != nil && namespaceLabelMap != nil {
-		return s.spec.podSelector.Matches(labels.Set(*podsLabelMap)) && s.spec.namespaceSelector.Matches(labels.Set(*namespaceLabelMap))
-	} else if podsLabelMap != nil {
-		return s.spec.podSelector.Matches(labels.Set(*podsLabelMap))
-	} else if namespaceLabelMap != nil {
-		return s.spec.namespaceSelector.Matches(labels.Set(*namespaceLabelMap))
-	}
-	return false
+func (s *selector) matchesPodSelector(podsLabelMap map[string]string) bool {
+	return s.spec.podSelector.Matches(labels.Set(podsLabelMap))
+}
+
+func (s *selector) matchesNamespaceSelector(namespaceLabelMap map[string]string) bool {
+	return s.spec.namespaceSelector.Matches(labels.Set(namespaceLabelMap))
+}
+
+func (s *selector) matchesNamespacedPodSelector(podsLabelMap, namespaceLabelMap map[string]string) bool {
+	return s.spec.podSelector.Matches(labels.Set(podsLabelMap)) && s.spec.namespaceSelector.Matches(labels.Set(namespaceLabelMap))
 }
 
 func (s *selector) addEntry(user types.UID, entry string, comment string) error {
@@ -126,11 +127,11 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewTargetSe
 		targetSelectorsCount: make(map[string]map[policyType]int)}
 }
 
-func (ss *selectorSet) addToMatching(user types.UID, podLabelsMap *map[string]string, namespaceLabelsMap *map[string]string, entry string, comment string) (bool, bool, error) {
+func (ss *selectorSet) addToMatchingPodSelector(user types.UID, podLabelsMap map[string]string, entry string, comment string) (bool, bool, error) {
 	foundIngress := false
 	foundEgress := false
 	for _, s := range ss.entries {
-		if s.matches(podLabelsMap, namespaceLabelsMap) {
+		if s.matchesPodSelector(podLabelsMap) {
 			if ss.targetSelectorExist(s, policyTypeIngress) {
 				foundIngress = true
 			}
@@ -145,9 +146,53 @@ func (ss *selectorSet) addToMatching(user types.UID, podLabelsMap *map[string]st
 	return foundIngress, foundEgress, nil
 }
 
-func (ss *selectorSet) delFromMatching(user types.UID, podLabelsMap *map[string]string, namespaceLabelsMap *map[string]string, entry string) error {
+func (ss *selectorSet) addToMatchingNamespaceSelector(user types.UID, namespaceLabelsMap map[string]string, entry string, comment string) error {
 	for _, s := range ss.entries {
-		if s.matches(podLabelsMap, namespaceLabelsMap) {
+		if s.matchesNamespaceSelector(namespaceLabelsMap) {
+			if err := s.addEntry(user, entry, comment); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (ss *selectorSet) addToMatchingNamespacedPodSelector(user types.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string, comment string) error {
+	for _, s := range ss.entries {
+		if s.matchesNamespacedPodSelector(podLabelsMap, namespaceLabelsMap) {
+			if err := s.addEntry(user, entry, comment); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (ss *selectorSet) delFromMatchingPodSelector(user types.UID, podLabelsMap map[string]string, entry string) error {
+	for _, s := range ss.entries {
+		if s.matchesPodSelector(podLabelsMap) {
+			if err := s.delEntry(user, entry); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (ss *selectorSet) delFromMatchingNamespaceSelector(user types.UID, namespaceLabelsMap map[string]string, entry string) error {
+	for _, s := range ss.entries {
+		if s.matchesNamespaceSelector(namespaceLabelsMap) {
+			if err := s.delEntry(user, entry); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (ss *selectorSet) delFromMatchingNamespacedPodSelector(user types.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string) error {
+	for _, s := range ss.entries {
+		if s.matchesNamespacedPodSelector(podLabelsMap, namespaceLabelsMap) {
 			if err := s.delEntry(user, entry); err != nil {
 				return err
 			}
