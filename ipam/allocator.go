@@ -814,6 +814,10 @@ func (alloc *Allocator) sendRingUpdate(dest mesh.PeerName) {
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
+func (alloc *Allocator) checkRangeHasAllocations(r address.Range) bool {
+	return alloc.space.NumFreeAddressesInRange(r) != r.Size()
+}
+
 func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
@@ -832,7 +836,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		updated, err := alloc.ring.Merge(*data.Ring)
+		updated, err := alloc.ring.Merge(*data.Ring, alloc.checkRangeHasAllocations)
 		switch err {
 		case nil:
 			if updated {

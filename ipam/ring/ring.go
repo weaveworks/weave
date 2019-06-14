@@ -213,7 +213,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 
 // Merge the given ring into this ring and indicate whether this ring
 // got updated as a result.
-func (r *Ring) Merge(gossip Ring) (bool, error) {
+func (r *Ring) Merge(gossip Ring, checkRangeHasAllocations func(r address.Range) bool) (bool, error) {
 	r.assertInvariants()
 	defer r.trackUpdates()()
 
@@ -238,10 +238,20 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 		return false, ErrDifferentRange
 	}
 
-	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer)
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer, r, checkRangeHasAllocations)
 
 	if err != nil {
 		return false, err
+	}
+
+	// reset the free space for entries if there is invalid free space
+	// due to accepting an unexpected update from the peers
+	for i := 0; i < len(result); i++ {
+		distance := r.distance(result.entry(i).Token, result.entry(i+1).Token)
+		if result.entry(i).Peer == r.Peer && result.entry(i).Free > distance {
+			// case that can arise when a range that we own that got split and had no allocations
+			result.entry(i).Free = distance
+		}
 	}
 
 	if err := r.checkEntries(result); err != nil {
@@ -260,7 +270,7 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 // entries belonging to ourPeer. Returns the merged entries and an
 // indication whether the merge resulted in any changes, i.e. the
 // result differs from the original.
-func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, updated bool, err error) {
+func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRangeHasAllocations func(r address.Range) bool) (result entries, updated bool, err error) {
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
 	addToResult := func(e entry) { result = append(result, &e) }
@@ -274,6 +284,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 	var i, j int
 	for i < len(es) && j < len(other) {
 		mine, theirs = es[i], other[j]
+		common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
@@ -282,29 +293,57 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
-				err = errEntryInMyRange(theirs)
-				return
+				// check we have no allocations in the range that got split
+				if checkRangeHasAllocations(address.Range{Start: theirs.Token, End: mine.Token}) {
+					err = errEntryInMyRange(theirs)
+					return
+				}
 			}
 			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
+			common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			// merge
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					err = errInconsistentEntry(mine, theirs)
-					return
+					if mine.Peer == ourPeer {
+						// if we own the entry and has allocations
+						if checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
+							err = errInconsistentEntry(mine, theirs)
+							return
+						}
+					}
+					// tie-break here, pick the entry with the highest free count
+					if mine.Free >= theirs.Free {
+						addToResult(*mine)
+						previousOwner = &mine.Peer
+					} else {
+						addTheirs(*theirs)
+					}
+				} else {
+					addToResult(*mine)
+					previousOwner = &mine.Peer
 				}
-				addToResult(*mine)
-				previousOwner = &mine.Peer
-				common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			case mine.Version < theirs.Version:
-				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
-					err = errNewerVersion(mine, theirs)
-					return
+				if mine.Peer == ourPeer {
+					// We received update to our own tokens accept the received entry
+					// if either it belongs to a different peer and we do not have allocations
+					// in the range effectively given away, or it belongs to our own peer, in
+					// which case we should set our version to the one received plus one,
+					// effectively imposing our existing entry.
+					if theirs.Peer != ourPeer && !checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
+						addTheirs(*theirs)
+					} else if theirs.Peer == ourPeer {
+						mine.Version = theirs.Version + 1
+						addToResult(*mine)
+					} else {
+						err = errNewerVersion(mine, theirs)
+						return
+					}
+				} else {
+					addTheirs(*theirs)
 				}
-				addTheirs(*theirs)
-				common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			}
 			i++
 			j++

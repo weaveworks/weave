@@ -32,7 +32,25 @@ func ParseIP(s string) address.Address {
 }
 
 func merge(r1, r2 *Ring) error {
-	_, err := r1.Merge(*r2)
+	distance := func(start, end address.Address) address.Count {
+		if end > start {
+			return address.Count(end - start)
+		}
+		return address.Count((r1.End - start) + (end - r1.Start))
+	}
+	checkEntryHasAllocations := func(r address.Range) bool {
+		size := distance(r.Start, r.End)
+		entry, found := r1.Entries.get(r.Start)
+		if !found {
+			return false
+		}
+		if entry.Free < size {
+			return true
+		}
+		return false
+	}
+
+	_, err := r1.Merge(*r2, checkEntryHasAllocations)
 	return err
 }
 
@@ -219,6 +237,61 @@ func TestMergeSimple(t *testing.T) {
 	require.Equal(t, ring2.Entries, ring1.Entries)
 }
 
+func TestMergeWithConflicts(t *testing.T) {
+
+	// received update to entry with a token and version identical to an entry we have
+	// but but holding different content, if there are no allocations, resolve the
+	// conflict by picking entry one with high free count
+	ring1 := NewRing(start, end, peer1name)
+	ring2 := NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 256, Version: 1}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}}
+	require.NoError(t, merge(ring1, ring2))
+
+	// received update to entry with a token and version identical to an entry we have
+	// but but holding different content, if there are allocations, then reject the received
+	// entry
+	ring1 = NewRing(start, end, peer1name)
+	ring2 = NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 128, Version: 1}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}}
+	require.Error(t, merge(ring1, ring2), "Expected error")
+
+	// received an entry with update to one of our own tokens and with new version,
+	// accept the received entry if its still going to belong to us
+	ring1 = NewRing(start, end, peer1name)
+	ring2 = NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Version: 1}}
+	require.NoError(t, merge(ring1, ring2))
+
+	// received an entry with update to one of our own tokens and with new version,
+	// but belongs to a different peer, accept the received entry if we do not
+	// have allocations in the range
+	ring1 = NewRing(start, end, peer1name)
+	ring2 = NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 256}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}}
+	require.NoError(t, merge(ring1, ring2))
+
+	// received an entry with update to one of our own tokens and with new version,
+	// reject received entry if we have allocations in the range
+	ring1 = NewRing(start, end, peer1name)
+	ring2 = NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 128}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Version: 1}}
+	require.Error(t, merge(ring1, ring2), "Expected error")
+
+	// we receive an entry that splits one of our ranges, giving some of it
+	// away to another peer. accept the entry provided that we have no allocations
+	// in the range that got given away.
+	ring1 = NewRing(start, end, peer1name)
+	ring2 = NewRing(start, end, peer2name)
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 256, Version: 1}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Free: 128, Version: 2}, {Token: middle, Peer: peer2name, Free: 128}}
+	require.NoError(t, merge(ring1, ring2))
+}
+
 func TestMergeErrors(t *testing.T) {
 	// Cannot Merge in an invalid ring
 	ring1 := NewRing(start, end, peer1name)
@@ -230,13 +303,6 @@ func TestMergeErrors(t *testing.T) {
 	ring2 = NewRing(start, middle, peer2name)
 	ring2.Entries = []*entry{}
 	require.True(t, merge(ring1, ring2) == ErrDifferentRange, "Expected ErrDifferentRange")
-
-	// Cannot Merge newer version of entry I own
-	ring2 = NewRing(start, end, peer2name)
-	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
-	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Version: 1}}
-	fmt.Println(merge(ring1, ring2))
-	require.Error(t, merge(ring1, ring2), "Expected error")
 
 	// Cannot Merge two entries with same version but different hosts
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
