@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 type mockSet struct {
@@ -198,7 +199,10 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// Namespaces first
 	m := newMockIPSet()
-	controller := New("foo", newMockIPTables(), &m)
+	client := fake.NewSimpleClientset()
+	controller := New("foo", newMockIPTables(), &m, client)
+	client.CoreV1().Namespaces().Create(sourceNamespace)
+	client.CoreV1().Namespaces().Create(destinationNamespace)
 
 	const (
 		selectorIPSetName = "weave-I239Zp%sCvoVt*D6u=A!2]YEk"
@@ -214,7 +218,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 
 	// NetworkPolicy first
 	m = newMockIPSet()
-	controller = New("foo", newMockIPTables(), &m)
+	controller = New("foo", newMockIPTables(), &m, &fake.Clientset{})
 
 	controller.AddNetworkPolicy(networkPolicy)
 
@@ -235,7 +239,7 @@ func TestDefaultAllow(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("bar", newMockIPTables(), &m)
+	controller := New("bar", newMockIPTables(), &m, &fake.Clientset{})
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -363,13 +367,15 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("qux", newMockIPTables(), &m)
+	client := fake.NewSimpleClientset()
+	controller := New("qux", newMockIPTables(), &m, client)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
 		},
 	}
+	client.CoreV1().Namespaces().Create(defaultNamespace)
 	controller.AddNamespace(defaultNamespace)
 
 	podFoo := &coreapi.Pod{
@@ -445,13 +451,15 @@ func TestNewTargetSelector(t *testing.T) {
 	)
 
 	m := newMockIPSet()
-	controller := New("baz", newMockIPTables(), &m)
+	client := fake.NewSimpleClientset()
+	controller := New("baz", newMockIPTables(), &m, client)
 
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
 		},
 	}
+	client.CoreV1().Namespaces().Create(defaultNamespace)
 	controller.AddNamespace(defaultNamespace)
 
 	podFoo := &coreapi.Pod{
@@ -521,7 +529,21 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 
 	m := newMockIPSet()
 	ipt := newMockIPTables()
-	controller := New("foo", ipt, &m)
+	client := fake.NewSimpleClientset()
+	controller := New("foo", ipt, &m, client)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	nonDefaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "non-default",
+		},
+	}
+	client.CoreV1().Namespaces().Create(defaultNamespace)
+	client.CoreV1().Namespaces().Create(nonDefaultNamespace)
 
 	netpolFoo := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
