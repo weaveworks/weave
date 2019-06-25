@@ -614,3 +614,79 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(m.sets[exceptIPSetNameInNonDefault].subSets))
 }
+
+// Test case for https://github.com/weaveworks/weave/issues/3653
+func TestIngressPolicyWithIPBlockAndPortSpecified(t *testing.T) {
+	const (
+		barPodIP        = "10.32.0.11"
+		runBarIPSetName = "weave-bZ~x=yBgzH)Ht()K*Uv3z{M]Y"
+	)
+
+	m := newMockIPSet()
+	ipt := newMockIPTables()
+	client := fake.NewSimpleClientset()
+	controller := New("any", ipt, &m, client)
+
+	defaultNamespace := &coreapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+
+	client.CoreV1().Namespaces().Create(defaultNamespace)
+
+	podBar := &coreapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "bar",
+			Namespace: "default",
+			Name:      "bar",
+			Labels:    map[string]string{"run": "bar"}},
+		Status: coreapi.PodStatus{PodIP: barPodIP}}
+	controller.AddPod(podBar)
+	defer controller.DeletePod(podBar)
+
+	portProtocol := coreapi.ProtocolTCP
+	port := intstr.FromInt(80)
+	netpolicty := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "ipblock-bar",
+			Name:      "allow-ipblock-to-bar",
+			Namespace: "default",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+			},
+			PodSelector: metav1.LabelSelector{MatchLabels: podBar.Labels},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Protocol: &portProtocol,
+							Port:     &port,
+						},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							IPBlock: &networkingv1.IPBlock{
+								CIDR: "192.168.48.4/32",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := controller.AddNetworkPolicy(netpolicty)
+	require.NoError(t, err)
+	defer controller.DeleteNetworkPolicy(netpolicty)
+
+	require.Equal(t, 1, len(m.sets[runBarIPSetName].subSets))
+	require.True(t, m.entryExists(runBarIPSetName, barPodIP))
+
+	require.Equal(t, 1, len(ipt.rules[IngressChain]))
+	for rule := range ipt.rules[IngressChain] {
+		require.Contains(t, rule, "-s 192.168.48.4/32 -m set --match-set "+runBarIPSetName+" dst --dport 80")
+	}
+}
