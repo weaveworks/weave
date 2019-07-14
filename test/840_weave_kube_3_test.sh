@@ -52,7 +52,7 @@ fi
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.9.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
 
@@ -357,7 +357,7 @@ WEAVE_ENV_VARS="${WEAVE_ENV_VARS}\\n                - name: NO_MASQ_LOCAL\\n    
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.8.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.9.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
 
