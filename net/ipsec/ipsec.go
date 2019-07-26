@@ -223,9 +223,19 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, connUID uint64,
 
 	if outSPIInfo, ok := ipsec.spiInfo[outSPIID]; ok {
 		ipsec.log.Infof("ipsec: destroy: out %s -> %s 0x%x", localIP, remoteIP, outSPIInfo.spi)
-
-		if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPIInfo.spi)); err != nil {
-			ipsec.log.Warnf("ipsec: xfrm policy del (%s, %s, 0x%x) failed: %s", localIP, remoteIP, outSPIInfo.spi, err)
+		policy, err := netlink.XfrmPolicyGet(xfrmPolicy(localIP, remoteIP, outSPIInfo.spi))
+		if err != nil {
+			ipsec.log.Warnf("ipsec: xfrm policy get (%s, %s, 0x%x) failed: %s", localIP, remoteIP, outSPIInfo.spi, err)
+		} else {
+			if len(policy.Tmpls) == 1 {
+				if policy.Tmpls[0].Spi == int(outSPIInfo.spi) {
+					if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPIInfo.spi)); err != nil {
+						ipsec.log.Warnf("ipsec: xfrm policy del (%s, %s, 0x%x) failed: %s", localIP, remoteIP, outSPIInfo.spi, err)
+					}
+				} else {
+					ipsec.log.Debugf("ipsec: xfrm not my policy (%s, %s, 0x%x) got 0x%x ", localIP, remoteIP, outSPIInfo.spi, policy.Tmpls[0].Spi)
+				}
+			}
 		}
 
 		outSA := &netlink.XfrmState{
