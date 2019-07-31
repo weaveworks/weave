@@ -881,6 +881,11 @@ func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 }
 
 func (fwd *fastDatapathForwarder) handleCryptoInitSARemote(msg []byte) {
+	if fwd.stopped {
+		log.Info(fwd.logPrefix(), "IPSec init SA remote failed: forwarder has already been stopped")
+		return
+	}
+
 	log.Info(fwd.logPrefix(), "IPSec init SA remote")
 	err := fwd.fastdp.ipsec.InitSARemote(
 		msg,
