@@ -10,7 +10,7 @@ if ! bash "$DIR/sanity_check.sh"; then
 fi
 whitely echo ...ok
 
-TESTS="${@:-$(find "$DIR" -name '*_test.sh')}"
+TESTS="${@:-$(find "$DIR" ! -name '602_proxy_docker_py_test.sh' -name '*_test.sh')}"
 RUNNER_ARGS=${RUNNER_ARGS:-""}
 
 # If running on circle, use the scheduler to work out what tests to run
