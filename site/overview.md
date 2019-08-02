@@ -9,6 +9,9 @@ Weave Net creates a virtual network that connects Docker containers across multi
 
 Services provided by application containers on the weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
+### How does it work?
+
+Weave Net creates a new Layer 2 network using Linux kernel features; one daemon sets up that network and manages routing between machines and there are various ways to attach to that network (e.g. a CNI plugin which runs as a separate process). Also one more daemon if you are using Kubernetes Network Policy.
 
 ## Why Weave?
 
