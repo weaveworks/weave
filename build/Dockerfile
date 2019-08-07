@@ -1,4 +1,4 @@
-FROM golang:1.10.1-stretch
+FROM golang:1.12.7-buster
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
@@ -7,25 +7,25 @@ ENV GOARM 7
 ENV DEB_CROSSPLATFORMS \
 	armhf \
 	arm64 \
-	ppc64el
+	ppc64el \
+	s390x
 
 # The go platforms we are supporting to cross-compile
 ENV GO_CROSSPLATFORMS \
 	linux/arm \
 	linux/arm64 \
-	linux/ppc64le
+	linux/ppc64le \
+	linux/s390x
 
 # The names of the gcc cross-compilers we have installed
 ENV GCC_CROSSCOMPILERS \
 	arm-linux-gnueabihf \
 	aarch64-linux-gnu \
-	powerpc64le-linux-gnu
+	powerpc64le-linux-gnu \
+	s390x-linux-gnu
 
-# Temporarily add the Debian repositories, because we're going to install gcc cross-compilers from there
 # Install the build-essential and crossbuild-essential-ARCH packages
-RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && curl http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
-  && for platform in ${DEB_CROSSPLATFORMS}; do dpkg --add-architecture $platform; done \
+RUN for platform in ${DEB_CROSSPLATFORMS}; do dpkg --add-architecture $platform; done \
   && apt-get update \
   && apt-get install -y build-essential \
   && for platform in ${DEB_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
