@@ -17,8 +17,8 @@ QEMU_VERSION=v2.7.0
 
 # A list of all supported architectures here. Should be named as Go is naming platforms
 # All supported architectures must have an "ifeq" block below that customizes the parameters
-ALL_ARCHITECTURES=amd64 arm arm64 ppc64le
-ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le
+ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
+ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
 
 ifeq ($(ARCH),amd64)
 # The architecture to use when downloading the docker binary
@@ -94,6 +94,26 @@ ifeq ($(ARCH),ppc64le)
 	QEMUARCH=ppc64le
 
 # In the weaveworks/build image; libpcap libraries for ppc64le are placed here
+# Tell the gcc linker to search for libpcap here
+	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
+endif
+ifeq ($(ARCH),s390x)
+# The architecture to use when downloading the docker binary
+	WEAVEEXEC_DOCKER_ARCH?=s390x
+
+# Using the (semi-)official alpine image
+	ALPINE_BASEIMAGE?=s390x/alpine:3.6
+
+# s390x images have the -s390x suffix, for instance weaveworks/weave-s390x:latest
+	ARCH_EXT?=-s390x
+
+# The name of the gcc binary
+	CC=s390x-linux-gnu-gcc
+
+# The architecture name to use when downloading a prebuilt QEMU binary
+	QEMUARCH=s390x
+
+# In the weaveworks/build image; libpcap libraries for s390x are placed here
 # Tell the gcc linker to search for libpcap here
 	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
 endif
