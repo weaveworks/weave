@@ -27,8 +27,8 @@ RUN apk add --update \
   && mknod /var/log/ulogd.pcap p
 COPY ./weave-npc /usr/bin/weave-npc
 COPY ./ulogd.conf /etc/ulogd.conf
-COPY ./launch.sh /home/weave/
-ENTRYPOINT ["/home/weave/launch.sh"]
+COPY ./launch.sh /usr/bin/
+ENTRYPOINT ["/usr/bin/launch.sh"]
 
 # These labels will change for every build, and should therefore be the last layer of the image:
 ARG revision
