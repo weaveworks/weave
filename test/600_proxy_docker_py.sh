@@ -13,6 +13,9 @@ docker_py_test() {
 
     # Work round https://github.com/docker/docker-py/issues/852
     docker_on $HOST1 pull busybox:buildroot-2014.02 >/dev/null
+    # Work round https://github.com/weaveworks/weave/issues/3680 - pin busybox version to 1.28
+    docker_on $HOST1 pull busybox:1.28 >/dev/null
+    docker_on $HOST1 tag busybox:1.28 busybox:latest >/dev/null
     # Get a list of the tests for use to shard
     docker_on $HOST1 pull $IMAGE >/dev/null
     CANDIDATES=$(docker_on $HOST1 run \
