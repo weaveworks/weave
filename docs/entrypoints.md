@@ -64,7 +64,7 @@ To add new options to how weave should run with each invocation, you would do th
 5. Add a command-line option `--option` to `weaveutil` or `weaver` as appropriate.
 6. If the option can be configured for CNI:
     * have `prog/weave-kube/launch.sh` read it as an environment variable and set inside
-    * set a default for the environment variable in `prog/weave-kube/weave-daemonset-k8s-1.6.yaml` and `weave-daemonset.yaml`
+    * set a default for the environment variable in `prog/weave-kube/weave-daemonset-k8s-N.N.yaml`
     * if it should be set via `weaver` globally on its one-time initialization invocation, pass it on in `launch.sh`
     * if it needs to be set via `weaveutil` on each invocation of `weave-net`, have `launch.sh` save it as an option in the CNI config file `/etc/cni/net.d/10-weave.conflist` and then have the CNI code in `plugin/net/cni.go` in `weaveutil` read it and use where appropriate
 7. Document it!
