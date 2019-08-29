@@ -106,7 +106,7 @@ func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (
 						rules[rule.key] = rule
 					} else {
 						withNormalisedProtoAndPort(ingressRule.Ports, func(proto, port string) {
-							rule := newRuleSpec(policyTypeIngress, &proto, srcSelector, targetSelector, &port)
+							rule := newRuleSpec(policyTypeIngress, &proto, srcRuleHost, targetSelector, &port)
 							rules[rule.key] = rule
 						})
 					}
