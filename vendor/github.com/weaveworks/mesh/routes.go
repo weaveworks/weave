@@ -3,6 +3,7 @@ package mesh
 import (
 	"math"
 	"sync"
+	"time"
 )
 
 type unicastRoutes map[PeerName]PeerName
@@ -173,17 +174,24 @@ func (r *routes) ensureRecalculated() {
 }
 
 func (r *routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{}, action <-chan func()) {
+	// Check to see if recalculation is needed twice a second
+	ticker := time.NewTicker(500 * time.Millisecond)
 	for {
 		select {
-		case <-recalculate:
-			r.calculate()
-		case done := <-wait:
+		case <-ticker.C:
 			select {
 			case <-recalculate:
 				r.calculate()
+			case done := <-wait:
+				select {
+				case <-recalculate:
+					r.calculate()
+				default:
+				}
+				close(done)
 			default:
+				// don't wait
 			}
-			close(done)
 		case f := <-action:
 			f()
 		}

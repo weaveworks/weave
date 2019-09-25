@@ -32,3 +32,8 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+# Try out some PRs
+[[override]]
+  branch = "trial-run"
+  name = "github.com/weaveworks/mesh"

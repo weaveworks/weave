@@ -686,12 +686,12 @@
   revision = "6b0aa22550d9325eb8f43418185859e13dc0de1d"
 
 [[projects]]
-  digest = "1:277e090a58afaeb00fb9fd04e2b2f3466ff8fb327a331e0e531a3399a72697e3"
+  branch = "trial-run"
+  digest = "1:1c04a036b2af369ea92c4f43597fd468d8185cd2bee4f50bedf0d84640e688b1"
   name = "github.com/weaveworks/mesh"
   packages = ["."]
   pruneopts = "UT"
-  revision = "38e8100dfbc7b28ae8ffde5a2bbeceec57ffa52a"
-  version = "v0.1"
+  revision = "dd9d29228ac63a7227647a5303e0ef42f47b0193"
 
 [[projects]]
   branch = "master"

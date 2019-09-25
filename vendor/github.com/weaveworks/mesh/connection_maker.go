@@ -93,7 +93,7 @@ func (cm *connectionMaker) InitiateConnections(peers []string, replace bool) []e
 		}
 		if host == "" || !isAlnum(port) {
 			errors = append(errors, fmt.Errorf("invalid peer name %q, should be host[:port]", peer))
-		} else if addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port)); err != nil {
+		} else if addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%s", host, port)); err != nil {
 			errors = append(errors, err)
 		} else {
 			addrs[peer] = addr

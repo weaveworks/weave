@@ -6,6 +6,11 @@ import (
 	"io"
 	"math/rand"
 	"sync"
+	"time"
+)
+
+const (
+	gcInterval = 1 * time.Second
 )
 
 // Peers collects all of the known peers in the mesh, including ourself.
@@ -18,6 +23,8 @@ type Peers struct {
 
 	// Called when the mapping from short IDs to peers changes
 	onInvalidateShortIDs []func()
+	timer                *time.Timer
+	pendingGC            bool
 }
 
 type shortIDPeers struct {
@@ -60,8 +67,11 @@ func newPeers(ourself *localPeer) *Peers {
 		ourself:   ourself,
 		byName:    make(map[PeerName]*Peer),
 		byShortID: make(map[PeerShortID]shortIDPeers),
+		timer:     time.NewTimer(gcInterval),
 	}
 	peers.fetchWithDefault(ourself.Peer)
+	peers.timer.Stop()
+	go peers.actorLoop()
 	return peers
 }
 
@@ -339,6 +349,27 @@ func (peers *Peers) forEach(fun func(*Peer)) {
 	}
 }
 
+func (peers *Peers) actorLoop() {
+	stop := func() {
+		if !peers.timer.Stop() {
+			select {
+			case <-peers.timer.C:
+			default:
+			}
+		}
+	}
+	for {
+		select {
+		case <-peers.timer.C:
+			peers.GarbageCollect()
+			// stop the timer so that next scheduled GarbageCollect() will be done
+			// only on receiving topology update
+			stop()
+			peers.pendingGC = false
+		}
+	}
+}
+
 // Merge an incoming update with our own topology.
 //
 // We add peers hitherto unknown to us, and update peers for which the
@@ -363,7 +394,6 @@ func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error)
 
 	// Now apply the updates
 	newUpdate := peers.applyDecodedUpdate(decodedUpdate, decodedConns, &pending)
-	peers.garbageCollect(&pending)
 	for _, peerRemoved := range pending.removed {
 		delete(newUpdate, peerRemoved.Name)
 	}
@@ -371,6 +401,13 @@ func (peers *Peers) applyUpdate(update []byte) (peerNameSet, peerNameSet, error)
 	updateNames := make(peerNameSet)
 	for _, peer := range decodedUpdate {
 		updateNames[peer.Name] = struct{}{}
+	}
+
+	if !peers.pendingGC {
+		// schedule a GarbageCollect() to run after gcInterval time period
+		// corresponding to all topology updates received during the period
+		peers.timer.Reset(gcInterval)
+		peers.pendingGC = true
 	}
 
 	return updateNames, newUpdate, nil
