@@ -99,7 +99,9 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 		pending := make(pendingStarts)
 		retryInterval := InitialInterval
 		for {
-			events := make(chan *docker.APIEvents)
+			// Use a buffered chan so the client library can run ahead of the listener
+			// - Docker will drop an event if it is not collected quickly enough.
+			events := make(chan *docker.APIEvents, 1024)
 			if err := c.AddEventListener(events); err != nil {
 				c.errorf("Unable to add listener to Docker API: %s - retrying in %ds", err, retryInterval/time.Second)
 			} else {
