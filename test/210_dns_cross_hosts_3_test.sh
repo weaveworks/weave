@@ -45,6 +45,8 @@ for i in $(seq 5); do
        proxy docker_on $host kill bar 1>/dev/null
    done
 
+   sleep 2  # Allow DNS updates to propagate
+
    assert_no_dns_record $HOST1 baz foo.weave.local
    assert_no_dns_record $HOST1 baz bar.weave.local
 
@@ -58,10 +60,11 @@ for i in $(seq 5); do
        BAR_IPS="$BAR_IPS $(container_ip $host bar)"
    done
 
+   sleep 2  # Allow DNS updates to propagate
+
    assert_dns_record $HOST1 baz foo.weave.local $FOO_IPS
    assert_dns_record $HOST1 baz bar.weave.local $BAR_IPS
 done
-
 # resolution for names mapped to multiple addresses
 weave_on $HOST2 dns-add $C2a c2 -h $NAME2
 weave_on $HOST2 dns-add $C2b c2 -h $NAME2
