@@ -339,6 +339,8 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 
 ### <a name="key-points"></a> Things to watch out for
 
+- Weave Net does not work on hosts running iptables 1.8 or above, only with 1.6.
+  Track this via issue [#3465](https://github.com/weaveworks/weave/issues/3465)
 - Don't turn on `--masquerade-all` on kube-proxy: this will change the
   source address of every pod-to-pod conversation which will make it
   impossible to correctly enforce network policies that restrict which
