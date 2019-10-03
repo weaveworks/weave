@@ -9,7 +9,7 @@ kill_weaver() {
     run_on $HOST1 sudo ip link set weave down
     WEAVER_PID=$(container_pid $HOST1 weave)
     run_on $HOST1 sudo kill -9 $WEAVER_PID
-    sleep 5
+    sleep 3
 }
 
 start_suite "Re-create bridge after restart"
@@ -20,6 +20,7 @@ WEAVE_NO_FASTDP=1 weave_on $HOST2 launch $HOST1
 
 start_container $HOST1 $C1/24 --name=c1
 start_container $HOST2 $C2/24 --name=c2
+sleep 2 # give topology gossip some time to propagate
 assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 kill_weaver # should re-create the bridge
@@ -30,6 +31,7 @@ assert_raises "exec_on $HOST1 c1 $PING $C2"
 weave_on $HOST1 reset
 weave_on $HOST1 launch $HOST2
 weave_on $HOST1 attach $C1/24 c1
+sleep 2 # give topology gossip some time to propagate
 assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 kill_weaver # should re-create the bridge
