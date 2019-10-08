@@ -35,5 +35,5 @@
 
 # Try out some PRs
 [[override]]
-  branch = "trial-run"
+  branch = "trial-run-2"
   name = "github.com/weaveworks/mesh"

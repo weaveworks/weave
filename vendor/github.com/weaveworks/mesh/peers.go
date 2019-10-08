@@ -350,22 +350,13 @@ func (peers *Peers) forEach(fun func(*Peer)) {
 }
 
 func (peers *Peers) actorLoop() {
-	stop := func() {
-		if !peers.timer.Stop() {
-			select {
-			case <-peers.timer.C:
-			default:
-			}
-		}
-	}
 	for {
 		select {
 		case <-peers.timer.C:
 			peers.GarbageCollect()
-			// stop the timer so that next scheduled GarbageCollect() will be done
-			// only on receiving topology update
-			stop()
+			peers.Lock()
 			peers.pendingGC = false
+			peers.Unlock()
 		}
 	}
 }
