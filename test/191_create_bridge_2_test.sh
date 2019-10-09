@@ -9,7 +9,7 @@ kill_weaver() {
     run_on $HOST1 sudo ip link set weave down
     WEAVER_PID=$(container_pid $HOST1 weave)
     run_on $HOST1 sudo kill -9 $WEAVER_PID
-    sleep 3
+    sleep 5
 }
 
 start_suite "Re-create bridge after restart"
