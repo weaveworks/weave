@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	topologyUpdateInterval = 1 * time.Second
+	deferTopologyUpdateDuration = 1 * time.Second
 )
 
 // localPeer is the only "active" peer in the mesh. It extends Peer with
@@ -19,7 +19,7 @@ type localPeer struct {
 	*Peer
 	router                *Router
 	actionChan            chan<- localPeerAction
-	topologyUpdatesChan   chan []*Peer
+	topologyUpdates       peerNameSet
 	timer                 *time.Timer
 	pendingTopologyUpdate bool
 }
@@ -30,13 +30,13 @@ type localPeerAction func()
 // newLocalPeer returns a usable LocalPeer.
 func newLocalPeer(name PeerName, nickName string, router *Router) *localPeer {
 	actionChan := make(chan localPeerAction, ChannelSize)
-	topologyUpdatesChan := make(chan []*Peer, ChannelSize)
+	topologyUpdates := make(peerNameSet)
 	peer := &localPeer{
-		Peer:                newPeer(name, nickName, randomPeerUID(), 0, randomPeerShortID()),
-		router:              router,
-		actionChan:          actionChan,
-		topologyUpdatesChan: topologyUpdatesChan,
-		timer:               time.NewTimer(topologyUpdateInterval),
+		Peer:            newPeer(name, nickName, randomPeerUID(), 0, randomPeerShortID()),
+		router:          router,
+		actionChan:      actionChan,
+		topologyUpdates: topologyUpdates,
+		timer:           time.NewTimer(deferTopologyUpdateDuration),
 	}
 	peer.timer.Stop()
 	go peer.actorLoop(actionChan)
@@ -159,29 +159,19 @@ func (peer *localPeer) actorLoop(actionChan <-chan localPeerAction) {
 		case <-gossipTimer:
 			peer.router.sendAllGossip()
 		case <-peer.timer.C:
-			peer.brodcastTopologyUpdates()
-			if !peer.timer.Stop() {
-				select {
-				case <-peer.timer.C:
-				default:
-				}
-			}
-			peer.pendingTopologyUpdate = false
+			peer.broadcastPendingTopologyUpdates()
 		}
 	}
 }
 
-func (peer *localPeer) brodcastTopologyUpdates() {
-	peer.router.Routes.recalculate()
-	if len(peer.topologyUpdatesChan) == 0 {
-		return
-	}
-	updates := [][]*Peer{}
-	for i := 0; i < len(peer.topologyUpdatesChan); i++ {
-		u := <-peer.topologyUpdatesChan
-		updates = append(updates, u)
-	}
-	peer.router.broadcastTopologyUpdate(updates...)
+func (peer *localPeer) broadcastPendingTopologyUpdates() {
+	peer.Lock()
+	gossipData := peer.topologyUpdates
+	peer.topologyUpdates = make(peerNameSet)
+	peer.pendingTopologyUpdate = false
+	peer.Unlock()
+	gossipData[peer.Peer.Name] = struct{}{}
+	peer.router.broadcastTopologyUpdate(gossipData)
 }
 
 func (peer *localPeer) handleAddConnection(conn ourConnection, isRestartedPeer bool) error {
@@ -227,6 +217,7 @@ func (peer *localPeer) handleAddConnection(conn ourConnection, isRestartedPeer b
 		conn.logf("connection added (new peer)")
 		peer.router.sendAllGossipDown(conn)
 	}
+	peer.router.Routes.recalculate()
 	peer.broadcastPeerUpdate(conn.Remote())
 
 	return nil
@@ -242,6 +233,8 @@ func (peer *localPeer) handleConnectionEstablished(conn ourConnection) {
 	}
 	peer.connectionEstablished(conn)
 	conn.logf("connection fully established")
+
+	peer.router.Routes.recalculate()
 	peer.broadcastPeerUpdate()
 }
 
@@ -261,6 +254,7 @@ func (peer *localPeer) handleDeleteConnection(conn ourConnection) {
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.router.Peers.GarbageCollect()
+	peer.router.Routes.recalculate()
 	peer.broadcastPeerUpdate()
 }
 
@@ -275,10 +269,12 @@ func (peer *localPeer) broadcastPeerUpdate(peers ...*Peer) {
 		peer.Lock()
 		defer peer.Unlock()
 		if !peer.pendingTopologyUpdate {
-			peer.timer.Reset(topologyUpdateInterval)
+			peer.timer.Reset(deferTopologyUpdateDuration)
 			peer.pendingTopologyUpdate = true
 		}
-		peer.topologyUpdatesChan <- append(peers, peer.Peer)
+		for _, p := range peers {
+			peer.topologyUpdates[p.Name] = struct{}{}
+		}
 	}
 }
 

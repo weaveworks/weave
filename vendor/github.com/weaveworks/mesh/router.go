@@ -229,18 +229,10 @@ func (router *Router) sendPendingGossip() bool {
 	return sentSomething
 }
 
-// BroadcastTopologyUpdate is invoked whenever there is one or more changes to the mesh
-// topology, and broadcasts the new set of peers to the mesh after coalescing updates.
-func (router *Router) broadcastTopologyUpdate(updates ...[]*Peer) {
-	var gossipData GossipData
-	gossipData = &topologyGossipData{peers: router.Peers, update: nil}
-	for _, update := range updates {
-		names := make(peerNameSet)
-		for _, p := range update {
-			names[p.Name] = struct{}{}
-		}
-		gossipData = gossipData.Merge(&topologyGossipData{peers: router.Peers, update: names})
-	}
+// BroadcastTopologyUpdate is invoked whenever there is a change to the mesh
+// topology, and broadcasts the new set of peers to the mesh.
+func (router *Router) broadcastTopologyUpdate(update peerNameSet) {
+	gossipData := &topologyGossipData{peers: router.Peers, update: update}
 	router.topologyGossip.GossipBroadcast(gossipData)
 }
 

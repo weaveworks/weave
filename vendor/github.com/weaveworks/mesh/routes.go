@@ -21,7 +21,7 @@ type routes struct {
 	broadcastAll  broadcastRoutes // [1]
 	recalcTimer   *time.Timer
 	pendingRecalc bool
-	wait          chan<- chan struct{}
+	wait          chan chan struct{}
 	action        chan<- func()
 	// [1] based on *all* connections, not just established &
 	// symmetric ones
