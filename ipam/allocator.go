@@ -814,8 +814,14 @@ func (alloc *Allocator) sendRingUpdate(dest mesh.PeerName) {
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) checkRangeHasAllocations(r address.Range) bool {
-	return alloc.space.NumFreeAddressesInRange(r) != r.Size()
+func (alloc *Allocator) hasAllocations(rs []address.Range) bool {
+	for _, r := range rs {
+		alloc.debugf("hasAllocations: %v %v vs %v", r, alloc.space.NumFreeAddressesInRange(r), r.Size())
+		if alloc.space.NumFreeAddressesInRange(r) != r.Size() {
+			return true
+		}
+	}
+	return false
 }
 
 func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
@@ -836,7 +842,8 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		updated, err := alloc.ring.Merge(*data.Ring, alloc.checkRangeHasAllocations)
+		updated, err := alloc.ring.Merge(*data.Ring, alloc.hasAllocations)
+		alloc.infof("Merge: updated %v, error %v", updated, err)
 		switch err {
 		case nil:
 			if updated {
