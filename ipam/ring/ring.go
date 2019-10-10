@@ -332,7 +332,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, hasAlloca
 					// which case we should set our version to the one received plus one,
 					// effectively imposing our existing entry.
 					if theirs.Peer != ourPeer && !hasAllocations(r.makeRanges(mine.Token, es.entry(i+1).Token)) {
-						common.Log.Debugf("[ring %s]: addTheirs - no allocations in %v->%v", ourPeer, mine.Token, es.entry(i+1).Token)
+						common.Log.Infof("ring: repair inconsistent data by accepting token %v from %v - no allocations up to %v", theirs.Token, theirs.Peer, es.entry(i+1).Token)
 						addTheirs(*theirs)
 					} else if theirs.Peer == ourPeer {
 						common.Log.Debugf("[ring %s]: addToResult", ourPeer)
