@@ -112,7 +112,9 @@ func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, m
 		}
 		peerMap := make(map[string]peerInfo, len(storedPeerList.Peers))
 		for _, peer := range storedPeerList.Peers {
-			peerMap[peer.PeerName] = peer
+			if peer.PeerName != myPeerName {
+				peerMap[peer.PeerName] = peer
+			}
 		}
 		// remove entries from the peer map that are current nodes
 		for key, peer := range peerMap {
