@@ -84,7 +84,7 @@ function relaunch_weave_pod {
 # Suite
 #
 function main {
-    local IPAM_RECOVER_DELAY=90
+    local IPAM_RECOVER_DELAY=10
 
     start_suite "Test weave-net deallocates from IPAM on node failure";
 
