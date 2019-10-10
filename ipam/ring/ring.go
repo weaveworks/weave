@@ -375,6 +375,11 @@ func (r *Ring) Empty() bool {
 	return len(r.Entries) == 0
 }
 
+// convenience function to normalise a single range that may span zero
+func (r *Ring) makeRanges(start, end address.Address) []address.Range {
+	return r.splitRangesOverZero([]address.Range{{Start: start, End: end}})
+}
+
 // Given a slice of ranges which are all in the right order except
 // possibly the last one spans zero, fix that up and return the slice
 func (r *Ring) splitRangesOverZero(ranges []address.Range) []address.Range {
@@ -425,10 +430,7 @@ type RangeInfo struct {
 
 func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 	for i, entry := range r.Entries {
-		nextEntry := r.Entries.entry(i + 1)
-		ranges := []address.Range{{Start: entry.Token, End: nextEntry.Token}}
-		ranges = r.splitRangesOverZero(ranges)
-		for _, r := range ranges {
+		for _, r := range r.makeRanges(entry.Token, r.Entries.entry(i+1).Token) {
 			result = append(result, RangeInfo{entry.Peer, r, entry.Version})
 		}
 	}
