@@ -21,15 +21,15 @@ type claim struct {
 
 // Send an error (or nil for success) back to caller listening on resultChan
 func (c *claim) sendResult(result error) {
+	if result != nil {
+		common.Log.Errorln("[allocator] " + result.Error())
+	}
 	// Make sure we only send a result once, since listener stops listening after that
 	if c.resultChan != nil {
 		c.resultChan <- result
 		close(c.resultChan)
 		c.resultChan = nil
 		return
-	}
-	if result != nil {
-		common.Log.Errorln("[allocator] " + result.Error())
 	}
 }
 
