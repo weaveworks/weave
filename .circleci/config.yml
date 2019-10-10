@@ -1,7 +1,7 @@
 version: 2
 defaults: &defaults
   docker:
-    - image: weaveworks/weavebuild:circle20-2e6504d3
+    - image: weaveworks/weavebuild:go-1-13-1-88d87f8e
   working_directory: /go/src/github.com/weaveworks/weave
 
 jobs:
