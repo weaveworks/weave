@@ -284,7 +284,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, hasAlloca
 	var i, j int
 	for i < len(es) && j < len(other) {
 		mine, theirs = es[i], other[j]
-		common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
+		common.Log.Debugf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%v theirs.Version=%v", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, mine.Version, theirs.Version)
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
@@ -302,7 +302,6 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, hasAlloca
 			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
-			common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			// merge
 			switch {
 			case mine.Version >= theirs.Version:
@@ -333,6 +332,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, hasAlloca
 					// which case we should set our version to the one received plus one,
 					// effectively imposing our existing entry.
 					if theirs.Peer != ourPeer && !hasAllocations(r.makeRanges(mine.Token, es.entry(i+1).Token)) {
+						common.Log.Infof("ring: repair inconsistent data by accepting token %v from %v - no allocations up to %v", theirs.Token, theirs.Peer, es.entry(i+1).Token)
 						addTheirs(*theirs)
 					} else if theirs.Peer == ourPeer {
 						mine.Version = theirs.Version + 1
@@ -528,7 +528,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated 
 
 		entries[i].Free = free
 		entries[i].Version++
-		common.Log.Debugln(fmt.Sprintf("[ring %s]: ReportFree token=%s peer=%s version=%s", r.Peer, entries[i].Token, entries[i].Peer, fmt.Sprint(entries[i].Version)))
+		common.Log.Debugf("[ring %s]: ReportFree token=%s peer=%s version=%v", r.Peer, entries[i].Token, entries[i].Peer, entries[i].Version)
 		updated = true
 	}
 	return
@@ -612,7 +612,7 @@ func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 			// bump version by large value so that transfer of range takes precedence (if there is any conflict in merging entry)
 			// over other opertaions on the entry that increments the version
 			entry.Version = entry.Version + 100
-			common.Log.Debugln(fmt.Sprintf("[ring %s]: Transfer token=%s from=%s to=%s version=%s", r.Peer, entry.Token, from, to, fmt.Sprint(entry.Version)))
+			common.Log.Debugf("[ring %s]: Transfer token=%s from=%s to=%s version=%v", r.Peer, entry.Token, from, to, entry.Version)
 			newRanges = append(newRanges, address.Range{Start: entry.Token, End: r.Entries.entry(i + 1).Token})
 		}
 	}
