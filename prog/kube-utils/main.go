@@ -259,6 +259,13 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 	common.Log.Debugln("registering for updates for node delete events")
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
+			var name string
+			if apiObj, ok := obj.(api.Object); ok {
+				name = apiObj.GetName()
+			} else {
+				name = fmt.Sprintf("%#v", obj)
+			}
+			common.Log.Debugln("Delete event for", name)
 			// add random delay to avoid all nodes acting on node delete event at the same
 			// time leading to contention to use `weave-net` configmap
 			r := rand.Intn(5000)
