@@ -204,6 +204,6 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		if alloc.tracker != nil {
 			tracker = alloc.tracker.String()
 		}
-		fmt.Fprintf(w, tracker)
+		fmt.Fprintln(w, tracker)
 	})
 }
