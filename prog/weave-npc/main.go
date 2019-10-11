@@ -248,7 +248,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	npc := npc.New(nodeName, ipt, ips, client)
 
-	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
+	nsController := makeController(client.CoreV1().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
@@ -268,7 +268,7 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
-	podController := makeController(client.Core().RESTClient(), "pods", &coreapi.Pod{},
+	podController := makeController(client.CoreV1().RESTClient(), "pods", &coreapi.Pod{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddPod(obj.(*coreapi.Pod)))
