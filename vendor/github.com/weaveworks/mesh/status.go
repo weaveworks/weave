@@ -30,7 +30,7 @@ type Status struct {
 func NewStatus(router *Router) *Status {
 	return &Status{
 		Protocol:           Protocol,
-		ProtocolMinVersion: ProtocolMinVersion,
+		ProtocolMinVersion: int(router.ProtocolMinVersion),
 		ProtocolMaxVersion: ProtocolMaxVersion,
 		Encryption:         router.usingPassword(),
 		PeerDiscovery:      router.PeerDiscovery,
