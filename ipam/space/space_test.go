@@ -73,7 +73,7 @@ func TestLowlevel(t *testing.T) {
 
 	// test Donate when addresses are scarce
 	s = New()
-	r, ok = s.Donate(address.NewRange(0, 1000))
+	_, ok = s.Donate(address.NewRange(0, 1000))
 	require.True(t, !ok, "donate on empty space should fail")
 	s.Add(0, 3)
 	require.NoError(t, s.Claim(0))
@@ -81,7 +81,7 @@ func TestLowlevel(t *testing.T) {
 	r, ok = s.Donate(address.NewRange(0, 1000))
 	require.True(t, ok, "donate")
 	require.Equal(t, address.NewRange(1, 1), r, "donate")
-	r, ok = s.Donate(address.NewRange(0, 1000))
+	_, ok = s.Donate(address.NewRange(0, 1000))
 	require.True(t, !ok, "donate should fail")
 }
 

@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	containerIDRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/([^/]*)/.*")
+	containerIDRegexp   = regexp.MustCompile(`^(/v[0-9.]*)?/containers/([^/]*)/.*`)
 	weaveWaitEntrypoint = []string{"/w/w"}
 
 	Log = common.Log
