@@ -348,14 +348,6 @@ func main() {
 		}
 		return
 	}
-	peers, err := getKubePeers(c, false)
-	if err != nil {
-		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
-	}
-	for _, node := range peers {
-		fmt.Println(node.addr)
-	}
-
 	if runReclaimDaemon {
 		// Handle SIGINT and SIGTERM
 		ch := make(chan os.Signal)
@@ -365,5 +357,14 @@ func main() {
 		registerForNodeUpdates(c, stopCh, nodeName, peerName)
 		<-ch
 		close(stopCh)
+		return
+	}
+
+	peers, err := getKubePeers(c, false)
+	if err != nil {
+		common.Log.Fatalf("[kube-peers] Could not get peers: %v", err)
+	}
+	for _, node := range peers {
+		fmt.Println(node.addr)
 	}
 }
