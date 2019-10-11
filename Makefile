@@ -176,18 +176,11 @@ PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_weave-kube push_ml_weave-npc
 
 WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
 
-NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
-	rm $@; \
-	echo "\nYour go standard library was built without the 'netgo' build tag."; \
-	echo "To fix that, run"; \
-	echo "    sudo go clean -i net"; \
-	echo "    sudo go install -tags netgo std"; \
-	false; \
-}
 # The flags we are passing to go build. -extldflags -static for making a static binary, 
-# -linkmode external for linking external C libraries into the binary, -X main.version for telling the
-# Go binary which version it is, -tags netgo for enforcing the native Go DNS resolver
-BUILD_FLAGS=-i -ldflags "-linkmode external -extldflags -static -X main.version=$(WEAVE_VERSION)" -tags netgo
+# -X main.version for telling the Go binary which version it is,
+# -s -w drop symbol tables used by debuggers (not Go's internal symbol info)
+# -tags "osusergo netgo" to use native Go UID and DNS implementations
+BUILD_FLAGS=-ldflags "-extldflags -static -X main.version=$(WEAVE_VERSION) -s -w" -tags "osusergo netgo"
 
 PACKAGE_BASE=$(shell go list -e ./)
 
@@ -216,10 +209,8 @@ ifeq ($(BUILD_IN_CONTAINER),true)
 # This make target compiles all binaries inside of the weaveworks/build container
 # It bind-mounts the source into the container and passes all important variables
 exes $(EXES) tests lint: $(BUILD_UPTODATE)
-	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
-		-v $(shell pwd)/.pkg:/go/pkg \
 		-e GOARCH=$(ARCH) -e CGO_ENABLED=1 -e GOOS=linux -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW -e DEBUG \
 		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) CC=$(CC) QEMUARCH=$(QEMUARCH) CGO_LDFLAGS=$(CGO_LDFLAGS) $@
 	touch $@
@@ -235,19 +226,15 @@ ifeq ($(COVERAGE),true)
 else
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 endif
-	$(NETGO_CHECK)
 
 $(WEAVEUTIL_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
-	$(NETGO_CHECK)
 
 $(WEAVEWAIT_EXE):
-	go build $(BUILD_FLAGS) -tags "netgo iface mcast" -o $@ ./$(@D)
-	$(NETGO_CHECK)
+	go build $(BUILD_FLAGS) -tags "osusergo netgo iface mcast" -o $@ ./$(@D)
 
 $(WEAVEWAIT_NOMCAST_EXE):
-	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
-	$(NETGO_CHECK)
+	go build $(BUILD_FLAGS) -tags "osusergo netgo iface" -o $@ ./$(@D)
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
@@ -412,15 +399,14 @@ clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	find prog -type f -name "Dockerfile.*" -not -name "Dockerfile.template" -print | xargs rm -f
 	find prog -type f -name "*qemu-*" -print | xargs rm -f
-	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz .pkg
+	go clean ./...
+	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz .cache
 
 clean: clean-bin clean-work-dir
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
 	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
 
 build:
-	$(SUDO) go clean -i net
-	$(SUDO) go install -tags netgo std
 	$(MAKE)
 
 run-smoketests: all testrunner
