@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -71,6 +72,7 @@ func doConcurrentIterations(iterations, concurrency int, f func(int)) {
 }
 
 func TestPeerListFuzz(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	const (
 		testIters   = 1000
 		maxNodes    = 100

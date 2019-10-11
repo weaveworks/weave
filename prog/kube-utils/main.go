@@ -354,6 +354,7 @@ func main() {
 		ch := make(chan os.Signal)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 		stopCh := make(chan struct{})
+		rand.Seed(time.Now().UnixNano())
 		registerForNodeUpdates(c, stopCh, nodeName, peerName)
 		<-ch
 		close(stopCh)
