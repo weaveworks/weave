@@ -54,6 +54,8 @@ function setup_kubernetes_cluster {
 }
 
 function force_drop_node {
+    greyly echo "Shutting down Kubernetes on node $1"
+    run_on $1 "sudo kubeadm reset --force"
     greyly echo "Dropping node $1 with 'sudo kubectl delete node'"
     local target=$(echo "$1" | awk -F"." '{print $1}')
     run_on $HOST1 "$KUBECTL delete node $target"
