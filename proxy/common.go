@@ -17,8 +17,6 @@ import (
 var (
 	containerIDRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/([^/]*)/.*")
 	weaveWaitEntrypoint = []string{"/w/w"}
-	weaveEntrypoint     = "/home/weave/weaver"
-	weaveContainerName  = "/weave"
 
 	Log = common.Log
 )

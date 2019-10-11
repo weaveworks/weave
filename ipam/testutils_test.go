@@ -24,14 +24,6 @@ func (m *mockMessage) String() string {
 	return fmt.Sprintf("-> %s [%x]", m.dst, m.buf)
 }
 
-func toStringArray(messages []mockMessage) []string {
-	out := make([]string, len(messages))
-	for i := range out {
-		out[i] = messages[i].String()
-	}
-	return out
-}
-
 type mockGossipComms struct {
 	sync.RWMutex
 	*testing.T
@@ -98,14 +90,6 @@ func (m *mockGossipComms) GossipUnicast(dstPeerName mesh.PeerName, buf []byte) e
 		m.messages = m.messages[1:]
 	}
 	return nil
-}
-
-func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
-	m := alloc.gossip.(*mockGossipComms)
-	dstPeerName, _ := mesh.PeerNameFromString(dst)
-	m.Lock()
-	m.messages = append(m.messages, mockMessage{dstPeerName, msgType, buf})
-	m.Unlock()
 }
 
 func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
@@ -200,15 +184,6 @@ func AssertSent(t *testing.T, ch <-chan bool) {
 }
 
 func AssertNothingSent(t *testing.T, ch <-chan bool) {
-	select {
-	case val := <-ch:
-		require.FailNow(t, fmt.Sprintf("Unexpected value on channel: %v", val))
-	default:
-		// no message received
-	}
-}
-
-func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 	select {
 	case val := <-ch:
 		require.FailNow(t, fmt.Sprintf("Unexpected value on channel: %v", val))
