@@ -15,6 +15,9 @@ assert_raises "timeout 10 cat <( start_container $HOST2 --name c2)"
 # Connect routers
 weave_on $HOST2 connect $HOST1
 
+# Allow topology to propagate
+sleep 2
+
 # Check connectivity
 assert_raises "exec_on $HOST1 c1 $PING c2"
 assert_raises "exec_on $HOST2 c2 $PING c1"
