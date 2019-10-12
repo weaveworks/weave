@@ -18,6 +18,7 @@ The following topics are discussed:
    * [Troubleshooting Blocked Connections](#blocked-connections)
    * [Things to watch out for](#key-points)
 * [Changing Configuration Options](#configuration-options)
+* [Securing The Setup](#securing-the-setup)
 
 
 ## <a name="install"></a> Installation
@@ -33,7 +34,7 @@ with a single command:
 $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
 
-**Important:** this configuration won't enable encryption by default. If your data plane traffic isn't secured that will allow malicios actors to access your pod network. Read on to see the alternatives.
+**Important:** this configuration won't enable encryption by default. If your data plane traffic isn't secured that could allow malicious actors to access your pod network. Read on to see the alternatives.
 
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
