@@ -38,19 +38,21 @@ func merge(r1, r2 *Ring) error {
 		}
 		return address.Count((r1.End - start) + (end - r1.Start))
 	}
-	checkEntryHasAllocations := func(r address.Range) bool {
-		size := distance(r.Start, r.End)
-		entry, found := r1.Entries.get(r.Start)
-		if !found {
-			return false
-		}
-		if entry.Free < size {
-			return true
+	check := func(rs []address.Range) bool {
+		for _, r := range rs {
+			size := distance(r.Start, r.End)
+			entry, found := r1.Entries.get(r.Start)
+			if !found {
+				continue
+			}
+			if entry.Free < size {
+				return true
+			}
 		}
 		return false
 	}
 
-	_, err := r1.Merge(*r2, checkEntryHasAllocations)
+	_, err := r1.Merge(*r2, check)
 	return err
 }
 

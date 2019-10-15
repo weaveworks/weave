@@ -213,7 +213,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 
 // Merge the given ring into this ring and indicate whether this ring
 // got updated as a result.
-func (r *Ring) Merge(gossip Ring, checkRangeHasAllocations func(r address.Range) bool) (bool, error) {
+func (r *Ring) Merge(gossip Ring, hasAllocations func(r []address.Range) bool) (bool, error) {
 	r.assertInvariants()
 	defer r.trackUpdates()()
 
@@ -238,7 +238,7 @@ func (r *Ring) Merge(gossip Ring, checkRangeHasAllocations func(r address.Range)
 		return false, ErrDifferentRange
 	}
 
-	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer, r, checkRangeHasAllocations)
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer, r, hasAllocations)
 
 	if err != nil {
 		return false, err
@@ -270,7 +270,7 @@ func (r *Ring) Merge(gossip Ring, checkRangeHasAllocations func(r address.Range)
 // entries belonging to ourPeer. Returns the merged entries and an
 // indication whether the merge resulted in any changes, i.e. the
 // result differs from the original.
-func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRangeHasAllocations func(r address.Range) bool) (result entries, updated bool, err error) {
+func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, hasAllocations func(r []address.Range) bool) (result entries, updated bool, err error) {
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
 	addToResult := func(e entry) { result = append(result, &e) }
@@ -284,7 +284,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRang
 	var i, j int
 	for i < len(es) && j < len(other) {
 		mine, theirs = es[i], other[j]
-		common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
+		common.Log.Debugf("[ring %s]: Merge mine.Token=%s theirs.Token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%v theirs.Version=%v", ourPeer, mine.Token, theirs.Token, mine.Peer, theirs.Peer, mine.Version, theirs.Version)
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
@@ -294,7 +294,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRang
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
 				// check we have no allocations in the range that got split
-				if checkRangeHasAllocations(address.Range{Start: theirs.Token, End: mine.Token}) {
+				if hasAllocations(r.makeRanges(theirs.Token, mine.Token)) {
 					err = errEntryInMyRange(theirs)
 					return
 				}
@@ -302,14 +302,13 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRang
 			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
-			common.Log.Debugln(fmt.Sprintf("[ring %s]: Merge token=%s mine.Peer=%s theirs.Peer=%s mine.Version=%s theirs.Version=%s", ourPeer, mine.Token, mine.Peer, theirs.Peer, fmt.Sprint(mine.Version), fmt.Sprint(theirs.Version)))
 			// merge
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
 					if mine.Peer == ourPeer {
 						// if we own the entry and has allocations
-						if checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
+						if hasAllocations(r.makeRanges(theirs.Token, es.entry(i+1).Token)) {
 							err = errInconsistentEntry(mine, theirs)
 							return
 						}
@@ -332,7 +331,8 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRang
 					// in the range effectively given away, or it belongs to our own peer, in
 					// which case we should set our version to the one received plus one,
 					// effectively imposing our existing entry.
-					if theirs.Peer != ourPeer && !checkRangeHasAllocations(address.Range{Start: mine.Token, End: es.entry(i + 1).Token}) {
+					if theirs.Peer != ourPeer && !hasAllocations(r.makeRanges(mine.Token, es.entry(i+1).Token)) {
+						common.Log.Infof("ring: repair inconsistent data by accepting token %v from %v - no allocations up to %v", theirs.Token, theirs.Peer, es.entry(i+1).Token)
 						addTheirs(*theirs)
 					} else if theirs.Peer == ourPeer {
 						mine.Version = theirs.Version + 1
@@ -373,6 +373,11 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName, r *Ring, checkRang
 // Empty returns true if the ring has no entries
 func (r *Ring) Empty() bool {
 	return len(r.Entries) == 0
+}
+
+// convenience function to normalise a single range that may span zero
+func (r *Ring) makeRanges(start, end address.Address) []address.Range {
+	return r.splitRangesOverZero([]address.Range{{Start: start, End: end}})
 }
 
 // Given a slice of ranges which are all in the right order except
@@ -425,10 +430,7 @@ type RangeInfo struct {
 
 func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 	for i, entry := range r.Entries {
-		nextEntry := r.Entries.entry(i + 1)
-		ranges := []address.Range{{Start: entry.Token, End: nextEntry.Token}}
-		ranges = r.splitRangesOverZero(ranges)
-		for _, r := range ranges {
+		for _, r := range r.makeRanges(entry.Token, r.Entries.entry(i+1).Token) {
 			result = append(result, RangeInfo{entry.Peer, r, entry.Version})
 		}
 	}
@@ -526,7 +528,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated 
 
 		entries[i].Free = free
 		entries[i].Version++
-		common.Log.Debugln(fmt.Sprintf("[ring %s]: ReportFree token=%s peer=%s version=%s", r.Peer, entries[i].Token, entries[i].Peer, fmt.Sprint(entries[i].Version)))
+		common.Log.Debugf("[ring %s]: ReportFree token=%s peer=%s version=%v", r.Peer, entries[i].Token, entries[i].Peer, entries[i].Version)
 		updated = true
 	}
 	return
@@ -610,7 +612,7 @@ func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 			// bump version by large value so that transfer of range takes precedence (if there is any conflict in merging entry)
 			// over other opertaions on the entry that increments the version
 			entry.Version = entry.Version + 100
-			common.Log.Debugln(fmt.Sprintf("[ring %s]: Transfer token=%s from=%s to=%s version=%s", r.Peer, entry.Token, from, to, fmt.Sprint(entry.Version)))
+			common.Log.Debugf("[ring %s]: Transfer token=%s from=%s to=%s version=%v", r.Peer, entry.Token, from, to, entry.Version)
 			newRanges = append(newRanges, address.Range{Start: entry.Token, End: r.Entries.entry(i + 1).Token})
 		}
 	}
