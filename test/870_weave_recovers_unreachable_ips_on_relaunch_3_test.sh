@@ -54,6 +54,8 @@ function setup_kubernetes_cluster {
 }
 
 function force_drop_node {
+    greyly echo "Shutting down Kubernetes on node $1"
+    run_on $1 "sudo kubeadm reset --force"
     greyly echo "Dropping node $1 with 'sudo kubectl delete node'"
     local target=$(echo "$1" | awk -F"." '{print $1}')
     run_on $HOST1 "$KUBECTL delete node $target"
@@ -84,7 +86,7 @@ function relaunch_weave_pod {
 # Suite
 #
 function main {
-    local IPAM_RECOVER_DELAY=90
+    local IPAM_RECOVER_DELAY=10
 
     start_suite "Test weave-net deallocates from IPAM on node failure";
 
