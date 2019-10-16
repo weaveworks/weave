@@ -1,24 +1,13 @@
 package main
 
 import (
-	"net/http"
-	"os"
-
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
 )
-
-func metricsHandler(router *weave.NetworkRouter, allocator *ipam.Allocator, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) http.Handler {
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(prometheus.NewProcessCollector(os.Getpid(), ""))
-	reg.MustRegister(newMetrics(router, allocator, ns, dnsserver))
-	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
-}
 
 type collector struct {
 	router    *weave.NetworkRouter
