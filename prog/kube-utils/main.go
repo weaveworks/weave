@@ -32,6 +32,10 @@ type nodeInfo struct {
 	addr string
 }
 
+var (
+	maxSleepInterval int
+)
+
 // return the IP addresses of all nodes in the cluster
 func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo, error) {
 	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
@@ -116,6 +120,9 @@ func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, m
 				peerMap[peer.PeerName] = peer
 			}
 		}
+		// this is the list of peers we actually removed from the IPAM ring
+		removedPeerSlice := make([]string, 0)
+
 		// remove entries from the peer map that are current nodes
 		for key, peer := range peerMap {
 			if _, found := nodeSet[peer.NodeName]; found {
@@ -142,11 +149,27 @@ func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, m
 				return err
 			}
 			if changed {
+				removedPeerSlice = append(removedPeerSlice, peer.PeerName)
 				loopsWhenNothingChanged = 0
 			}
 		}
 
-		// 9. Go back to step 1 until there is no difference between the two sets
+		// 9. For each peer that we changed, unlock after a wait so other weave pods don't
+		// try to reclaim the IP space.  This is done after reclaiming the IP space from the remove peer.
+		// Wait at least maxSleepTime since other pods may see an empty config map, without the lock.
+		// We want the other weave pods to see the lock and do nothing
+		err = cml.LoopUpdate(func() error {
+			// Remove annotation with key X after sleeping
+			time.Sleep(time.Duration(maxSleepInterval) * time.Second)
+			for _, peerName := range removedPeerSlice {
+				if err := cml.RemoveAnnotation(KubePeersPrefix + peerName); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// 10. Go back to step 1 until there is no difference between the two sets
 		// (or we hit the counter that says we've been round the loop 3 times and nothing happened)
 	}
 	return nil
@@ -216,12 +239,9 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 			return err
 		}
 		storedPeerList.remove(peerName)
-		if err := cml.UpdatePeerList(*storedPeerList); err != nil {
-			return err
-		}
-		// 7b.    Remove annotation with key X
-		return cml.RemoveAnnotation(KubePeersPrefix + peerName)
+		return cml.UpdatePeerList(*storedPeerList)
 	})
+
 	// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
 
 	// Step 3-5 is to protect against two simultaneous rmpeers of X
@@ -270,7 +290,7 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 			common.Log.Debugln("Delete event for", name)
 			// add random delay to avoid all nodes acting on node delete event at the same
 			// time leading to contention to use `weave-net` configmap
-			r := rand.Intn(5000)
+			r := rand.Intn(maxSleepInterval * 1000)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 
 			cml := newConfigMapAnnotations(configMapNamespace, configMapName, client)
@@ -305,6 +325,7 @@ func main() {
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
+	flag.IntVar(&maxSleepInterval, "max-sleep-interval", 5, "max sleep interval in seconds")
 	flag.Parse()
 
 	common.SetLogLevel(logLevel)
