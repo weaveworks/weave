@@ -32,6 +32,10 @@ type nodeInfo struct {
 	addr string
 }
 
+var (
+	maxSleepInterval int
+)
+
 // return the IP addresses of all nodes in the cluster
 func getKubePeers(c kubernetes.Interface, includeWithNoIPAddr bool) ([]nodeInfo, error) {
 	nodeList, err := c.CoreV1().Nodes().List(api.ListOptions{})
@@ -220,6 +224,9 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 			return err
 		}
 		// 7b.    Remove annotation with key X
+		// we sleep here to keep the hold on owning the annotation until all the other
+		// weave pods have checked for the existing annotation.
+		time.Sleep(time.Duration(maxSleepInterval*1000) * time.Millisecond)
 		return cml.RemoveAnnotation(KubePeersPrefix + peerName)
 	})
 	// 8.   If step 5 failed due to optimistic lock conflict, stop: someone else is handling X
@@ -270,7 +277,7 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 			common.Log.Debugln("Delete event for", name)
 			// add random delay to avoid all nodes acting on node delete event at the same
 			// time leading to contention to use `weave-net` configmap
-			r := rand.Intn(5000)
+			r := rand.Intn(maxSleepInterval * 1000)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 
 			cml := newConfigMapAnnotations(configMapNamespace, configMapName, client)
@@ -305,6 +312,7 @@ func main() {
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
+	flag.IntVar(&maxSleepInterval, "max-sleep-interval", 5, "max sleep interval in seconds")
 	flag.Parse()
 
 	common.SetLogLevel(logLevel)
