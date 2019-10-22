@@ -94,11 +94,8 @@ type weaveClient interface {
 func reclaimRemovedPeers(kube kubernetes.Interface, cml *configMapAnnotations, myPeerName, myNodeName string) error {
 	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
 	for loopsWhenNothingChanged := 0; loopsWhenNothingChanged < 3; loopsWhenNothingChanged++ {
-		if err := cml.Init(); err != nil {
-			return err
-		}
 		// 1. Compare peers stored in the peerList against all peers reported by k8s now.
-		storedPeerList, err := cml.GetPeerList()
+		storedPeerList, err := getRefreshedPeerList(cml)
 		if err != nil {
 			return err
 		}
@@ -175,7 +172,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 		if existingAnnotation == myPeerName {
 			okToRemove = true
 		} else {
-			storedPeerList, err := cml.GetPeerList()
+			storedPeerList, err := getRefreshedPeerList(cml)
 			if err != nil {
 				return false, err
 			}
@@ -200,10 +197,15 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 		return false, nil
 	}
 	// 6.   If step 4 or 5 succeeded, rmpeer X
-	result, err := weave.RmPeer(peerName)
-	common.Log.Infof("[kube-peers] rmpeer of %s: %s", peerName, result)
-	if err != nil {
-		return false, err
+	// we will try once more to see if the peerName has been removed from the annotation
+	// by another weave pod
+	storedPeerList, err := getRefreshedPeerList(cml)
+	if storedPeerList.contains(peerName) {
+		result, err := weave.RmPeer(peerName)
+		common.Log.Infof("[kube-peers] rmpeer of %s: %s", peerName, result)
+		if err != nil {
+			return false, err
+		}
 	}
 	err = cml.LoopUpdate(func() error {
 		// 7aa.   Remove any annotations Z* that have contents X
@@ -211,13 +213,15 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 			return err
 		}
 		// 7a.    Remove X from peerList
-		storedPeerList, err := cml.GetPeerList()
+		storedPeerList, err := getRefreshedPeerList(cml)
 		if err != nil {
 			return err
 		}
-		storedPeerList.remove(peerName)
-		if err := cml.UpdatePeerList(*storedPeerList); err != nil {
-			return err
+		if storedPeerList.contains(peerName) {
+			storedPeerList.remove(peerName)
+			if err := cml.UpdatePeerList(*storedPeerList); err != nil {
+				return err
+			}
 		}
 		// 7b.    Remove annotation with key X
 		return cml.RemoveAnnotation(KubePeersPrefix + peerName)
@@ -286,6 +290,19 @@ func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}
 	})
 	informerFactory.WaitForCacheSync(stopCh)
 	informerFactory.Start(stopCh)
+}
+
+// getRefreshedPeerList will fetch the latest peer list from the config map annotation
+func getRefreshedPeerList(cml *configMapAnnotations) (*peerList, error) {
+	if err := cml.Init(); err != nil {
+		return nil, err
+	}
+	// 1. Compare peers stored in the peerList against all peers reported by k8s now.
+	storedPeerList, err := cml.GetPeerList()
+	if err != nil {
+		return nil, err
+	}
+	return storedPeerList, nil
 }
 
 func main() {
