@@ -16,6 +16,8 @@ for host in $HOSTS; do
     weave_on $host launch --ipalloc-range $UNIVERSE $HOSTS
 done
 
+sleep 2  # Allow topology updates to propagate
+
 # Basic test
 start_container          $HOST2 $C2/24 --name=c2 -h $NAME2
 start_container_with_dns $HOST1 $C1/24 --name=c1

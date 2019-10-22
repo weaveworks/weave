@@ -15,6 +15,8 @@ weave_on $HOST2 launch $HOST1
 start_container_local_plugin $HOST1 --name=c1 --hostname=$C1_NAME --dns=$DNS_IP
 start_container_local_plugin $HOST2 --name=c2 --hostname=$C2_NAME --dns=$DNS_IP
 
+sleep 2  # Allow topology to propagate
+
 assert_raises "exec_on $HOST1 c1 $PING $C2_NAME"
 assert_raises "exec_on $HOST2 c2 $PING $C1_NAME"
 
