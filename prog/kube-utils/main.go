@@ -172,7 +172,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 		if existingAnnotation == myPeerName {
 			okToRemove = true
 		} else {
-			storedPeerList, err := getRefreshedPeerList(cml)
+			storedPeerList, err := cml.GetPeerList()
 			if err != nil {
 				return false, err
 			}
@@ -213,7 +213,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 			return err
 		}
 		// 7a.    Remove X from peerList
-		storedPeerList, err := getRefreshedPeerList(cml)
+		storedPeerList, err := cml.GetPeerList()
 		if err != nil {
 			return err
 		}
@@ -222,6 +222,8 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 			if err := cml.UpdatePeerList(*storedPeerList); err != nil {
 				return err
 			}
+		} else {
+			common.Log.Infof("[kube-peers] annotation was removed already for %s", peerName)
 		}
 		// 7b.    Remove annotation with key X
 		return cml.RemoveAnnotation(KubePeersPrefix + peerName)
@@ -297,7 +299,6 @@ func getRefreshedPeerList(cml *configMapAnnotations) (*peerList, error) {
 	if err := cml.Init(); err != nil {
 		return nil, err
 	}
-	// 1. Compare peers stored in the peerList against all peers reported by k8s now.
 	storedPeerList, err := cml.GetPeerList()
 	if err != nil {
 		return nil, err
