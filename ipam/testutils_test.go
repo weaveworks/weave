@@ -65,6 +65,9 @@ func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) {
 	}
 }
 
+func (m *mockGossipComms) GossipNeighbourSubset(update mesh.GossipData) {
+	m.GossipBroadcast(update)
+}
 func equalByteBuffer(a, b []byte) bool {
 	if len(a) != len(b) {
 		return false
