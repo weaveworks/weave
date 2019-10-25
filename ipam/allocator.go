@@ -275,7 +275,7 @@ func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range
 	for i := 0; i < len(alloc.pendingClaims); {
 		claim := alloc.pendingClaims[i].(*claim)
 		if r.Contains(claim.cidr.Addr) {
-			claim.deniedBy(alloc, sender)
+			claim.deniedBy(alloc, sender, nil)
 			alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
 			continue
 		}

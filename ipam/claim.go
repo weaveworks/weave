@@ -135,12 +135,16 @@ func (c *claim) Try(alloc *Allocator) bool {
 	return true
 }
 
-func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName) {
+func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName, err error) {
 	name, found := alloc.nicknames[owner]
 	if found {
 		name = " (" + name + ")"
 	}
-	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.cidr.String(), owner, name))
+	reason := ""
+	if err != nil {
+		reason = fmt.Sprintf(" - %s", err)
+	}
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s%s", c.cidr.String(), owner, name, reason))
 }
 
 func (c *claim) Cancel() {
