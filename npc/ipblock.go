@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/ipset"
@@ -51,17 +50,17 @@ func (spec *ipBlockSpec) getRuleSpec(src bool) ([]string, string) {
 
 type ipBlockSet struct {
 	ips   ipset.Interface
-	users map[string]map[types.UID]struct{}
+	users map[string]map[ipset.UID]struct{}
 }
 
 func newIPBlockSet(ips ipset.Interface) *ipBlockSet {
 	return &ipBlockSet{
 		ips:   ips,
-		users: make(map[string]map[types.UID]struct{}),
+		users: make(map[string]map[ipset.UID]struct{}),
 	}
 }
 
-func (s *ipBlockSet) deprovision(user types.UID, current, desired map[string]*ipBlockSpec) error {
+func (s *ipBlockSet) deprovision(user ipset.UID, current, desired map[string]*ipBlockSpec) error {
 	for key, spec := range current {
 		if key == "" {
 			continue
@@ -83,7 +82,7 @@ func (s *ipBlockSet) deprovision(user types.UID, current, desired map[string]*ip
 	return nil
 }
 
-func (s *ipBlockSet) provision(user types.UID, current, desired map[string]*ipBlockSpec) (err error) {
+func (s *ipBlockSet) provision(user ipset.UID, current, desired map[string]*ipBlockSpec) (err error) {
 	for key, spec := range desired {
 		if key == "" {
 			// No need to provision an ipBlock with empty list of excepted CIDRs
@@ -106,7 +105,7 @@ func (s *ipBlockSet) provision(user types.UID, current, desired map[string]*ipBl
 					}
 				}
 
-				s.users[key] = make(map[types.UID]struct{})
+				s.users[key] = make(map[ipset.UID]struct{})
 			}
 			s.users[key][user] = struct{}{}
 		}

@@ -63,7 +63,7 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 	for _, ns := range npc.nss {
 		if ns.namespace != nil {
 			if selector.matchesNamespaceSelector(ns.namespace.ObjectMeta.Labels) {
-				if err := selector.addEntry(ns.namespace.ObjectMeta.UID, string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
+				if err := selector.addEntry(nsuid(ns.namespace), string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
 					return err
 				}
 			}
@@ -78,7 +78,7 @@ func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 			for _, pod := range ns.pods {
 				if hasIP(pod) {
 					if selector.matchesNamespacedPodSelector(pod.ObjectMeta.Labels, ns.namespace.ObjectMeta.Labels) {
-						if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
+						if err := selector.addEntry(uid(pod), pod.Status.PodIP, podComment(pod)); err != nil {
 							return err
 						}
 
@@ -262,4 +262,12 @@ func isEgressNetworkPolicy(obj interface{}) (bool, error) {
 		return false, nil
 	}
 	return false, errInvalidNetworkPolicyObjType
+}
+
+func uid(pod *coreapi.Pod) ipset.UID {
+	return ipset.UID(pod.UID)
+}
+
+func nsuid(ns *coreapi.Namespace) ipset.UID {
+	return ipset.UID(ns.UID)
 }

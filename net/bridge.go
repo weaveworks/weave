@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/chains"
@@ -588,13 +587,13 @@ func ConfigureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 
 type NoMasqLocalTracker struct {
 	ips   ipset.Interface
-	owner types.UID
+	owner ipset.UID
 }
 
 func NewNoMasqLocalTracker(ips ipset.Interface) *NoMasqLocalTracker {
 	return &NoMasqLocalTracker{
 		ips:   ips,
-		owner: types.UID(0), // dummy ipset owner
+		owner: ipset.UID(0), // dummy ipset owner
 	}
 }
 
