@@ -12,12 +12,15 @@ import (
 
 type claim struct {
 	resultChan       chan<- error
+	tryCount         int
 	ident            string       // a container ID, something like "weave:expose", or api.NoContainerID
 	cidr             address.CIDR // single address being claimed
 	isContainer      bool         // true if ident is a container ID
 	noErrorOnUnknown bool         // if false, error or block if we don't know; if true return ok but keep trying
 	hasBeenCancelled func() bool
 }
+
+const maxTryCount = 5
 
 // Send an error (or nil for success) back to caller listening on resultChan
 func (c *claim) sendResult(result error) {
@@ -39,6 +42,8 @@ func (c *claim) Try(alloc *Allocator) bool {
 		c.Cancel()
 		return true
 	}
+
+	c.tryCount++
 
 	addOwned := func() {
 		if c.ident == api.NoContainerID {
@@ -90,8 +95,10 @@ func (c *claim) Try(alloc *Allocator) bool {
 			if c.noErrorOnUnknown {
 				alloc.infof("Claim %s for %s: %s; will try later.", c.cidr, c.ident, err)
 				c.sendResult(nil)
-			} else { // just tell the user they can't do this.
-				c.deniedBy(alloc, owner)
+			} else if c.tryCount > maxTryCount {
+				// give up, tell the user they can't do this
+				c.deniedBy(alloc, owner, err)
+				return true
 			}
 		}
 		return false
@@ -128,12 +135,16 @@ func (c *claim) Try(alloc *Allocator) bool {
 	return true
 }
 
-func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName) {
+func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName, err error) {
 	name, found := alloc.nicknames[owner]
 	if found {
 		name = " (" + name + ")"
 	}
-	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.cidr.String(), owner, name))
+	reason := ""
+	if err != nil {
+		reason = fmt.Sprintf(" - %s", err)
+	}
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s%s", c.cidr.String(), owner, name, reason))
 }
 
 func (c *claim) Cancel() {
