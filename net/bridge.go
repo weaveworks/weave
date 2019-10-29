@@ -15,7 +15,6 @@ import (
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/common/odp"
-	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
 )
@@ -606,9 +605,9 @@ func (t *NoMasqLocalTracker) HandleUpdate(prevRanges, currRanges []address.Range
 		return nil
 	}
 
-	prev, curr := tracker.RemoveCommon(
-		address.NewCIDRs(tracker.Merge(prevRanges)),
-		address.NewCIDRs(tracker.Merge(currRanges)))
+	prev, curr := address.RemoveCommon(
+		address.NewCIDRs(address.Merge(prevRanges)),
+		address.NewCIDRs(address.Merge(currRanges)))
 
 	for _, cidr := range curr {
 		if err := t.ips.AddEntry(t.owner, NoMasqLocalIpset, cidr.String(), ""); err != nil {

@@ -1,13 +1,9 @@
-package tracker
-
-import (
-	"github.com/weaveworks/weave/net/address"
-)
+package address
 
 // Merge merges adjacent range entries.
 // The given slice has to be sorted in increasing order.
-func Merge(r []address.Range) []address.Range {
-	var merged []address.Range
+func Merge(r []Range) []Range {
+	var merged []Range
 
 	for i := range r {
 		if prev := len(merged) - 1; prev >= 0 && merged[prev].End == r[i].Start {
@@ -22,7 +18,7 @@ func Merge(r []address.Range) []address.Range {
 
 // RemoveCommon filters out CIDR ranges which are contained in both a and b slices.
 // Both slices have to be sorted in increasing order.
-func RemoveCommon(a, b []address.CIDR) (newA, newB []address.CIDR) {
+func RemoveCommon(a, b []CIDR) (newA, newB []CIDR) {
 	i, j := 0, 0
 
 	for i < len(a) && j < len(b) {
