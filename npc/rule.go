@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
@@ -55,9 +56,9 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 
 func (spec *ruleSpec) iptChain() string {
 	if spec.policyType == policyTypeEgress {
-		return EgressCustomChain
+		return chains.EgressCustomChain
 	}
-	return IngressChain
+	return chains.IngressChain
 }
 
 func (spec *ruleSpec) iptRuleSpecs() [][]string {
@@ -71,7 +72,7 @@ func (spec *ruleSpec) iptRuleSpecs() [][]string {
 	// policyTypeEgress
 	ruleMark := make([]string, len(spec.args))
 	copy(ruleMark, spec.args)
-	ruleMark = append(ruleMark, "-j", EgressMarkChain)
+	ruleMark = append(ruleMark, "-j", chains.EgressMarkChain)
 	ruleReturn := make([]string, len(spec.args))
 	copy(ruleReturn, spec.args)
 	ruleReturn = append(ruleReturn, "-j", "RETURN")

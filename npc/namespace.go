@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
 )
@@ -455,12 +456,12 @@ func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetNam
 
 func bypassRules(namespace string, ingress, egress ipset.Name) map[string][][]string {
 	return map[string][][]string{
-		DefaultChain: {
+		chains.DefaultChain: {
 			{"-m", "set", "--match-set", string(ingress), "dst", "-j", "ACCEPT",
 				"-m", "comment", "--comment", "DefaultAllow ingress isolation for namespace: " + namespace},
 		},
-		EgressDefaultChain: {
-			{"-m", "set", "--match-set", string(egress), "src", "-j", EgressMarkChain,
+		chains.EgressDefaultChain: {
+			{"-m", "set", "--match-set", string(egress), "src", "-j", chains.EgressMarkChain,
 				"-m", "comment", "--comment", "DefaultAllow egress isolation for namespace: " + namespace},
 			{"-m", "set", "--match-set", string(egress), "src", "-j", "RETURN",
 				"-m", "comment", "--comment", "DefaultAllow egress isolation for namespace: " + namespace},

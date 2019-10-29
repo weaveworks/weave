@@ -14,11 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
-	"github.com/weaveworks/weave/npc"
 )
 
 /* This code implements three possible configurations to connect
@@ -513,12 +513,12 @@ func ConfigureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	if config.NPC {
 		// Steer traffic via the NPC.
 
-		if err = ensureChains(ipt, "filter", npc.MainChain, npc.EgressChain); err != nil {
+		if err = ensureChains(ipt, "filter", chains.MainChain, chains.EgressChain); err != nil {
 			return err
 		}
 
 		// Steer egress traffic destined to local node.
-		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
+		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", chains.EgressChain); err != nil {
 			return err
 		}
 		fwdRules = append(fwdRules,
@@ -527,11 +527,11 @@ func ConfigureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 				// ACCEPT in WEAVE-NPC-EGRESS chain
 				{"-i", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", npc.EgressChain},
+					"-j", chains.EgressChain},
 				// The following rules are for ingress NPC processing
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", npc.MainChain},
+					"-j", chains.MainChain},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)

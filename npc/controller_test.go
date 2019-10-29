@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/net/ipset"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -582,8 +583,8 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 	require.True(t, m.entriesExist(exceptIPSetName, "192.168.48.2/32"))
 
 	// Each egress rule is represented as two iptables rules (-J MARK and -J RETURN).
-	require.Equal(t, 2, len(ipt.rules[EgressCustomChain]))
-	for rule := range ipt.rules[EgressCustomChain] {
+	require.Equal(t, 2, len(ipt.rules[chains.EgressCustomChain]))
+	for rule := range ipt.rules[chains.EgressCustomChain] {
 		require.Contains(t, rule, "-d 192.168.48.0/24 -m set ! --match-set "+exceptIPSetName+" dst")
 	}
 
@@ -690,8 +691,8 @@ func TestIngressPolicyWithIPBlockAndPortSpecified(t *testing.T) {
 	require.Equal(t, 1, len(m.sets[runBarIPSetName].subSets))
 	require.True(t, m.entriesExist(runBarIPSetName, barPodIP))
 
-	require.Equal(t, 1, len(ipt.rules[IngressChain]))
-	for rule := range ipt.rules[IngressChain] {
+	require.Equal(t, 1, len(ipt.rules[chains.IngressChain]))
+	for rule := range ipt.rules[chains.IngressChain] {
 		require.Contains(t, rule, "-s 192.168.48.4/32 -m set --match-set "+runBarIPSetName+" dst --dport 80")
 	}
 }
