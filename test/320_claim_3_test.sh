@@ -66,7 +66,7 @@ weave_on $HOST1 launch --ipalloc-range $UNIVERSE $HOST2
 # Start another container on host1. The starting should block, because host1 is
 # not able to establish the ring due to host2 being offline.
 CMD="proxy_start_container $HOST1 --name c4 -e WEAVE_CIDR=$C4/12"
-assert_raises "timeout 5 cat <( $CMD )" 124
+assert_raises "timeout --signal=9 5 cat <( $CMD )" 137
 
 # However, allocation for an external subnet should not block.
 assert_raises "proxy_start_container $HOST1 -e WEAVE_CIDR=10.3.0.1/12"
