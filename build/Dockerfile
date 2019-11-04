@@ -1,4 +1,4 @@
-FROM golang:1.12.7-buster
+FROM golang:1.13.3-buster
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
@@ -56,19 +56,6 @@ RUN go get \
 	github.com/fzipp/gocyclo \
 	github.com/fatih/hclfmt \
 	github.com/client9/misspell/cmd/misspell
-
-# First clean, because we're gonna rebuild the std both with -race enabled and disabled
-# Running go install std twice is intentional and required, as content is written in two different directories
-# (/usr/local/go/pkg/linux_amd64 vs /usr/local/go/pkg/linux_amd64_race)
-# The other architectures do not have support for -race
-RUN go clean -i net \
-	&& go install -tags netgo std \
-	&& go install -race -tags netgo std
-
-# Prebuild std for the other architectures
-RUN for platform in ${GO_CROSSPLATFORMS}; do \
-		GOOS=${platform%/*} GOARCH=${platform##*/} \
-			go install -tags netgo std; done
 
 # Allow full write access to the Go folders for anyone
 RUN chmod -R a+w /usr/local/go
