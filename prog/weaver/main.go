@@ -188,7 +188,7 @@ func main() {
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	mflag.BoolVar(&pktdebug, []string{"-pkt-debug"}, false, "enable per-packet debug logging")
 	mflag.StringVar(&prof, []string{"-profile"}, "", "enable profiling and write profiles to given path")
-	mflag.IntVar(&config.ConnLimit, []string{"-conn-limit"}, 100, "connection limit (0 for unlimited)")
+	mflag.IntVar(&config.ConnLimit, []string{"-conn-limit"}, 200, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"-bufsz"}, 8, "capture buffer size in MB")
 	mflag.IntVar(&bridgeConfig.MTU, []string{"-mtu"}, 0, "MTU size")
