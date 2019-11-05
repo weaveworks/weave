@@ -350,14 +350,11 @@ func (peers *Peers) forEach(fun func(*Peer)) {
 }
 
 func (peers *Peers) actorLoop() {
-	for {
-		select {
-		case <-peers.timer.C:
-			peers.GarbageCollect()
-			peers.Lock()
-			peers.pendingGC = false
-			peers.Unlock()
-		}
+	for range peers.timer.C {
+		peers.GarbageCollect()
+		peers.Lock()
+		peers.pendingGC = false
+		peers.Unlock()
 	}
 }
 

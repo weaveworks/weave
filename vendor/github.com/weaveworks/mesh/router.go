@@ -24,8 +24,8 @@ var (
 const (
 	tcpHeartbeat     = 30 * time.Second
 	maxDuration      = time.Duration(math.MaxInt64)
-	acceptMaxTokens  = 100
-	acceptTokenDelay = 100 * time.Millisecond // [2]
+	acceptMaxTokens  = 20
+	acceptTokenDelay = 50 * time.Millisecond
 )
 
 // Config defines dimensions of configuration for the router.
@@ -233,7 +233,7 @@ func (router *Router) sendPendingGossip() bool {
 // topology, and broadcasts the new set of peers to the mesh.
 func (router *Router) broadcastTopologyUpdate(update peerNameSet) {
 	gossipData := &topologyGossipData{peers: router.Peers, update: update}
-	router.topologyGossip.GossipBroadcast(gossipData)
+	router.topologyGossip.GossipNeighbourSubset(gossipData)
 }
 
 // OnGossipUnicast implements Gossiper, but always returns an error, as a

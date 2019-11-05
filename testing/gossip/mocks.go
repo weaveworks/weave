@@ -199,3 +199,7 @@ func (client TestRouterClient) GossipUnicast(dstPeerName mesh.PeerName, buf []by
 func (client TestRouterClient) GossipBroadcast(update mesh.GossipData) {
 	client.router.gossipBroadcast(client.sender, update)
 }
+
+func (client TestRouterClient) GossipNeighbourSubset(update mesh.GossipData) {
+	client.router.gossip(client.sender, update)
+}
