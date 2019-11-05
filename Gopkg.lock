@@ -686,12 +686,12 @@
   revision = "6b0aa22550d9325eb8f43418185859e13dc0de1d"
 
 [[projects]]
-  digest = "1:ef8d0a1f90a33a968984ba2159a02304c591bbe964ad13e6408bf361975b3a58"
+  digest = "1:dfa8458da99855b0f0e13f580e6107b46311db15dc7f76cb80c131b937f7f8aa"
   name = "github.com/weaveworks/mesh"
   packages = ["."]
   pruneopts = "UT"
-  revision = "8889a805f7f6fe19a40dd175575d7f5efb7eda79"
-  version = "v0.3"
+  revision = "58dbcc3e8e63eed7dd77f3a6286855ae8c8876c1"
+  version = "v0.4"
 
 [[projects]]
   branch = "master"
@@ -1108,7 +1108,6 @@
     "github.com/weaveworks/mesh",
     "golang.org/x/crypto/hkdf",
     "golang.org/x/crypto/nacl/secretbox",
-    "golang.org/x/net/context",
     "golang.org/x/sys/unix",
     "golang.org/x/tools/cover",
     "k8s.io/api/core/v1",

@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -127,7 +128,7 @@ func (r *routes) lookupOrCalculate(name PeerName, broadcast *broadcastRoutes, es
 	return <-res
 }
 
-// RandomNeighbours chooses min(log2(n_peers), n_neighbouring_peers)
+// RandomNeighbours chooses min(2 log2(n_peers), n_neighbouring_peers)
 // neighbours, with a random distribution that is topology-sensitive,
 // favouring neighbours at the end of "bottleneck links". We determine the
 // latter based on the unicast routing table. If a neighbour appears as the
@@ -135,29 +136,39 @@ func (r *routes) lookupOrCalculate(name PeerName, broadcast *broadcastRoutes, es
 // proportion of peers via that neighbour than other neighbours - then it is
 // chosen with a higher probability.
 //
-// Note that we choose log2(n_peers) *neighbours*, not peers. Consequently, on
+// Note that we choose 2log2(n_peers) *neighbours*, not peers. Consequently, on
 // sparsely connected peers this function returns a higher proportion of
 // neighbours than elsewhere. In extremis, on peers with fewer than
 // log2(n_peers) neighbours, all neighbours are returned.
 func (r *routes) randomNeighbours(except PeerName) []PeerName {
-	destinations := make(peerNameSet)
 	r.RLock()
 	defer r.RUnlock()
-	count := int(math.Log2(float64(len(r.unicastAll))))
-	// depends on go's random map iteration
+	var total int64 = 0
+	weights := make(map[PeerName]int64)
+	// First iterate the whole set, counting how often each neighbour appears
 	for _, dst := range r.unicastAll {
 		if dst != UnknownPeerName && dst != except {
-			destinations[dst] = struct{}{}
-			if len(destinations) >= count {
-				break
-			}
+			total++
+			weights[dst]++
 		}
 	}
-	res := make([]PeerName, 0, len(destinations))
-	for dst := range destinations {
-		res = append(res, dst)
+	needed := int(math.Min(2*math.Log2(float64(len(r.unicastAll))), float64(len(weights))))
+	destinations := make([]PeerName, 0, needed)
+	for len(destinations) < needed {
+		// Pick a random point on the distribution and linear search for it
+		rnd := rand.Int63n(total)
+		for dst, count := range weights {
+			if rnd < count {
+				destinations = append(destinations, dst)
+				// Remove the one we selected from consideration
+				delete(weights, dst)
+				total -= count
+				break
+			}
+			rnd -= count
+		}
 	}
-	return res
+	return destinations
 }
 
 // Recalculate requests recalculation of the routing table. This is async but
