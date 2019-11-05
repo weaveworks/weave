@@ -1,3 +1,58 @@
+## Release 2.6.0
+
+This release reduces CPU and memory usage in larger clusters, by
+sending notifications to a smaller set of peers and coalescing updates
+to reduce topology recalculation. #3715, #3732
+
+The default soft limit on connections has been raised from 100 to 200.
+
+### Bug fixes
+
+* Fix a race condition in Kubernetes addon when reclaiming IP
+  addresses after node deletion #3724, #3716
+* Buffer events so Docker won't drop them, and Weave Net can clean up
+  after dead containers #3432, #3705
+* Weave reconnect occasionally fails after network interface
+  disconnect #3666, #3669, #3676
+* Ingress NetworkPolicy would accepts all traffic when specifying both
+  IPBlock and port #3653, #3654
+
+### Kubernetes improvements
+
+* Support both podSelector and namespaceSelector in NetworkPolicy #3312, #3647
+* Only add default-drop egress rule if network policies are in use #3639
+* Manifests use 'apps/v1' rather than deprecated 'apps/v1beta1' #3660
+* Avoid Weave Net pods being evicted by setting priorityClassName: system-node-critical #3697
+* Manifests use recommended DNS policy ClusterFirstWithHostNet #3692
+* Weave Net now tolerates 'NoExecute' taint #3655
+* Allow extra arguments to NetworkPolicy controller to be set in an environment variable #3683
+* Stop reporting a failure to connect to self #3454, #3585
+* Minor reduction in log noise when reclaiming IPs #3710
+
+### Other improvements
+
+* Avoid isolating nodes which have restarted by automatically
+  repairing inconsistencies in IP allocation data #1962, #3637, #3708
+* Build Weave Net for the s390x architecture #3685
+* When a IP address is requested that may be in use, make several
+  attempts to claim it before returning an error #3725
+* Improve logging for IP allocation updates #3627, #3630
+* Improve 'expecting PMTU update' log message on initial connection #3603
+
+### Build and test
+
+* Shut down Kubernetes on node when testing node deletion #3716
+* Update the base 'Alpine' container image to version 3.8 #3701
+* Update Go to version 1.13.3 #3712
+* Update gopacket library #3590
+* Pin busybox version to 1.28 to avoid CI failure in Python test #3689
+* Remove obsolete weave-daemonset.yaml file #3674
+
+Thanks to contributors @christian-2, @hpdvanwyk, @guirish, @kitt1987,
+@mmerrill3, @Pensu, @scritchley, @sidharthsurana, @tanishq-dubey
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/78?closed=1)
+
 
 ## Release 2.5.2
 
