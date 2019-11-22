@@ -89,23 +89,18 @@ Kubernetes manages
 on each node, and only schedules pods to run on nodes that have enough
 free resources.
 
-The components of a typical Kubernetes installation (with the master
-node running etcd, scheduler, api-server, etc.) take up about 95% of a
-CPU, which leaves little room to run anything else. For all of Weave
-Net's features to work, it must run on every node, including the
-master.
+In the example manifests we request 10% of a CPU, which will be enough
+for small installations, but you should monitor how much it uses in
+your production clusters and adjust the requests to suit.
 
-The best way to resolve this issue is to use machines with at least
-two CPU cores. However if you are installing Kubernetes and Weave Net
-for the first time, you may not be aware of this requirement. For this
-reason, Weave Net launches as a DaemonSet with a specification that
-reserves at least 1% CPU for each container. This enables Weave Net to
-start up seamlessly on a single-CPU node.
+We do not recommend that you set a CPU or memory _limit_ unless you
+are very experienced in such matters, because the implementation of
+limits in the Linux kernel sometimes behaves in a surprising way.
 
-Depending on the workload, Weave Net may need more than 1% of the
-CPU. The percentage set in the DaemonSet is the minimum and not a
-limit. This minimum setting allows Weave Net to take advantage of
-available CPU and "burst" above that limit if it needs to.
+On a 1-node single-CPU cluster you may find Weave Net does not install
+at all, because other Kubernetes components already take 95% of the
+CPU. The best way to resolve this issue is to use machines with at
+least two CPU cores.
 
 ## <a name="eviction"></a>Pod Eviction
 
