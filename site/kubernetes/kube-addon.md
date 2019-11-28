@@ -458,3 +458,11 @@ You must pass the `password-secret` option as noted in the previous section to e
 A different option is to use `trusted-subnets` and whitelist only the subnets that host your k8s nodes. Mind that depending on your circumstances that might allow a malicious container running in your cluster to access the weave dataplane, still.
 
 Read on the [Securing Connections Across Untrusted Networks](/site/tasks/manage/security-untrusted-networks/) document to see the alternatives.
+
+To improve security drop `CAP_NET_RAW` from pod capabilities: by default pods can forge packets from anywhere on the network, which enables attacks such as DNS spoofing.
+
+```
+     securityContext:
+       capabilities:
+         drop: ["NET_RAW"]
+```
