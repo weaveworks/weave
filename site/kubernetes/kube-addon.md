@@ -231,8 +231,7 @@ You may also set the `--log-level` flag to `warning` or `error` if you
 prefer to only log exceptional conditions.
 
 Many Kubernetes network issues occur at a higher level than Weave Net.
-The [Kubernetes Service Debugging Guide]
-(https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
+The [Kubernetes Service Debugging Guide](https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
 has a detailed step-by-step guide.
 
 Once it is up and running, the status of Weave Net can be checked by
