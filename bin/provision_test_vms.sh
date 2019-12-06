@@ -10,7 +10,7 @@ function signal_failure() {
 trap signal_failure ERR
 
 function install_terraform() {
-    curl -fsS https://releases.hashicorp.com/terraform/0.8.5/terraform_0.8.5_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
+    curl -fsS https://releases.hashicorp.com/terraform/0.11.14/terraform_0.11.14_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
 }
 
 function install_ansible() {
