@@ -206,7 +206,8 @@ function set_hosts() {
 function provision_remotely() {
     case "$1" in
         on)
-            terraform apply -input=false -parallelism="$NUM_HOSTS" -var "app=$APP" -var "name=$NAME" -var "num_hosts=$NUM_HOSTS" "$DIR/../tools/provisioning/$2"
+            terraform init "$DIR/../tools/provisioning/gcp"
+            terraform apply -auto-approve -input=false -parallelism="$NUM_HOSTS" -var "app=$APP" -var "name=$NAME" -var "num_hosts=$NUM_HOSTS" "$DIR/../tools/provisioning/$2"
             local status=$?
             ssh_user=$(terraform output username)
             ssh_id_file=$(terraform output private_key_path)
