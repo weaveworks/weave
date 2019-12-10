@@ -25,7 +25,7 @@ ifeq ($(ARCH),amd64)
 	WEAVEEXEC_DOCKER_ARCH?=x86_64
 
 # The name of the alpine baseimage to use as the base for weave images
-	ALPINE_BASEIMAGE?=alpine:3.8
+	ALPINE_BASEIMAGE?=alpine:3.10
 
 # The extension for the made images
 # Specifying none means for example weaveworks/weave:latest
