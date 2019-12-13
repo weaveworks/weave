@@ -6,6 +6,34 @@ modprobe_safe() {
     modprobe $1 || echo "Ignore the error if \"$1\" is built-in in the kernel" >&2
 }
 
+# Setup iptables backend to be legacy or nftable
+setup_iptables_backend() {
+    if [ -n "${IPTABLES_BACKEND}" ]; then
+      mode=$IPTABLES_BACKEND
+    else
+      # auto-detect if iptables backend mode to use if not specified explicitly
+      num_legacy_lines=$( (iptables-legacy-save || true) 2>/dev/null | grep '^-' | wc -l)
+      num_nft_lines=$( (iptables-nft-save || true) 2>/dev/null | grep '^-' | wc -l)
+      if [ "${num_legacy_lines}" -ge 10 ]; then
+        mode="legacy"
+      else
+        if [ "${num_legacy_lines}" -ge "${num_nft_lines}" ]; then
+          mode="legacy"
+        else
+          mode="nft"
+        fi
+      fi
+    fi
+    if [ $mode = "nft" ]; then
+      rm /sbin/iptables
+      rm /sbin/iptables-save
+      rm /sbin/iptables-restore
+      ln /sbin/iptables-nft /sbin/iptables
+      ln /sbin/iptables-nft-save /sbin/iptables-save
+      ln /sbin/iptables-nft-restore /sbin/iptables-restore
+    fi
+}
+
 # Check whether xt_set actually exists
 xt_set_exists() {
     # Clean everything up in advance, in case there's leftovers
@@ -23,6 +51,8 @@ xt_set_exists() {
     ipset destroy weave-kube-test
     [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
 }
+
+setup_iptables_backend
 
 # Default if not supplied - same as weave net default
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
