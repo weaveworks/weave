@@ -28,9 +28,9 @@ setup_iptables_backend() {
       rm /sbin/iptables
       rm /sbin/iptables-save
       rm /sbin/iptables-restore
-      ln /sbin/iptables-nft /sbin/iptables
-      ln /sbin/iptables-nft-save /sbin/iptables-save
-      ln /sbin/iptables-nft-restore /sbin/iptables-restore
+      ln -s /sbin/iptables-nft /sbin/iptables
+      ln -s /sbin/iptables-nft-save /sbin/iptables-save
+      ln -s /sbin/iptables-nft-restore /sbin/iptables-restore
     fi
 }
 

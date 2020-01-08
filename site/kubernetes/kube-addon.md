@@ -406,6 +406,7 @@ The list of variables you can set is:
 * `NO_MASQ_LOCAL` - set to 1 to preserve the client source IP address when
   accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
   The feature works only with Weave IPAM (default).
+* `IPTABLES_BACKEND` - set to `nft` to use `nftables` backend for `iptables` (default is `iptables`) 
 
 Example:
 ```
