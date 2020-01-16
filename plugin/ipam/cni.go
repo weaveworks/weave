@@ -2,6 +2,7 @@ package ipamplugin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 
@@ -37,7 +38,15 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 	}
 	var ipnet *net.IPNet
 
-	if conf.Subnet == "" {
+	if len(conf.IPs) == 1 {
+		ip := conf.IPs[0]
+		if ip.Version == "4" {
+			ipnet = &ip.Address
+			err = i.weave.ClaimIP(containerID, ipnet, false)
+		} else {
+			return nil, errors.New("Not Implemented")
+		}
+	} else if conf.Subnet == "" {
 		ipnet, err = i.weave.AllocateIP(containerID, false)
 	} else {
 		var subnet *net.IPNet
@@ -71,9 +80,10 @@ func (i *Ipam) Release(args *skel.CmdArgs) error {
 }
 
 type ipamConf struct {
-	Subnet  string         `json:"subnet,omitempty"`
-	Gateway net.IP         `json:"gateway,omitempty"`
-	Routes  []*types.Route `json:"routes"`
+	Subnet  string              `json:"subnet,omitempty"`
+	Gateway net.IP              `json:"gateway,omitempty"`
+	Routes  []*types.Route      `json:"routes"`
+	IPs     []*current.IPConfig `json:"ips,omitempty"`
 }
 
 type netConf struct {
