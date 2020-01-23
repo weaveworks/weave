@@ -99,8 +99,9 @@ func contains(addrs []netlink.Addr, addr *net.IPNet) bool {
 }
 
 const (
-	VethName   = "ethwe"        // name inside container namespace
-	vethPrefix = "v" + VethName // starts with "veth" to suppress UI notifications
+	VethName = "ethwe" // name inside container namespace
+	//vethPrefix = "v" + VethName // starts with "veth" to suppress UI notifications
+	vethPrefix = "v"
 )
 
 func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
@@ -119,11 +120,13 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 	defer ns.Close()
 
 	if !interfaceExistsInNamespace(netNSPath, ifName) {
-		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
+		//maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
+		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"l")
 		if len(id) > maxIDLen {
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
-		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
+		//name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
+		name, peerName := vethPrefix+"l"+id, vethPrefix+"g"+id
 		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
