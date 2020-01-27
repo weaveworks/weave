@@ -126,7 +126,7 @@ items:
                   port: 6784
               resources:
                 requests:
-                  cpu: 10m
+                  cpu: 50m
               securityContext:
                 privileged: true
               volumeMounts:
@@ -156,7 +156,7 @@ items:
               imagePullPolicy: Always
               resources:
                 requests:
-                  cpu: 10m
+                  cpu: 50m
               securityContext:
                 privileged: true
               volumeMounts:
