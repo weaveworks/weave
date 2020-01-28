@@ -482,7 +482,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 			// The netdev interface is down, so most likely bringing it up
 			// has failed due to the UDP port being in use.
 			if err := fastdp.dp.DeleteVport(vxlanVportID); err != nil {
-				log.Warning("Unable to remove vxlan vport %d: %s", vxlanVportID, err)
+				log.Warningf("Unable to remove vxlan vport %d: %s", vxlanVportID, err)
 			}
 			return 0, odp.NetlinkError(syscall.EADDRINUSE)
 		}
