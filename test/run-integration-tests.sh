@@ -147,7 +147,8 @@ function create_image() {
         greenly echo "> Creating GCP image $IMAGE_NAME..."
         local begin_img=$(date +%s)
         local num_hosts=1
-        terraform apply -input=false -var "app=$APP" -var "name=$NAME" -var "num_hosts=$num_hosts" "$DIR/../tools/provisioning/gcp"
+        terraform init "$DIR/../tools/provisioning/gcp"
+        terraform apply -auto-approve -input=false -var "app=$APP" -var "name=$NAME" -var "num_hosts=$num_hosts" "$DIR/../tools/provisioning/gcp"
         configure_with_ansible "$(terraform output username)" "$(terraform output public_ips)," "$(terraform output private_key_path)" $num_hosts
         local zone=$(terraform output zone)
         local name=$(terraform output instances_names)
