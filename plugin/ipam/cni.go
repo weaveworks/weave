@@ -44,7 +44,7 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 			ipnet = &ip.Address
 			err = i.weave.ClaimIP(containerID, ipnet, false)
 		} else {
-			return nil, errors.New("Not Implemented")
+			return nil, errors.New("allocation of ipv6 addresses is not implemented")
 		}
 	} else if conf.Subnet == "" {
 		ipnet, err = i.weave.AllocateIP(containerID, false)
