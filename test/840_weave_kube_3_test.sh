@@ -37,7 +37,7 @@ k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\
 
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
-	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --kubernetes-version=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
+	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --ignore-preflight-errors=NumCPU --kubernetes-version=$k8s_version --token=$TOKEN --pod-network-cidr=$WEAVE_NETWORK"
     else
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
     fi
