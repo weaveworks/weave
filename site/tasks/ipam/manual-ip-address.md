@@ -13,7 +13,22 @@ Weave Net detects when a container has exited and releases its allocated address
 
 See the [Automatic IP Address Management](/site/tasks/ipam/ipam.md) and also an explanation of [the basics of IP addressing](/site/concepts/ip-addresses.md) for further details.
 
-Instead of allowing Weave Net to allocate IP addresses automatically (using IPAM), there may be instances where you need to control a particular container or a cluster by setting an IP address for it.  
+Instead of allowing Weave Net to allocate IP addresses automatically (using IPAM), there may be instances where you need to control a particular container or a cluster by setting an IP address for it.  The way to do this varies according to how containers are attached to Weave Net.
+
+## Manually specifying an IP address when using CNI
+
+The software making a call to CNI has to specify an allocator that allows static IPs.
+For instance the [static allocator](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/static)
+
+(At the time of writing there is no straightforward way to ask Kubernetes to do this.)
+
+## Manually specifying an IP address when using the Weave Net Docker Plugin
+
+Docker has a flag `--ip` to specify an address, e.g.:
+
+    $ docker run --network=mynetwork --ip=172.18.0.22 ...
+
+## Manually specifying an IP address when using the Weave Net Docker Proxy
 
 You can specify an IP address and a network explicitly, using Classless Inter-Domain Routing or [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
 
