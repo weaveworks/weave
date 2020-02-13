@@ -129,6 +129,11 @@ func (npc *controller) UpdatePod(oldObj, newObj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
+	// if the version hasn't changed, do nothing
+	if oldObj.GetResourceVersion() == newObj.GetResourceVersion() {
+		return nil
+	}
+
 	common.Log.Debugf("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updatePod(oldObj, newObj), "update pod")
@@ -184,6 +189,24 @@ func (npc *controller) UpdateNetworkPolicy(oldObj, newObj interface{}) error {
 		return err
 	}
 
+	var (
+		oldObjResourceVersion string
+		newObjResourceVersion string
+	)
+	oldObjResourceVersion, err = nsResourceVersion(oldObj)
+	if err != nil {
+		return err
+	}
+	newObjResourceVersion, err = nsResourceVersion(newObj)
+	if err != nil {
+		return err
+	}
+
+	// if the version hasn't changed, do nothing
+	if oldObjResourceVersion == newObjResourceVersion {
+		return nil
+	}
+
 	common.Log.Infof("EVENT UpdateNetworkPolicy %s %s", js(oldObj), js(newObj))
 	return npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.updateNetworkPolicy(oldObj, newObj), "update network policy")
@@ -219,6 +242,11 @@ func (npc *controller) UpdateNamespace(oldObj, newObj *coreapi.Namespace) error 
 	npc.Lock()
 	defer npc.Unlock()
 
+	// if the version hasn't changed, do nothing
+	if oldObj.GetResourceVersion() == newObj.GetResourceVersion() {
+		return nil
+	}
+
 	common.Log.Infof("EVENT UpdateNamespace %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.updateNamespace(oldObj, newObj), "update namespace")
@@ -241,6 +269,17 @@ func nsName(obj interface{}) (string, error) {
 		return obj.ObjectMeta.Namespace, nil
 	case *extnapi.NetworkPolicy:
 		return obj.ObjectMeta.Namespace, nil
+	}
+
+	return "", errInvalidNetworkPolicyObjType
+}
+
+func nsResourceVersion(obj interface{}) (string, error) {
+	switch obj := obj.(type) {
+	case *networkingv1.NetworkPolicy:
+		return obj.GetResourceVersion(), nil
+	case *extnapi.NetworkPolicy:
+		return obj.GetResourceVersion(), nil
 	}
 
 	return "", errInvalidNetworkPolicyObjType

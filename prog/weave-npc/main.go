@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/spf13/cobra"
@@ -25,13 +26,15 @@ import (
 )
 
 var (
-	version        = "unreleased"
-	metricsAddr    string
-	logLevel       string
-	allowMcast     bool
-	nodeName       string
-	maxList        int
-	bridgePortName string
+	version           = "unreleased"
+	metricsAddr       string
+	logLevel          string
+	allowMcast        bool
+	nodeName          string
+	maxList           int
+	bridgePortName    string
+	reconcileInterval string
+	reconcileDuration time.Duration
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -39,7 +42,7 @@ func handleError(err error) { common.CheckFatal(err) }
 func makeController(getter cache.Getter, resource string,
 	objType runtime.Object, handlers cache.ResourceEventHandlerFuncs) cache.Controller {
 	listWatch := cache.NewListWatchFromClient(getter, resource, "", fields.Everything())
-	_, controller := cache.NewInformer(listWatch, objType, 0, handlers)
+	_, controller := cache.NewInformer(listWatch, objType, reconcileDuration, handlers)
 	return controller
 }
 
@@ -239,6 +242,13 @@ func root(cmd *cobra.Command, args []string) {
 		common.Log.Fatalf("Failed to start ulogd: %v", err)
 	}
 
+	if duration, err := time.ParseDuration(reconcileInterval); err != nil {
+
+		common.Log.Fatalf("Failed to parse reconcileInterval of %s: %s", reconcileInterval, err)
+	} else {
+		reconcileDuration = duration
+	}
+
 	config, err := rest.InClusterConfig()
 	handleError(err)
 
@@ -338,6 +348,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&nodeName, "node-name", "", "only generate rules that apply to this node")
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
 	rootCmd.PersistentFlags().StringVar(&bridgePortName, "bridge-port-name", "vethwe-bridge", "name of the brige port on which packets are received and sent")
+	rootCmd.PersistentFlags().StringVar(&reconcileInterval, "reconcile-interval", "0s", "reconcile interval, in time.Duration format 'ex: 120s' that all pods, namespaces, and network polcies are sent through reconciliation loop")
 
 	handleError(rootCmd.Execute())
 }
