@@ -254,10 +254,11 @@ func TestDefaultAllow(t *testing.T) {
 
 	podFoo := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       "foo",
-			Namespace: "default",
-			Name:      "foo",
-			Labels:    map[string]string{"run": "foo"}},
+			UID:             "foo",
+			Namespace:       "default",
+			Name:            "foo",
+			ResourceVersion: "v0",
+			Labels:          map[string]string{"run": "foo"}},
 		Status: coreapi.PodStatus{PodIP: fooPodIP}}
 	controller.AddPod(podFoo)
 
@@ -267,14 +268,17 @@ func TestDefaultAllow(t *testing.T) {
 
 	podBar := &coreapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       "bar",
-			Namespace: "default",
-			Name:      "bar",
-			Labels:    map[string]string{"run": "bar"}},
+			UID:             "bar",
+			Namespace:       "default",
+			Name:            "bar",
+			ResourceVersion: "v0",
+			Labels:          map[string]string{"run": "bar"}},
 		Status: coreapi.PodStatus{PodIP: barPodIP}}
 	podBarNoIP := &coreapi.Pod{ObjectMeta: podBar.ObjectMeta}
 	controller.AddPod(podBarNoIP)
 
+	// Increment resource version, as object changed, emulating automatic etcd update outside of tests
+	podBar.ObjectMeta.ResourceVersion = "v1"
 	controller.UpdatePod(podBarNoIP, podBar)
 
 	// Should add the bar pod to default-allow
@@ -317,6 +321,8 @@ func TestDefaultAllow(t *testing.T) {
 
 	podBarWithNewIP := *podBar
 	podBarWithNewIP.Status.PodIP = barPodNewIP
+	// Increment resource version again
+	podBarWithNewIP.ObjectMeta.ResourceVersion = "v2"
 	controller.UpdatePod(podBar, &podBarWithNewIP)
 
 	// Should update IP addr of the bar pod in default-allow
@@ -332,6 +338,8 @@ func TestDefaultAllow(t *testing.T) {
 
 	podFooWithNewLabel := *podFoo
 	podFooWithNewLabel.ObjectMeta.Labels = map[string]string{"run": "new-foo"}
+	// Increment resource version again
+	podFooWithNewLabel.ObjectMeta.ResourceVersion = "v1"
 	controller.UpdatePod(podFoo, &podFooWithNewLabel)
 
 	// Should bring back the foo pod to default-allow as it does not match dst of any netpol
