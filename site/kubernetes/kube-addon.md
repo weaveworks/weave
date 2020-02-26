@@ -90,6 +90,8 @@ EKS by default installs `amazon-vpc-cni-k8s` CNI. Please follow below steps to u
 - apply weave-net daemoset by following above installation steps
 - delete existing pods so they get recreated in Weave pod CIDR's address-space. 
 
+Please note that the api-server for your cluster will not be connected to Weave Net (it runs elsewhere, managed by EKS) so will not be able to connect to pods.
+
 
 ### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 
