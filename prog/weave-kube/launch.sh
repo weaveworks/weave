@@ -67,6 +67,7 @@ DB_PREFIX=${DB_PREFIX:-/weavedb/weave-net}
 
 # Default for network policy
 EXPECT_NPC=${EXPECT_NPC:-1}
+NO_MASQ_LOCAL=${NO_MASQ_LOCAL:-1}
 
 # Ensure we have the required modules for NPC
 if [ "${EXPECT_NPC}" != "0" ]; then
@@ -96,9 +97,9 @@ if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
 fi
 
-NO_MASQ_LOCAL_OPT=""
-if [ -n "${NO_MASQ_LOCAL}" ]; then
-    NO_MASQ_LOCAL_OPT="--no-masq-local"
+NO_MASQ_LOCAL_OPT="--no-masq-local"
+if [ "${NO_MASQ_LOCAL}" = "0" ]; then
+    NO_MASQ_LOCAL_OPT=""
 fi
 
 # Kubernetes sets HOSTNAME to the host's hostname
