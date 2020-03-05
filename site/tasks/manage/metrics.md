@@ -169,3 +169,7 @@ remote_write:
 For information on getting started with Weave Cloud metrics, including
 on how to obtain your Weave Cloud token, please go
 [here](https://github.com/weaveworks/cortex).
+
+# Weave Net Monitoring Setup using kube-prometheus
+
+Weave Net monitoring can be setup using the [weave-net kube-prometheus library](https://github.com/coreos/kube-prometheus/blob/master/jsonnet/kube-prometheus/kube-prometheus-weave-net.libsonnet). Please follow this [document](https://github.com/coreos/kube-prometheus/blob/master/docs/weave-net-support.md) for setting up the monitoring.
