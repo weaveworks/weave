@@ -1,3 +1,19 @@
+## Release 2.6.1
+
+This release fixes a bug discovered since the release of Weave Net 2.6.0 and
+an improvement to support iptables 1.8
+
+### Bug fixes
+
+* Weave Net on node restart unable to form connections to peers and connections get stuck in
+  pending state and stops responding to API endpoint #3762 #3763
+
+### Other improvements
+
+* Weave Net Kubernetes images by default uses iptables 1.8 with legacy (netfilter) backend with
+  option to choose netfilter as backend #3465, #3747
+
+
 ## Release 2.6.0
 
 This release reduces CPU and memory usage in larger clusters, by

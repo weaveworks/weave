@@ -482,7 +482,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 			// The netdev interface is down, so most likely bringing it up
 			// has failed due to the UDP port being in use.
 			if err := fastdp.dp.DeleteVport(vxlanVportID); err != nil {
-				log.Warning("Unable to remove vxlan vport %d: %s", vxlanVportID, err)
+				log.Warningf("Unable to remove vxlan vport %d: %s", vxlanVportID, err)
 			}
 			return 0, odp.NetlinkError(syscall.EADDRINUSE)
 		}
@@ -654,27 +654,26 @@ func (fwd *fastDatapathForwarder) logPrefix() string {
 
 func (fwd *fastDatapathForwarder) Confirm() {
 	fwd.lock.Lock()
-	defer fwd.lock.Unlock()
 
 	if fwd.confirmed {
 		log.Fatal(fwd.logPrefix(), "already confirmed")
 	}
 
+	var controlMsg []byte
 	if fwd.fastdp.ipsec != nil && fwd.sessionKey != nil {
 		fwd.isEncrypted = true
 		log.Info("Setting up IPsec between ", fwd.fastdp.localPeer, " and ", fwd.remotePeer)
-		err := fwd.fastdp.ipsec.InitSALocal(
+		var err error
+		controlMsg, err = fwd.fastdp.ipsec.InitSALocal(
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
 			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP,
 			fwd.remoteAddr.Port,
 			fwd.sessionKey,
-			func(msg []byte) error {
-				return fwd.sendControlMsg(FastDatapathCryptoInitSARemote, msg)
-			},
 		)
 		if err != nil {
 			log.Error(fwd.logPrefix(), "ipsec init SA local failed: ", err)
 			fwd.handleError(err)
+			fwd.lock.Unlock()
 			return
 		}
 	}
@@ -692,6 +691,15 @@ func (fwd *fastDatapathForwarder) Confirm() {
 	}
 
 	fwd.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
+
+	fwd.lock.Unlock() // unlock before calling send() which may block
+
+	if err := fwd.sendControlMsg(FastDatapathCryptoInitSARemote, controlMsg); err != nil {
+		log.Error(fwd.logPrefix(), "ipsec send InitSARemote failed: ", err)
+		fwd.handleError(err)
+		return
+	}
+
 	go fwd.doHeartbeats()
 }
 
