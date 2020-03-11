@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket/pcap"
 )
+
+// Must be less than 2^31 usec - see https://github.com/google/gopacket/issues/708
+const longTimeout = time.Duration(30 * time.Minute)
 
 type Pcap struct {
 	NonDiscardingFlowOp
@@ -77,7 +81,7 @@ func newPcapHandle(ifName string, promisc bool, snaplen int, bufSz int) (handle 
 	if err = inactive.SetSnapLen(snaplen); err != nil {
 		return
 	}
-	if err = inactive.SetTimeout(MaxDuration); err != nil {
+	if err = inactive.SetTimeout(longTimeout); err != nil {
 		return
 	}
 	if err = inactive.SetImmediateMode(true); err != nil {
