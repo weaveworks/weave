@@ -694,10 +694,12 @@ func (fwd *fastDatapathForwarder) Confirm() {
 
 	fwd.lock.Unlock() // unlock before calling send() which may block
 
-	if err := fwd.sendControlMsg(FastDatapathCryptoInitSARemote, controlMsg); err != nil {
-		log.Error(fwd.logPrefix(), "ipsec send InitSARemote failed: ", err)
-		fwd.handleError(err)
-		return
+	if len(controlMsg) > 0 {
+		if err := fwd.sendControlMsg(FastDatapathCryptoInitSARemote, controlMsg); err != nil {
+			log.Error(fwd.logPrefix(), "ipsec send InitSARemote failed: ", err)
+			fwd.handleError(err)
+			return
+		}
 	}
 
 	go fwd.doHeartbeats()
