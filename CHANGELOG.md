@@ -1,3 +1,14 @@
+## Release 2.6.2
+
+This release fixes a regression found in 2.6.1 release and removes a possible case
+of CPU spinning when pcap is used in sleeve mode
+
+### Bug fixes
+
+* Weave Net can not be used in fastdp mode and always falls back to sleeve mode #3781, #3783
+* Restrict timeout value passed to pcap library to a value less than 2^31 microseconds to
+  prevent CPU spinning #3782
+
 ## Release 2.6.1
 
 This release fixes a bug discovered since the release of Weave Net 2.6.0 and
