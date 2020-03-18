@@ -44,14 +44,21 @@ func uint64Counter(desc *prometheus.Desc, val uint64, labels ...string) promethe
 }
 
 var metrics = []metric{
-	{desc("weave_connections", "Number of peer-to-peer connections.", "state"),
+	{desc("weave_connections", "Number of peer-to-peer connections.", "state", "type"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			counts := make(map[string]int)
+			counts := make(map[string]map[string]int)
 			for _, conn := range s.Router.Connections {
-				counts[conn.State]++
+				t, ok := conn.Attrs["name"].(string)
+				if !ok {
+					// TODO: some kind of log statement here may be useful here?
+					t = "unknown"
+				}
+				counts[t][conn.State]++
 			}
-			for _, state := range allConnectionStates {
-				ch <- intGauge(desc, counts[state], state)
+			for connType, stateCounts := range counts {
+				for state, count := range stateCounts {
+					ch <- intGauge(desc, count, state, connType)
+				}
 			}
 		}},
 	{desc("weave_connection_terminations_total", "Number of peer-to-peer connections terminated."),
