@@ -14,6 +14,7 @@ import (
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
+	"github.com/weaveworks/weave/npc/metrics"
 )
 
 type NetworkPolicyController interface {
@@ -170,9 +171,13 @@ func (npc *controller) AddNetworkPolicy(obj interface{}) error {
 		return err
 	}
 	common.Log.Infof("EVENT AddNetworkPolicy %s", js(obj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	err = npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.addNetworkPolicy(obj), "add network policy")
 	})
+	if err != nil {
+		metrics.PolicyEnforcementErrors.Inc()
+	}
+	return err
 }
 
 func (npc *controller) UpdateNetworkPolicy(oldObj, newObj interface{}) error {
@@ -185,9 +190,10 @@ func (npc *controller) UpdateNetworkPolicy(oldObj, newObj interface{}) error {
 	}
 
 	common.Log.Infof("EVENT UpdateNetworkPolicy %s %s", js(oldObj), js(newObj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	err = npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.updateNetworkPolicy(oldObj, newObj), "update network policy")
 	})
+	return err
 }
 
 func (npc *controller) DeleteNetworkPolicy(obj interface{}) error {
@@ -200,9 +206,13 @@ func (npc *controller) DeleteNetworkPolicy(obj interface{}) error {
 	}
 
 	common.Log.Infof("EVENT DeleteNetworkPolicy %s", js(obj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	err = npc.withNS(nsName, func(ns *ns) error {
 		return errors.Wrap(ns.deleteNetworkPolicy(obj), "delete network policy")
 	})
+	if err != nil {
+		metrics.PolicyEnforcementErrors.Inc()
+	}
+	return err
 }
 
 func (npc *controller) AddNamespace(obj *coreapi.Namespace) error {

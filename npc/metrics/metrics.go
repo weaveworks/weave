@@ -22,6 +22,12 @@ var (
 		},
 		[]string{"protocol", "dport"},
 	)
+	PolicyEnforcementErrors = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "weavenpc_policy_enforcement_errors",
+			Help: "Errors occured in enforcing the network policies.",
+		},
+	)
 )
 
 func gatherMetrics() {
@@ -93,6 +99,9 @@ func dstIP(packet gopacket.Packet) string {
 
 func Start(addr string) error {
 	if err := prometheus.Register(blockedConnections); err != nil {
+		return err
+	}
+	if err := prometheus.Register(PolicyEnforcementErrors); err != nil {
 		return err
 	}
 
