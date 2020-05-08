@@ -54,6 +54,12 @@ func SetLogLevel(levelname string) {
 	Log.Level = level
 }
 
+func CheckError(e error) {
+	if e != nil {
+		Log.Error(e)
+	}
+}
+
 func CheckFatal(e error) {
 	if e != nil {
 		Log.Fatal(e)

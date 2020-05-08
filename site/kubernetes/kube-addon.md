@@ -7,6 +7,8 @@ search_type: Documentation
 The following topics are discussed:
 
 * [Installation](#install)
+   * [Installing on GKE](#gke)
+   * [Installing on EKS](#eks)
    * [Upgrading the Daemon Sets](#daemon-sets)
    * [CPU and Memory Requirements](#resources)
    * [Pod Eviction](#eviction)
@@ -71,9 +73,25 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-**Note:** Installing on GKE
+### <a name="gke"></a> Installing on GKE
 Please note that you must grant the user the ability to create roles in Kubernetes before launching Weave Net.
 This is a prerequisite to use use role-based access control on GKE. Please see the GKE [instructions](https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control).
+
+### <a name="gke"></a> Installing on EKS
+
+EKS by default installs `amazon-vpc-cni-k8s` CNI. Please follow below steps to use Weave-net as CNI
+
+- create EKS cluster in any of [prescribed](https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html) way
+- delete `amazon-vpc-cni-k8s` deamonset by running `kubectl delete ds aws-node -n kube-system` command
+- delete `/etc/cni/net.d/10-aws.conflist` on each of the node
+- edit instance security group to allow TCP 6783 and UDP 6783/6784 ports
+- flush iptables nat, mangle, filter tables to clear any iptables configurations done by `amazon-vpc-cni-k8s`
+- restart kube-proxy pods to reconfigure iptables
+- apply weave-net daemoset by following above installation steps
+- delete existing pods so they get recreated in Weave pod CIDR's address-space. 
+
+Please note that while pods can connect to the Kubernetes API server for your cluser, API server will not be able to connect to the pods as API server nodes are not connected to Weave Net (they run on network managed by EKS).
+
 
 ### <a name="daemon-sets"></a> Upgrading the Daemon Sets
 

@@ -34,7 +34,9 @@ var (
 	bridgePortName string
 )
 
-func handleError(err error) { common.CheckFatal(err) }
+func handleError(err error) { common.CheckError(err) }
+
+func handleFatal(err error) { common.CheckFatal(err) }
 
 func makeController(getter cache.Getter, resource string,
 	objType runtime.Object, handlers cache.ResourceEventHandlerFuncs) cache.Controller {
@@ -240,19 +242,19 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	config, err := rest.InClusterConfig()
-	handleError(err)
+	handleFatal(err)
 
 	client, err := kubernetes.NewForConfig(config)
-	handleError(err)
+	handleFatal(err)
 
 	ipt, err := iptables.New()
-	handleError(err)
+	handleFatal(err)
 
 	ips := ipset.New(common.LogLogger(), maxList)
 
-	handleError(resetIPTables(ipt))
-	handleError(resetIPSets(ips))
-	handleError(createBaseRules(ipt, ips))
+	handleFatal(resetIPTables(ipt))
+	handleFatal(resetIPSets(ips))
+	handleFatal(createBaseRules(ipt, ips))
 
 	npc := npc.New(nodeName, ipt, ips, client)
 
@@ -339,5 +341,5 @@ func main() {
 	rootCmd.PersistentFlags().IntVar(&maxList, "max-list-size", 1024, "maximum size of ipset list (for namespaces)")
 	rootCmd.PersistentFlags().StringVar(&bridgePortName, "bridge-port-name", "vethwe-bridge", "name of the brige port on which packets are received and sent")
 
-	handleError(rootCmd.Execute())
+	handleFatal(rootCmd.Execute())
 }
