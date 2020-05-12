@@ -497,6 +497,9 @@ func (ns *ns) deleteBypassRules() error {
 func (ns *ns) addNamespace(obj *coreapi.Namespace) error {
 	ns.namespace = obj
 
+	//
+	// This is gonna need to be re-triggered somehow. Either here, or restart the controller.
+	//
 	// Insert a rule to bypass policies
 	if err := ns.ensureBypassRules(); err != nil {
 		return err

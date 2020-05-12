@@ -122,9 +122,9 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewTargetSe
 		onNewSelector:           onNewSelector,
 		onNewTargetSelector:     onNewTargetSelector,
 		onDestroyTargetSelector: onDestroyTargetSelector,
-		users:                make(map[string]map[types.UID]struct{}),
-		entries:              make(map[string]*selector),
-		targetSelectorsCount: make(map[string]map[policyType]int)}
+		users:                   make(map[string]map[types.UID]struct{}),
+		entries:                 make(map[string]*selector),
+		targetSelectorsCount:    make(map[string]map[policyType]int)}
 }
 
 func (ss *selectorSet) addToMatchingPodSelector(user types.UID, podLabelsMap map[string]string, entry string, comment string) (bool, bool, error) {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/spf13/cobra"
@@ -255,6 +256,26 @@ func root(cmd *cobra.Command, args []string) {
 	handleFatal(resetIPTables(ipt))
 	handleFatal(resetIPSets(ips))
 	handleFatal(createBaseRules(ipt, ips))
+
+	// Tickity tock
+	ticker := time.NewTicker(time.Second * 10).C
+	go func() {
+		for {
+			select {
+			case <-ticker:
+				common.Log.Infof("createBaseRules (iptables and that).")
+				//
+				// resetIPTables makes sure the chains exist.
+				// if we don't run it then createBaseRules crashes with missing rules
+				// Which actually triggers a pod restart and then everything works
+				// So don't wanna rule that out a solution yet.
+				//
+				handleFatal(resetIPTables(ipt))
+				handleFatal(resetIPSets(ips))
+				handleFatal(createBaseRules(ipt, ips))
+			}
+		}
+	}()
 
 	npc := npc.New(nodeName, ipt, ips, client)
 

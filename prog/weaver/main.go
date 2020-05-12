@@ -506,6 +506,19 @@ func main() {
 		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
 	}
 
+	// Tickity tock
+	ticker := time.NewTicker(time.Second * 10).C
+	go func() {
+		for {
+			select {
+			case <-ticker:
+				Log.Println("Ensuring the bridge (iptables and that).")
+				_, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
+				checkFatal(err)
+			}
+		}
+	}()
+
 	signals.SignalHandlerLoop(common.Log, router)
 }
 
