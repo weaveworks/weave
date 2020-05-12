@@ -168,6 +168,7 @@ func main() {
 		procPath           string
 		discoveryEndpoint  string
 		token              string
+		iptablesRefresh    time.Duration
 		advertiseAddress   string
 		pluginConfig       plugin.Config
 		defaultDockerHost  = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -216,6 +217,7 @@ func main() {
 	mflag.StringVar(&discoveryEndpoint, []string{"-peer-discovery-url"}, "https://cloud.weave.works/api/net", "url for peer discovery")
 	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
 	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
+	mflag.DurationVar(&iptablesRefresh, []string{"-iptables-refresh-interval"}, 10*time.Second, "Interval to reapply iptables. 0 to only apply on launch.")
 
 	mflag.BoolVar(&pluginConfig.Enable, []string{"-plugin"}, false, "enable Docker plugin (v1)")
 	mflag.BoolVar(&pluginConfig.EnableV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
@@ -313,8 +315,11 @@ func main() {
 		}
 	}
 	ips := ipset.New(common.LogLogger(), 0)
+	err = weavenet.ResetIPTables(&bridgeConfig, ips)
+	checkFatal(err)
 	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
+
 	Log.Println("Bridge type is", bridgeType)
 
 	config.Password = determinePassword(password)
@@ -510,6 +515,29 @@ func main() {
 		// We remove the default route installed by the kernel,
 		// because awsvpc has installed it as well
 		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
+	}
+
+	if iptablesRefresh > 0 {
+		Log.Printf("Entering iptable refresh loop (interval %v)", iptablesRefresh)
+		ticker := time.NewTicker(iptablesRefresh).C
+		go func() {
+			for {
+				select {
+				case <-ticker:
+					Log.Debug("Re-configuring iptables")
+					err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
+					if err != nil {
+						Log.Errorf("Error configuring iptables: %s", err)
+					}
+
+					Log.Debug("Beginning re-exposure...")
+					weavenet.Reexpose(&bridgeConfig, Log)
+					Log.Debug("... re-exposure complete.")
+				}
+			}
+		}()
+	} else {
+		Log.Printf("Not refreshing iptables (interval: %v)", iptablesRefresh)
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)
