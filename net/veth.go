@@ -49,6 +49,13 @@ func CreateAndAttachVeth(procPath, name, peerName, bridgeName string, mtu int, k
 	if err := bridgeType.attach(veth); err != nil {
 		return cleanup("attaching veth %q to %q: %s", name, bridgeName, err)
 	}
+	// No ipv6 router advertisments please
+	if err := sysctl(procPath, "net/ipv6/conf/"+name+"/accept_ra", "0"); err != nil {
+		return cleanup("setting accept_ra to 0: %s", err)
+	}
+	if err := sysctl(procPath, "net/ipv6/conf/"+peerName+"/accept_ra", "0"); err != nil {
+		return cleanup("setting accept_ra to 0: %s", err)
+	}
 	if !bridgeType.IsFastdp() && !keepTXOn {
 		if err := EthtoolTXOff(veth.PeerName); err != nil {
 			return cleanup(`unable to set tx off on %q: %s`, peerName, err)
