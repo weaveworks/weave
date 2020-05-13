@@ -13,7 +13,7 @@ import (
 )
 
 // create and attach a veth to the Weave bridge
-func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bool, errIfLinkExist bool, init func(peer netlink.Link) error) (*netlink.Veth, error) {
+func CreateAndAttachVeth(procPath, name, peerName, bridgeName string, mtu int, keepTXOn bool, errIfLinkExist bool, init func(peer netlink.Link) error) (*netlink.Veth, error) {
 	bridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
@@ -112,6 +112,9 @@ func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
 }
 
 func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool, hairpinMode bool) error {
+	// AttachContainer expects to be called in host pid namespace
+	const procPath = "/proc"
+
 	ns, err := netns.GetFromPath(netNSPath)
 	if err != nil {
 		return err
@@ -124,12 +127,12 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
 		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
-		veth, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
+		veth, err := CreateAndAttachVeth(procPath, name, peerName, bridgeName, mtu, keepTXOn, true, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
 			if err := WithNetNS(ns, func() error {
-				return setupIface(peerName, ifName)
+				return setupIface(procPath, peerName, ifName)
 			}); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
@@ -206,7 +209,7 @@ func setupIfaceAddrs(veth netlink.Link, withMulticastRoute bool, cidrs []*net.IP
 }
 
 // setupIface expects to be called in the container's netns
-func setupIface(ifaceName, newIfName string) error {
+func setupIface(procPath, ifaceName, newIfName string) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return err
@@ -219,8 +222,7 @@ func setupIface(ifaceName, newIfName string) error {
 	if err := netlink.LinkSetName(link, newIfName); err != nil {
 		return err
 	}
-	// This is only called by AttachContainer which is only called in host pid namespace
-	if err := configureARPCache("/proc", newIfName); err != nil {
+	if err := configureARPCache(procPath, newIfName); err != nil {
 		return err
 	}
 	return ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP")

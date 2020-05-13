@@ -63,10 +63,10 @@ const (
 )
 
 type Bridge interface {
-	init(config *BridgeConfig) error // create and initialise bridge device(s)
-	attach(veth *netlink.Veth) error // attach veth to bridge
-	IsFastdp() bool                  // does this bridge use fastdp?
-	String() string                  // human-readable type string
+	init(procPath string, config *BridgeConfig) error // create and initialise bridge device(s)
+	attach(veth *netlink.Veth) error                  // attach veth to bridge
+	IsFastdp() bool                                   // does this bridge use fastdp?
+	String() string                                   // human-readable type string
 }
 
 // Used to indicate a fallback to the Bridge type
@@ -250,7 +250,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 	}
 
 	for {
-		if err := bridgeType.init(config); err != nil {
+		if err := bridgeType.init(procPath, config); err != nil {
 			if errors.Cause(err) == errBridgeNotSupported {
 				log.Warnf("Skipping bridge creation of %q due to: %s", bridgeType, err)
 				bridgeType = bridgeImpl{}
@@ -345,11 +345,11 @@ func (b bridgeImpl) initPrep(config *BridgeConfig) error {
 	return nil
 }
 
-func (b bridgeImpl) init(config *BridgeConfig) error {
+func (b bridgeImpl) init(procPath string, config *BridgeConfig) error {
 	if err := b.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(procPath, BridgeIfName, PcapIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		return netlink.LinkSetUp(veth)
 	}); err != nil {
 		return errors.Wrap(err, "creating pcap veth pair")
@@ -361,7 +361,7 @@ func (b bridgeImpl) init(config *BridgeConfig) error {
 	return nil
 }
 
-func (f fastdpImpl) init(config *BridgeConfig) error {
+func (f fastdpImpl) init(procPath string, config *BridgeConfig) error {
 	odpSupported, err := odp.CreateDatapath(f.datapathName)
 	if !odpSupported {
 		msg := ""
@@ -392,14 +392,14 @@ func (f fastdpImpl) init(config *BridgeConfig) error {
 	return nil
 }
 
-func (bf bridgedFastdpImpl) init(config *BridgeConfig) error {
-	if err := bf.fastdpImpl.init(config); err != nil {
+func (bf bridgedFastdpImpl) init(procPath string, config *BridgeConfig) error {
+	if err := bf.fastdpImpl.init(procPath, config); err != nil {
 		return err
 	}
 	if err := bf.bridgeImpl.initPrep(config); err != nil {
 		return err
 	}
-	if _, err := CreateAndAttachVeth(BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
+	if _, err := CreateAndAttachVeth(procPath, BridgeIfName, DatapathIfName, config.WeaveBridgeName, config.MTU, true, false, func(veth netlink.Link) error {
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return errors.Wrapf(err, "setting link up on %q", veth.Attrs().Name)
 		}
