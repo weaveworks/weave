@@ -17,6 +17,7 @@ import (
 	"github.com/weaveworks/common/mflagext"
 	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/mesh"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -519,23 +520,16 @@ func main() {
 
 	if iptablesRefresh > 0 {
 		Log.Printf("Entering iptable refresh loop (interval %v)", iptablesRefresh)
-		ticker := time.NewTicker(iptablesRefresh).C
-		go func() {
-			for {
-				select {
-				case <-ticker:
-					Log.Debug("Re-configuring iptables")
-					err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
-					if err != nil {
-						Log.Errorf("Error configuring iptables: %s", err)
-					}
-
-					Log.Debug("Beginning re-exposure...")
-					weavenet.Reexpose(&bridgeConfig, Log)
-					Log.Debug("... re-exposure complete.")
-				}
+		applyIPTables := func() {
+			Log.Info("Re-configuring iptables")
+			err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
+			if err != nil {
+				Log.Errorf("Error configuring iptables: %s", err)
 			}
-		}()
+
+			weavenet.Reexpose(&bridgeConfig, Log)
+		}
+		go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, iptablesRefresh, wait.NeverStop)
 	} else {
 		Log.Printf("Not refreshing iptables (interval: %v)", iptablesRefresh)
 	}

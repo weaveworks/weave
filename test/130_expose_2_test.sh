@@ -27,10 +27,6 @@ exec_on1() {
     assert_raises "exec_on  $HOST1 $@"
 }
 
-wait_for_iptable_refresh() {
-    sleep 2
-}
-
 # Containers in the same subnet should be able to talk; different subnet not.
 check_container_connectivity() {
     exec_on1 "c1 $PING $C2"
@@ -43,7 +39,7 @@ check_container_connectivity() {
 
 start_suite "exposing weave network to host"
 
-weave_on $HOST1 launch --ipalloc-range $UNIVERSE --iptables-refresh-interval=1s
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE
 
 start_container $HOST1 $C1/24 --name=c1
 start_container $HOST1 $C2/24 --name=c2
@@ -65,17 +61,8 @@ weave_on1 "expose $EXP/24"
 run_on1   "! $PING $C1"
 run_on1   "  $PING $C3"
 run_on1   "! $PING $C5"
-wait_for_iptable_refresh
-run_on1   "! $PING $C1"
-run_on1   "  $PING $C3"
-run_on1   "! $PING $C5"
-
 weave_on1 "expose"
 weave_on1 "expose"
-run_on1   "! $PING $C1"
-run_on1   "  $PING $C3"
-run_on1   "  $PING $C5"
-wait_for_iptable_refresh
 run_on1   "! $PING $C1"
 run_on1   "  $PING $C3"
 run_on1   "  $PING $C5"
@@ -86,14 +73,8 @@ weave_on1 "hide $EXP/24"
 weave_on1 "hide $EXP/24"
 run_on1   "! $PING $C3"
 run_on1   "  $PING $C5"
-wait_for_iptable_refresh
-run_on1   "! $PING $C3"
-run_on1   "  $PING $C5"
-
 weave_on1 "hide"
 weave_on1 "hide"
-run_on1   "! $PING $C5"
-wait_for_iptable_refresh
 run_on1   "! $PING $C5"
 
 # remote host connectivity after 'expose'

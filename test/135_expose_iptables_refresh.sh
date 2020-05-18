@@ -29,7 +29,7 @@ start_suite "exposing weave network to host"
 ## Check no refreshing
 weave_on1 "launch --iptables-refresh-interval=0s"
 IPT_BEFORE=$(get_weave_iptable_rules)
-run_on1 "sudo iptables -t nat -D POSTROUTING -j WEAVE"
+run_on1 "sudo iptables -t nat -X WEAVE-CANARY"
 wait_for_iptable_refresh
 IPT_AFTER=$(get_weave_iptable_rules)
 assert_raises "diff <(echo $IPT_BEFORE) <(echo $IPT_AFTER)" 1
@@ -38,7 +38,7 @@ stop_weave_on1
 ## Check refreshing
 weave_on1 "launch --iptables-refresh-interval=1s"
 IPT_BEFORE=$(get_weave_iptable_rules)
-run_on1 "sudo iptables -t nat -D POSTROUTING -j WEAVE"
+run_on1 "sudo iptables -t nat -X WEAVE-CANARY"
 wait_for_iptable_refresh
 IPT_AFTER=$(get_weave_iptable_rules)
 assert_raises "diff <(echo $IPT_BEFORE) <(echo $IPT_AFTER)" 0
@@ -50,7 +50,7 @@ stop_weave_on1
 weave_on1 "launch --iptables-refresh-interval=0s"
 weave_on1 "expose"
 IPT_BEFORE=$(get_weave_iptable_rules)
-run_on1 "sudo iptables -D FORWARD -o weave -j WEAVE-EXPOSE"
+run_on1 "sudo iptables -t nat -X WEAVE-CANARY"
 wait_for_iptable_refresh
 IPT_AFTER=$(get_weave_iptable_rules)
 assert_raises "diff <(echo $IPT_BEFORE) <(echo $IPT_AFTER)" 1
@@ -60,7 +60,7 @@ stop_weave_on1
 weave_on1 "launch --iptables-refresh-interval=1s"
 weave_on1 "expose"
 IPT_BEFORE=$(get_weave_iptable_rules)
-run_on1 "sudo iptables -D FORWARD -o weave -j WEAVE-EXPOSE"
+run_on1 "sudo iptables -t nat -X WEAVE-CANARY"
 wait_for_iptable_refresh
 IPT_AFTER=$(get_weave_iptable_rules)
 assert_raises "diff <(echo $IPT_BEFORE) <(echo $IPT_AFTER)" 0
