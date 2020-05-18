@@ -55,9 +55,9 @@ func WithNetNSByPath(path string, work func() error) error {
 }
 
 func NSPathByPid(pid int) string {
-	return NSPathByPidWithRoot("/", pid)
+	return NSPathByPidWithProc("/proc", pid)
 }
 
-func NSPathByPidWithRoot(root string, pid int) string {
-	return filepath.Join(root, fmt.Sprintf("/proc/%d/ns/net", pid))
+func NSPathByPidWithProc(procPath string, pid int) string {
+	return filepath.Join(procPath, fmt.Sprint(pid), "/ns/net")
 }

@@ -236,7 +236,7 @@ func setupIface(procPath, ifaceName, newIfName string) error {
 }
 
 // configureARP is a helper for the Docker plugin which doesn't set the addresses itself
-func ConfigureARP(prefix, rootPath string) error {
+func ConfigureARP(prefix, procPath string) error {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return err
@@ -244,7 +244,7 @@ func ConfigureARP(prefix, rootPath string) error {
 	for _, link := range links {
 		ifName := link.Attrs().Name
 		if strings.HasPrefix(ifName, prefix) {
-			configureARPCache(rootPath+"/proc", ifName)
+			configureARPCache(procPath, ifName)
 			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
 				for _, addr := range addrs {
 					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
