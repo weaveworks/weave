@@ -32,6 +32,7 @@ type Config struct {
 	EnableV2Multicast bool
 	DNS               bool
 	DefaultSubnet     string
+	ProcPath          string // path to reach host /proc filesystem
 }
 
 type Plugin struct {
@@ -62,7 +63,7 @@ func (plugin *Plugin) run(dockerClient *docker.Client, weave *weaveapi.Client, r
 	endChan := make(chan error, 1)
 
 	if plugin.Socket != "" {
-		globalListener, err := listenAndServe(dockerClient, weave, plugin.Socket, endChan, "global", false, plugin.DNS, plugin.EnableV2, plugin.EnableV2Multicast)
+		globalListener, err := listenAndServe(dockerClient, weave, plugin.Socket, endChan, "global", false, plugin.DNS, plugin.EnableV2, plugin.EnableV2Multicast, plugin.ProcPath)
 		if err != nil {
 			return err
 		}
@@ -70,7 +71,7 @@ func (plugin *Plugin) run(dockerClient *docker.Client, weave *weaveapi.Client, r
 		defer globalListener.Close()
 	}
 	if plugin.MeshSocket != "" {
-		meshListener, err := listenAndServe(dockerClient, weave, plugin.MeshSocket, endChan, "local", true, plugin.DNS, plugin.EnableV2, plugin.EnableV2Multicast)
+		meshListener, err := listenAndServe(dockerClient, weave, plugin.MeshSocket, endChan, "local", true, plugin.DNS, plugin.EnableV2, plugin.EnableV2Multicast, plugin.ProcPath)
 		if err != nil {
 			return err
 		}
@@ -87,7 +88,7 @@ func (plugin *Plugin) run(dockerClient *docker.Client, weave *weaveapi.Client, r
 	return <-endChan
 }
 
-func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, dns bool, isPluginV2, forceMulticast bool) (net.Listener, error) {
+func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam, dns bool, isPluginV2, forceMulticast bool, procPath string) (net.Listener, error) {
 	var name string
 	if isPluginV2 {
 		name = pluginV2Name
@@ -95,7 +96,7 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 		name = pluginNameFromAddress(address)
 	}
 
-	d, err := netplugin.New(dockerClient, weave, name, scope, dns, isPluginV2, forceMulticast)
+	d, err := netplugin.New(dockerClient, weave, name, scope, dns, isPluginV2, forceMulticast, procPath)
 	if err != nil {
 		return nil, err
 	}

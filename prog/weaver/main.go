@@ -453,6 +453,7 @@ func main() {
 
 	pluginConfig.DNS = !noDNS
 	pluginConfig.DefaultSubnet = defaultSubnet.String()
+	pluginConfig.ProcPath = procPath
 	plugin := plugin.NewPlugin(pluginConfig)
 
 	// The weave script always waits for a status call to succeed,
