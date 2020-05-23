@@ -34,7 +34,12 @@ var (
 	bridgePortName string
 )
 
-func handleError(err error) { common.CheckError(err) }
+func handleError(err error) {
+	if err != nil {
+		metrics.PolicyEnforcementErrors.Inc()
+		common.Log.Error(err)
+	}
+}
 
 func handleFatal(err error) { common.CheckFatal(err) }
 
