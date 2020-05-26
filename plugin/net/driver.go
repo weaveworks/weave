@@ -39,9 +39,10 @@ type driver struct {
 	// used only by plugin-v2
 	forceMulticast bool
 	networks       map[string]network
+	procPath       string
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, name, scope string, dns, isPluginV2, forceMulticast bool) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, name, scope string, dns, isPluginV2, forceMulticast bool, procPath string) (skel.Driver, error) {
 	driver := &driver{
 		name:       name,
 		scope:      scope,
@@ -51,6 +52,7 @@ func New(client *docker.Client, weave *weaveapi.Client, name, scope string, dns,
 		// make sure that it's used only by plugin-v2
 		forceMulticast: isPluginV2 && forceMulticast,
 		networks:       make(map[string]network),
+		procPath:       procPath,
 	}
 
 	// Do not start watcher in the case of plugin v2, which prevents us from
@@ -134,7 +136,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 
 	// create veths. note we assume endpoint IDs are unique in the first 9 chars
 	name, peerName := vethPair(create.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, true, nil); err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(driver.procPath, name, peerName, weavenet.WeaveBridgeName, 0, false, true, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
