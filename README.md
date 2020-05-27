@@ -29,7 +29,7 @@ If you have any questions about, feedback for or a problem with Weave Net:
 
 - Read [the Weave Net docs](https://www.weave.works/docs/net/latest/overview).
 - Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-- Ask a question on the [#net-dev](https://weave-community.slack.com/messages/net-dev/) slack channel.
+  - The channel for contributors and developers of Weave Net is [#net-dev](https://weave-community.slack.com/messages/net-dev/).
 - Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area.
 - [File an issue](https://github.com/weaveworks/weave/issues/new).
 
