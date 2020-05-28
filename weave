@@ -483,6 +483,7 @@ destroy_bridge() {
 
     [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 
+    run_iptables -t filter -D INPUT -d 127.0.0.1/32 -p tcp -m addrtype ! --src-type LOCAL -m conntrack ! --ctstate RELATED,ESTABLISHED -j DROP >/dev/null 2>&1 || true
     run_iptables -t filter -D INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT  >/dev/null 2>&1 || true
     run_iptables -t filter -D INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT  >/dev/null 2>&1 || true
 
