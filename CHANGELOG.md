@@ -1,3 +1,12 @@
+## Release 2.6.3
+
+This release has a couple of security improvements, and some other fixes.
+
+* Block non-local traffic to the Weave control port	#3805
+* Tell Linux not to accept router advisory messages	#3801
+* Network Policy Controller: add a metric to show errors while operating	#3804
+* Network Policy Controller: don't treat named port as a fatal error	#3790
+
 ## Release 2.6.2
 
 This release fixes a regression found in 2.6.1 release and removes a possible case
