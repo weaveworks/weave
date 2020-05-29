@@ -13,13 +13,6 @@ function install_terraform() {
     curl -fsS https://releases.hashicorp.com/terraform/0.11.14/terraform_0.11.14_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
 }
 
-function install_ansible() {
-    sudo apt-get update || true
-    sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev \
-        && pip install --user -U setuptools cffi \
-        && pip install --user ansible
-}
-
 [ -n "$SECRET_KEY" ] || {
     echo "Cannot run smoke tests: no secret key"
     exit 1
@@ -28,7 +21,6 @@ function install_ansible() {
 source "$SRCDIR/bin/circle-env"
 
 install_terraform
-install_ansible
 
 # Only attempt to create GCP image in first container, wait for it to be created otherwise:
 [ "$CIRCLE_NODE_INDEX" != "0" ] && export CREATE_IMAGE=0
