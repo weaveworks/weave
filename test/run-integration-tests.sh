@@ -66,7 +66,7 @@ function print_vars() {
 }
 
 function verify_dependencies() {
-    local deps=(python terraform ansible-playbook gcloud)
+    local deps=(python terraform gcloud)
     for dep in "${deps[@]}"; do
         if [ ! "$(which "$dep")" ]; then
             echo >&2 "$dep is not installed or not in PATH."
@@ -141,9 +141,18 @@ function wait_for_image() {
     exit 1
 }
 
+function install_ansible() {
+    sudo apt-get update || true
+    sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev \
+        && pip install --user -U setuptools cffi \
+        && pip install --user ansible
+}
+
 # shellcheck disable=SC2155
 function create_image() {
     if [[ "$CREATE_IMAGE" == 1 ]]; then
+        install_ansible
+
         greenly echo "> Creating GCP image $IMAGE_NAME..."
         local begin_img=$(date +%s)
         local num_hosts=1
