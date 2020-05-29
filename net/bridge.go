@@ -221,6 +221,7 @@ type BridgeConfig struct {
 	MTU              int
 	Mac              string
 	Port             int
+	ControlPort      string
 	NoMasqLocal      bool
 }
 
@@ -469,10 +470,17 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 		}
 	}
 
-	// Block non-local traffic to the Weave control port
-	if err = ipt.AppendUnique("filter", "INPUT", "-p", "tcp", "--dst", "127.0.0.1", "-m", "addrtype", "!", "--src-type", "LOCAL", "-m", "conntrack", "!", "--ctstate", "RELATED,ESTABLISHED", "-j", "DROP"); err != nil {
-		return err
+	if config.ControlPort != "" {
+		if err = ipt.AppendUnique("filter", "INPUT", "-p", "tcp", "--dst", "127.0.0.1", "--dport", config.ControlPort,
+			"-m", "addrtype", "!", "--src-type", "LOCAL",
+			"-m", "conntrack", "!", "--ctstate", "RELATED,ESTABLISHED",
+			"-m", "comment", "--comment", "Block non-local access to Weave Net control port",
+			"-j", "DROP"); err != nil {
+			return err
+		}
 	}
+	// Remove the rule from Weave Net 2.6.3 which dropped too much.
+	_ = ipt.Delete("filter", "INPUT", "-p", "tcp", "--dst", "127.0.0.1", "-m", "addrtype", "!", "--src-type", "LOCAL", "-m", "conntrack", "!", "--ctstate", "RELATED,ESTABLISHED", "-j", "DROP")
 
 	if config.NPC {
 		// Steer traffic via the NPC.

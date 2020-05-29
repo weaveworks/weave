@@ -307,6 +307,11 @@ func main() {
 
 	bridgeConfig.Mac = name.String()
 	bridgeConfig.Port = config.Port
+	if httpAddr != "" {
+		if _, port, err := net.SplitHostPort(httpAddr); err == nil {
+			bridgeConfig.ControlPort = port
+		}
+	}
 	ips := ipset.New(common.LogLogger(), 0)
 	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
