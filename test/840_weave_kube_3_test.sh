@@ -54,7 +54,7 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.9.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
-sleep 5
+sleep 2
 
 check_connections() {
     run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\""
@@ -247,6 +247,9 @@ spec:
       - namespaceSelector: {}
 EOF
 
+# Allow some time for the policy change to take effect
+sleep 2
+
 # Should be able to access from the "deny" pod now
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
@@ -270,6 +273,7 @@ spec:
           cidr: $HOST1EXPIP/32
 EOF
 
+# Allow some time for the policy change to take effect
 sleep 2
 
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
@@ -288,6 +292,9 @@ spec:
   ingress:
     - {}
 EOF
+
+# Allow some time for the policy change to take effect
+sleep 2
 
 # Virtual IP and NodePort should now work
 assert_raises "$SSH $HOST1 curl -s -S -f -m 2 http://$VIRTUAL_IP/status >/dev/null"
@@ -313,6 +320,9 @@ spec:
         except:
         - 8.8.8.4/32
 EOF
+
+# Allow some time for the policy change to take effect
+sleep 2
 
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 assert_raises "! $SSH $HOST1 $KUBECTL exec $denyPodName -- dig @8.8.8.4 google.com >/dev/null"
@@ -346,6 +356,9 @@ spec:
           name: kube-system
 EOF
 
+# Allow some time for the policy change to take effect
+sleep 2
+
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
 # Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
@@ -359,10 +372,12 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.9.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
-sleep 5
+sleep 2
+assert_raises 'wait_for_x check_connections "connections to establish"'
 
 run_on $HOST1 "$KUBECTL patch svc netvirt -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
 
+sleep 2
 CLIENT_IP_NO_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
 
 assert_raises "[ $CLIENT_IP_NO_MASQ != $CLIENT_IP_MASQ ]"
