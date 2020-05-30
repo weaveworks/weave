@@ -1,3 +1,9 @@
+## Release 2.6.4
+
+Improves the iptables rule added in 2.6.3 to block just the Weave Net
+control port and avoid blocking other uses of 127.0.0.1.	#3811
+
+
 ## Release 2.6.3
 
 This release has a couple of security improvements, and some other fixes.
