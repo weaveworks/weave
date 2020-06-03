@@ -11,6 +11,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -219,7 +220,7 @@ func ipsetExist(ips ipset.Interface, name ipset.Name) (bool, error) {
 
 func stopOnPanicRecover(stopChan chan struct{}) {
 	if r := recover(); r != nil {
-		stopChan <- struct{}{}
+		os.Exit(1)
 	}
 }
 
@@ -334,26 +335,11 @@ func root(cmd *cobra.Command, args []string) {
 	}
 	npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)
 
+	go nsController.Run(wait.NeverStop)
+	go podController.Run(wait.NeverStop)
+	go npController.Run(wait.NeverStop)
+
 	signals := make(chan os.Signal, 1)
-	stopChan = make(chan struct{})
-
-	go func() {
-		nsController.Run(stopChan)
-		signals <- syscall.SIGINT
-	}()
-	go func() {
-		podController.Run(stopChan)
-		signals <- syscall.SIGINT
-	}()
-	go func() {
-		npController.Run(stopChan)
-		signals <- syscall.SIGINT
-	}()
-	go func() {
-		<-stopChan
-		close(stopChan)
-	}()
-
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	common.Log.Fatalf("Exiting: %v", <-signals)
 }
