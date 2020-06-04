@@ -41,3 +41,11 @@ func sysctl(procPath, variable, value string) error {
 
 	return nil
 }
+
+func sysctlIfExists(procPath, variable, value string) error {
+	err := sysctl(procPath, variable, value)
+	if err != nil && os.IsNotExist(err) {
+		err = nil // ignore 'not found' errors
+	}
+	return err
+}
