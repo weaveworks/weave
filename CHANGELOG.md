@@ -1,3 +1,10 @@
+## Release 2.6.5
+
+Fixes a bug that would leak memory every time a fast-datapath connection
+was stopped. #3808
+Also avoid a crash when the machine has ipv6 disabled. #3815
+
+
 ## Release 2.6.4
 
 Improves the iptables rule added in 2.6.3 to block just the Weave Net
