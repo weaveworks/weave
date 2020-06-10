@@ -452,6 +452,7 @@ func (fwd *overlaySwitchForwarder) Stop() {
 	fwd.lock.Lock()
 	defer fwd.lock.Unlock()
 	fwd.stopFrom(0)
+	close(fwd.stopChan)
 }
 
 func (fwd *overlaySwitchForwarder) ControlMessage(tag byte, msg []byte) {
