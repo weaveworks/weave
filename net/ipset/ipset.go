@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/weaveworks/weave/common"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -50,6 +53,31 @@ type ipset struct {
 	// events from k8s API server might be out of order causing duplicate IPs:
 	// https://github.com/weaveworks/weave/issues/2792.
 	users map[entryKey]map[types.UID]struct{}
+}
+
+var resyncOnDelete bool
+
+func init() {
+
+	// check if Kernel version is in between 4.2 and 4.10. There is a kerenl bug
+	// due to which ipset delete sometimes ends up in deleting unintended entries
+	// https://bugzilla.netfilter.org/show_bug.cgi?id=1119
+	// if Kernel version has this issue then we need to workaround by resyncing
+	// ipset to the expected list of entries
+	kernelVersion, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		common.Log.Fatalf("Failed to get Kernel version")
+	}
+	splitVersion := strings.SplitN(string(kernelVersion[:]), ".", 3)
+	if splitVersion[0] == "4" {
+		majorVersion, err := strconv.Atoi(splitVersion[1])
+		if err != nil {
+			common.Log.Fatalf("Failed to process Kernel major version")
+		}
+		if majorVersion >= 2 && majorVersion <= 10 {
+			resyncOnDelete = true
+		}
+	}
 }
 
 func New(logger *log.Logger, maxListSize int) Interface {
@@ -118,7 +146,56 @@ func (i *ipset) DelEntry(user types.UID, ipsetName Name, entry string) error {
 
 	i.Logger.Printf("deleted entry %s from %s of %s", entry, ipsetName, user)
 
+	if resyncOnDelete {
+		return i.safeDelEntry(user, ipsetName, entry)
+	}
+
 	return doExec("del", string(ipsetName), entry)
+}
+
+// logic to workaround Kernel bug https://bugzilla.netfilter.org/show_bug.cgi?id=1119
+func (i *ipset) safeDelEntry(user types.UID, ipsetName Name, entry string) error {
+	oldEntries, err := listEntries(ipsetName)
+	if err != nil {
+		return err
+	}
+	err = doExec("del", string(ipsetName), entry)
+	if err != nil && !strings.Contains(err.Error(), "Element cannot be deleted from the set: it's not added") {
+		return err
+	}
+	newEntries, err := listEntries(ipsetName)
+	if err != nil {
+		return err
+	}
+	expectedEntries := make([]string, 0)
+	for _, oe := range oldEntries {
+		if !strings.Contains(oe, entry) {
+			expectedEntries = append(expectedEntries, oe)
+		}
+	}
+	for _, ee := range expectedEntries {
+		exists := false
+		for _, ne := range newEntries {
+			if strings.Compare(ee, ne) == 0 {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			continue
+		}
+		args := make([]string, 0)
+		if i.enableComments {
+			splitEntry := strings.Split(ee, " comment ")
+			args = append(args, "add", string(ipsetName), splitEntry[0])
+			args = append(args, "comment", splitEntry[1])
+		} else {
+			args = append(args, "add", string(ipsetName), ee)
+		}
+		err = doExec(args...)
+		return err
+	}
+	return nil
 }
 
 func (i *ipset) Exist(user types.UID, ipsetName Name, entry string) bool {
@@ -204,6 +281,16 @@ func (i *ipset) removeSetFromUsers(ipsetName Name) {
 			delete(i.users, k)
 		}
 	}
+}
+
+func listEntries(ipsetName Name) ([]string, error) {
+	output, err := exec.Command("ipset", "list", string(ipsetName)).CombinedOutput()
+	if err != nil {
+		return nil, errors.Wrapf(err, "list ipset %s failed: %s", ipsetName, output)
+	}
+	r := regexp.MustCompile("(?m)^(.*\n)*Members:\n")
+	list := r.ReplaceAllString(string(output[:]), "")
+	return strings.Split(list, "\n"), nil
 }
 
 func doExec(args ...string) error {
