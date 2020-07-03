@@ -429,7 +429,7 @@ func (f fastdpImpl) attach(veth *netlink.Veth) error {
 	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
-// ResetIPTables resets IPTables if they're in a strange state from a previous run.
+// ResetIPTables resets IPTables in case they're in a strange state from a previous run.
 func ResetIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	ipt, err := iptables.New()
 	if err != nil {
@@ -568,23 +568,13 @@ func ConfigureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	}
 
 	// For the cases where the weave bridge is the default gateway for
-	// containers (e.g. Kubernetes): create the ipset to store CIDRs allocated
-	// by IPAM for local containers. In the case of Kubernetes, external traffic
-	// sent to these CIDRs avoids SNAT'ing so that NodePort with
-	// `"externalTrafficPolicy":"Local"` would receive packets with correct
-	// src IP addr.
+	// containers (e.g. Kubernetes): In `ResetIPTables` (which we assume
+	// to have been called at this point) we create an ipset to store CIDRs
+	// allocated by IPAM for local containers.
+	// In the case of Kubernetes, external traffic sent to these CIDRs
+	// avoids SNAT'ing so that NodePort with `"externalTrafficPolicy":"Local"`
+	// would receive packets with correct src IP addr.
 	if config.NoMasqLocal {
-		ips := ipset.New(common.LogLogger(), 0)
-
-		noMasqLocalExists, err := ips.Exists(NoMasqLocalIpset)
-		if err != nil {
-			common.Log.Errorf("Failed to look if ipset '%s' exists: %s", NoMasqLocalIpset, err)
-		} else if !noMasqLocalExists {
-			if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
-				return err
-			}
-		}
-
 		if err := ipt.AppendUnique("nat", "WEAVE",
 			"-m", "set", "--match-set", string(NoMasqLocalIpset), "dst",
 			"-m", "comment", "--comment", "Prevent SNAT to locally running containers",
