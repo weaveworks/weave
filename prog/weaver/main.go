@@ -17,7 +17,6 @@ import (
 	"github.com/weaveworks/common/mflagext"
 	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/mesh"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -529,7 +528,9 @@ func main() {
 
 			weavenet.Reexpose(&bridgeConfig, Log)
 		}
-		go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, iptablesRefresh, wait.NeverStop)
+		stopChan := make(chan struct{})
+		go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, iptablesRefresh, stopChan)
+		defer close(stopChan)
 	} else {
 		Log.Printf("Not refreshing iptables (interval: %v)", iptablesRefresh)
 	}
