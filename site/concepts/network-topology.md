@@ -146,9 +146,9 @@ which time the topology should have updated.
 
 In a fully connected mesh of N peers, this would mean N^2 connections. To constrain the resource consumption and 
 communication between the peers and complexity of route calculation there is a configurable upper limit on the 
-maximum number of connections that a peer can make to the remote peers. There is safe default value (100) which works
+maximum number of connections that a peer can make to the remote peers. There is safe default value (200) which works
 for most deployment. However if you would like to increase the number of peers, you should be able to explicitly override the
-default value by passing the value through `connlimit` flag for e.g.`weave launch --connlimit=100`. If you are using Weave with
+default value by passing the value through `connlimit` flag for e.g.`weave launch --connlimit=300`. If you are using Weave with
 Kubernetes using [Kubernetes Addon](/site/kubernetes/kube-addon.md) then you can set CONN_LIMIT environment variable to set
 the connection limit.
 
