@@ -168,7 +168,6 @@ func main() {
 		procPath           string
 		discoveryEndpoint  string
 		token              string
-		iptablesRefresh    time.Duration
 		advertiseAddress   string
 		pluginConfig       plugin.Config
 		defaultDockerHost  = getenvOrDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -217,7 +216,6 @@ func main() {
 	mflag.StringVar(&discoveryEndpoint, []string{"-peer-discovery-url"}, "https://cloud.weave.works/api/net", "url for peer discovery")
 	mflag.StringVar(&token, []string{"-token"}, "", "token for peer discovery")
 	mflag.StringVar(&advertiseAddress, []string{"-advertise-address"}, "", "address to advertise for peer discovery")
-	mflag.DurationVar(&iptablesRefresh, []string{"-iptables-refresh-interval"}, 10*time.Second, "Interval to reapply iptables. 0 to only apply on launch.")
 
 	mflag.BoolVar(&pluginConfig.Enable, []string{"-plugin"}, false, "enable Docker plugin (v1)")
 	mflag.BoolVar(&pluginConfig.EnableV2, []string{"-plugin-v2"}, false, "enable Docker plugin (v2)")
@@ -517,23 +515,17 @@ func main() {
 		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
 	}
 
-	if iptablesRefresh > 0 {
-		Log.Printf("Entering iptable refresh loop (interval %v)", iptablesRefresh)
-		applyIPTables := func() {
-			Log.Info("Re-configuring iptables")
-			err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
-			if err != nil {
-				Log.Errorf("Error configuring iptables: %s", err)
-			}
-
-			weavenet.Reexpose(&bridgeConfig, Log)
+	applyIPTables := func() {
+		Log.Info("Re-configuring iptables")
+		err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
+		if err != nil {
+			Log.Errorf("Error configuring iptables: %s", err)
 		}
-		stopChan := make(chan struct{})
-		go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, iptablesRefresh, stopChan)
-		defer close(stopChan)
-	} else {
-		Log.Printf("Not refreshing iptables (interval: %v)", iptablesRefresh)
+		weavenet.Reexpose(&bridgeConfig, Log)
 	}
+	stopChan := make(chan struct{})
+	go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, 10*time.Second, stopChan)
+	defer close(stopChan)
 
 	signals.SignalHandlerLoop(common.Log, router)
 }
