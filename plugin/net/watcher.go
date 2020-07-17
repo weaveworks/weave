@@ -49,7 +49,7 @@ func (w *watcher) ContainerStarted(id string) {
 				aliases := make([]string, 0, len(net.Aliases)+2)
 				aliases = append(aliases, fqdn)
 
-				if len(domain) > 0 && len(info.Name) > 1 && info.Name[0] == "/" {
+				if len(domain) > 0 && len(info.Name) > 1 && info.Name[0] == '/' {
 					name := fmt.Sprintf("%s.%s", info.Name[1:], domain)
 					aliases = append(aliases, name)
 				}
