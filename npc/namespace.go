@@ -441,7 +441,7 @@ func (ns *ns) updateDefaultAllowIPSetEntry(oldObj, newObj *coreapi.Pod, ipsetNam
 	// Instead of iterating over all selectors we check whether old pod IP
 	// has been inserted into default-allow ipset to decide whether the IP
 	// in the ipset has to be updated.
-	if ns.ips.Exist(oldObj.ObjectMeta.UID, ipsetName, oldObj.Status.PodIP) {
+	if ns.ips.EntryExists(oldObj.ObjectMeta.UID, ipsetName, oldObj.Status.PodIP) {
 
 		if err := ns.ips.DelEntry(oldObj.ObjectMeta.UID, ipsetName, oldObj.Status.PodIP); err != nil {
 			return err

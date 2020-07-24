@@ -313,8 +313,11 @@ func main() {
 		}
 	}
 	ips := ipset.New(common.LogLogger(), 0)
+	err = weavenet.ResetIPTables(&bridgeConfig, ips)
+	checkFatal(err)
 	bridgeType, err := weavenet.EnsureBridge(procPath, &bridgeConfig, Log, ips)
 	checkFatal(err)
+
 	Log.Println("Bridge type is", bridgeType)
 
 	config.Password = determinePassword(password)
@@ -511,6 +514,18 @@ func main() {
 		// because awsvpc has installed it as well
 		go exposeForAWSVPC(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, waitReady.Add())
 	}
+
+	applyIPTables := func() {
+		Log.Info("Re-configuring iptables")
+		err := weavenet.ConfigureIPTables(&bridgeConfig, ips)
+		if err != nil {
+			Log.Errorf("Error configuring iptables: %s", err)
+		}
+		weavenet.Reexpose(&bridgeConfig, Log)
+	}
+	stopChan := make(chan struct{})
+	go weavenet.MonitorForIptablesFlush(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, 10*time.Second, stopChan)
+	defer close(stopChan)
 
 	signals.SignalHandlerLoop(common.Log, router)
 }

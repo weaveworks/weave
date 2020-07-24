@@ -196,7 +196,7 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 
 	// delete `weave-local-pods` ipset which is no longer used by weave-npc
-	weaveLocalPodExist, err := ipsetExist(ips, npc.LocalIpset)
+	weaveLocalPodExist, err := ips.Exists(npc.LocalIpset)
 	if err != nil {
 		common.Log.Errorf("Failed to look if ipset '%s' exists", npc.LocalIpset)
 	} else if weaveLocalPodExist {
@@ -207,22 +207,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 
 	return nil
-}
-
-// Dummy way to check whether a given ipset exists.
-// TODO(brb) Use "ipset -exist create <..>" for our purpose instead (for some reasons
-// creating an ipset with -exist fails).
-func ipsetExist(ips ipset.Interface, name ipset.Name) (bool, error) {
-	sets, err := ips.List(string(name))
-	if err != nil {
-		return false, err
-	}
-	for _, s := range sets {
-		if s == name {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func root(cmd *cobra.Command, args []string) {
