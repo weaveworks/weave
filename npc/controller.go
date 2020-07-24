@@ -60,9 +60,9 @@ func New(nodeName string, ipt iptables.Interface, ips ipset.Interface, clientset
 
 func (npc *controller) onNewNsSelector(selector *selector) error {
 	for _, ns := range npc.nss {
-		if ns.namespace != nil {
-			if selector.matchesNamespaceSelector(ns.namespace.ObjectMeta.Labels) {
-				if err := selector.addEntry(ns.namespace.ObjectMeta.UID, string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
+		if ns.namespaceUID != "" {
+			if selector.matchesNamespaceSelector(ns.namespaceLabels) {
+				if err := selector.addEntry(ns.namespaceUID, string(ns.allPods.ipsetName), namespaceComment(ns)); err != nil {
 					return err
 				}
 			}
@@ -73,10 +73,10 @@ func (npc *controller) onNewNsSelector(selector *selector) error {
 
 func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 	for _, ns := range npc.nss {
-		if ns.namespace != nil && len(ns.pods) > 0 {
+		if ns.namespaceUID != "" && len(ns.pods) > 0 {
 			for _, pod := range ns.pods {
 				if hasIP(pod) {
-					if selector.matchesNamespacedPodSelector(pod.ObjectMeta.Labels, ns.namespace.ObjectMeta.Labels) {
+					if selector.matchesNamespacedPodSelector(pod.ObjectMeta.Labels, ns.namespaceLabels) {
 						if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
 							return err
 						}
