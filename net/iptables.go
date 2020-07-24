@@ -130,10 +130,10 @@ const (
 	iptablesFlushPollTime = 100 * time.Millisecond
 )
 
-// Monitor periodically checks for a canary chain in iptables. If this canary chain goes missing it calls the reloadFunc.
+// MonitorForIptablesFlush periodically checks for a canary chain in iptables. If this canary chain goes missing it calls the reloadFunc.
 // This is a more efficient way of detecting whether firewalld or another process has been removing rules that we rely on.
 // The reloadFunc can then check whether other chains that should exist are still there, fix things and restore the canary.
-func Monitor(log *logrus.Logger, canary string, tables []string, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
+func MonitorForIptablesFlush(log *logrus.Logger, canary string, tables []string, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 	ipt, err := iptables.New()
 	if err != nil {
 		log.Errorf("creating iptables object while initializing iptable Monitoring %s", err)

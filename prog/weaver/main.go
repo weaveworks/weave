@@ -524,7 +524,7 @@ func main() {
 		weavenet.Reexpose(&bridgeConfig, Log)
 	}
 	stopChan := make(chan struct{})
-	go weavenet.Monitor(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, 10*time.Second, stopChan)
+	go weavenet.MonitorForIptablesFlush(Log, "WEAVE-CANARY", []string{"mangle", "nat", "filter"}, applyIPTables, 10*time.Second, stopChan)
 	defer close(stopChan)
 
 	signals.SignalHandlerLoop(common.Log, router)
