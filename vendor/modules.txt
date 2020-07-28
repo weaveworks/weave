@@ -43,12 +43,13 @@ github.com/aws/aws-sdk-go/private/protocol/rest
 github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
 github.com/aws/aws-sdk-go/service/ec2
 github.com/aws/aws-sdk-go/service/sts
-# github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
-## explicit
+# github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
 # github.com/boltdb/bolt v1.3.1
 ## explicit
 github.com/boltdb/bolt
+# github.com/cespare/xxhash/v2 v2.1.1
+github.com/cespare/xxhash/v2
 # github.com/containerd/continuity v0.0.0-20180322171221-3e8f2ea4b190
 ## explicit
 github.com/containerd/continuity/pathdriver
@@ -67,8 +68,7 @@ github.com/containernetworking/cni/pkg/version
 # github.com/coreos/go-iptables v0.3.0
 ## explicit
 github.com/coreos/go-iptables/iptables
-# github.com/davecgh/go-spew v1.1.0
-## explicit
+# github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/docker/distribution v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible
 ## explicit
@@ -143,15 +143,15 @@ github.com/ghodss/yaml
 # github.com/go-ini/ini v1.33.0
 ## explicit
 github.com/go-ini/ini
-# github.com/gogo/protobuf v1.0.0
-## explicit
+# github.com/gogo/protobuf v1.1.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
 # github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 ## explicit
 github.com/golang/glog
-# github.com/golang/protobuf v1.0.0
+# github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 ## explicit
+# github.com/golang/protobuf v1.4.2
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
@@ -160,8 +160,9 @@ github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/btree v0.0.0-20180124185431-e89373fe6b4a
 ## explicit
 github.com/google/btree
-# github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+# github.com/google/go-cmp v0.5.1
 ## explicit
+# github.com/google/gofuzz v1.0.0
 github.com/google/gofuzz
 # github.com/google/gopacket v1.1.16
 ## explicit
@@ -180,6 +181,8 @@ github.com/gorilla/context
 # github.com/gorilla/mux v1.6.1
 ## explicit
 github.com/gorilla/mux
+# github.com/gotestyourself/gotestyourself v2.2.0+incompatible
+## explicit
 # github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 ## explicit
 github.com/gregjones/httpcache
@@ -200,17 +203,17 @@ github.com/j-keck/arping
 # github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8
 ## explicit
 github.com/jmespath/go-jmespath
-# github.com/json-iterator/go v0.0.0-20180315132816-ca39e5af3ece
-## explicit
+# github.com/json-iterator/go v1.1.10
 github.com/json-iterator/go
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
 # github.com/mattn/go-colorable v0.0.9
 ## explicit
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.3
 ## explicit
 github.com/mattn/go-isatty
-# github.com/matttproud/golang_protobuf_extensions v1.0.0
-## explicit
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9
 ## explicit
@@ -222,11 +225,11 @@ github.com/mgutz/ansi
 ## explicit
 github.com/miekg/dns
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-## explicit
 github.com/modern-go/concurrent
-# github.com/modern-go/reflect2 v0.0.0-20180228065516-1df9eeb2bb81
-## explicit
+# github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
+# github.com/onsi/ginkgo v1.14.0
+## explicit
 # github.com/opencontainers/go-digest v1.0.0-rc1
 ## explicit
 github.com/opencontainers/go-digest
@@ -238,44 +241,42 @@ github.com/opencontainers/image-spec/specs-go/v1
 ## explicit
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
+# github.com/opencontainers/selinux v1.6.0
+## explicit
 # github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
 ## explicit
 github.com/pborman/uuid
-# github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c
-## explicit
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
 # github.com/pkg/profile v1.2.1
 ## explicit
 github.com/pkg/profile
 # github.com/pmezard/go-difflib v1.0.0
-## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v0.9.0-pre1.0.20180328130430-f504d69affe1
+# github.com/prometheus/client_golang v1.7.1
 ## explicit
 github.com/prometheus/client_golang/prometheus
+github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.0.0-20171117100541-99fa1f4be8e5
-## explicit
+# github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.0.0-20180326160409-38c53a9f4bfc
-## explicit
+# github.com/prometheus/common v0.10.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.0.0-20180321230812-780932d4fbbe
-## explicit
+# github.com/prometheus/procfs v0.1.3
 github.com/prometheus/procfs
+github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-github.com/prometheus/procfs/nfs
-github.com/prometheus/procfs/xfs
-# github.com/sirupsen/logrus v1.0.4
+# github.com/sirupsen/logrus v1.4.2
 ## explicit
 github.com/sirupsen/logrus
+# github.com/smartystreets/goconvey v1.6.4
+## explicit
 # github.com/spf13/cobra v0.0.1
 ## explicit
 github.com/spf13/cobra
@@ -321,7 +322,7 @@ golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+# golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -335,13 +336,13 @@ golang.org/x/net/internal/socks
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/proxy
-# golang.org/x/sys v0.0.0-20190412213103-97732733099d
+# golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
 ## explicit
 golang.org/x/sys/cpu
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.0
-## explicit
+# golang.org/x/text v0.3.2
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
@@ -349,14 +350,49 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20180412165947-fbb02b2291d2
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20180324185418-77106db15f68
+# golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
 ## explicit
 golang.org/x/tools/cover
+# google.golang.org/protobuf v1.23.0
+google.golang.org/protobuf/encoding/prototext
+google.golang.org/protobuf/encoding/protowire
+google.golang.org/protobuf/internal/descfmt
+google.golang.org/protobuf/internal/descopts
+google.golang.org/protobuf/internal/detrand
+google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/messageset
+google.golang.org/protobuf/internal/encoding/tag
+google.golang.org/protobuf/internal/encoding/text
+google.golang.org/protobuf/internal/errors
+google.golang.org/protobuf/internal/fieldnum
+google.golang.org/protobuf/internal/fieldsort
+google.golang.org/protobuf/internal/filedesc
+google.golang.org/protobuf/internal/filetype
+google.golang.org/protobuf/internal/flags
+google.golang.org/protobuf/internal/genname
+google.golang.org/protobuf/internal/impl
+google.golang.org/protobuf/internal/mapsort
+google.golang.org/protobuf/internal/pragma
+google.golang.org/protobuf/internal/set
+google.golang.org/protobuf/internal/strs
+google.golang.org/protobuf/internal/version
+google.golang.org/protobuf/proto
+google.golang.org/protobuf/reflect/protoreflect
+google.golang.org/protobuf/reflect/protoregistry
+google.golang.org/protobuf/runtime/protoiface
+google.golang.org/protobuf/runtime/protoimpl
+google.golang.org/protobuf/types/known/anypb
+google.golang.org/protobuf/types/known/durationpb
+google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
-# gopkg.in/yaml.v2 v2.2.2
+# gopkg.in/ini.v1 v1.57.0
+## explicit
+# gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
+# gotest.tools v2.2.0+incompatible
+## explicit
 # k8s.io/api v0.0.0-20180911000052-49f236fe119e
 ## explicit
 k8s.io/api/admissionregistration/v1alpha1
