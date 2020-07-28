@@ -464,6 +464,8 @@ func main() {
 	pluginConfig.ProcPath = procPath
 	plugin := plugin.NewPlugin(pluginConfig)
 
+	metricsHandler := metricsHandler(router, allocator, ns, dnsserver)
+
 	// The weave script always waits for a status call to succeed,
 	// so there is no point in doing "weave launch --http-addr ''".
 	// This is here to support stand-alone use of weaver.
@@ -478,7 +480,7 @@ func main() {
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)
 		HandleHTTPPeer(muxRouter, allocator, discoveryEndpoint, token, name.String())
-		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
+		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler)
 		if proxy != nil {
 			muxRouter.Methods("GET").Path("/proxyaddrs").HandlerFunc(proxy.StatusHTTP)
 		}
@@ -490,7 +492,7 @@ func main() {
 	if statusAddr != "" {
 		muxRouter := mux.NewRouter()
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)
-		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
+		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler)
 		statusMux := http.NewServeMux()
 		statusMux.Handle("/", muxRouter)
 		Log.Println("Listening for status+metrics requests on", statusAddr)
@@ -499,7 +501,7 @@ func main() {
 
 	if metricsAddr != "" {
 		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", metricsHandler(router, allocator, ns, dnsserver))
+		metricsMux.Handle("/metrics", metricsHandler)
 		Log.Println("Listening for metrics requests on", metricsAddr)
 		go listenAndServeHTTP(metricsAddr, metricsMux)
 	}

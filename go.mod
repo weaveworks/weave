@@ -9,12 +9,10 @@ require (
 	github.com/andybalholm/go-bit v0.0.0-20150501193155-34813fe0e46a
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go v1.13.22
-	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/boltdb/bolt v1.3.1
 	github.com/containerd/continuity v0.0.0-20180322171221-3e8f2ea4b190 // indirect
 	github.com/containernetworking/cni v0.5.2
 	github.com/coreos/go-iptables v0.3.0
-	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/docker/distribution v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible // indirect
 	github.com/docker/docker v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible
 	github.com/docker/go-connections v0.3.0 // indirect
@@ -24,12 +22,10 @@ require (
 	github.com/fsouza/go-dockerclient v1.2.0
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-ini/ini v1.33.0 // indirect
-	github.com/gogo/protobuf v1.0.0 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/btree v0.0.0-20180124185431-e89373fe6b4a // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
-	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect
 	github.com/google/gopacket v1.1.16
 	github.com/googleapis/gnostic v0.1.0 // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
@@ -41,31 +37,22 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/j-keck/arping v0.0.0-20160618110441-2cf9dc699c56
 	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8 // indirect
-	github.com/json-iterator/go v0.0.0-20180315132816-ca39e5af3ece // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.3 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.0 // indirect
 	github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/miekg/dns v1.0.4
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v0.0.0-20180228065516-1df9eeb2bb81 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/opencontainers/selinux v1.6.0 // indirect
 	github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c // indirect
-	github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.2.1
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v0.9.0-pre1.0.20180328130430-f504d69affe1
-	github.com/prometheus/client_model v0.0.0-20171117100541-99fa1f4be8e5 // indirect
-	github.com/prometheus/common v0.0.0-20180326160409-38c53a9f4bfc // indirect
-	github.com/prometheus/procfs v0.0.0-20180321230812-780932d4fbbe // indirect
-	github.com/sirupsen/logrus v1.0.4
+	github.com/prometheus/client_golang v1.7.1
+	github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v0.0.1
 	github.com/spf13/pflag v1.0.0 // indirect
@@ -77,12 +64,9 @@ require (
 	github.com/weaveworks/go-odp v0.0.0-20181017121109-6b0aa22550d9
 	github.com/weaveworks/mesh v0.0.0-20191105120815-58dbcc3e8e63
 	golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
+	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
 	golang.org/x/time v0.0.0-20180412165947-fbb02b2291d2 // indirect
 	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
-	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
-	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.57.0 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
