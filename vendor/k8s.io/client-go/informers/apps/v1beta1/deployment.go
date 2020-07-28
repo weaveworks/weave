@@ -19,9 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
-	apps_v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +62,16 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().Deployments(namespace).List(options)
+				return client.AppsV1beta1().Deployments(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().Deployments(namespace).Watch(options)
+				return client.AppsV1beta1().Deployments(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apps_v1beta1.Deployment{},
+		&appsv1beta1.Deployment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resync
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1beta1.Deployment{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1beta1.Deployment{}, f.defaultInformer)
 }
 
 func (f *deploymentInformer) Lister() v1beta1.DeploymentLister {

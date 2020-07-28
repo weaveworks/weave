@@ -19,10 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
-	apps_v1 "k8s.io/api/apps/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -57,20 +58,20 @@ func NewDaemonSetInformer(client kubernetes.Interface, namespace string, resyncP
 func NewFilteredDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().DaemonSets(namespace).List(options)
+				return client.AppsV1().DaemonSets(namespace).List(context.TODO(), options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().DaemonSets(namespace).Watch(options)
+				return client.AppsV1().DaemonSets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apps_v1.DaemonSet{},
+		&appsv1.DaemonSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *daemonSetInformer) defaultInformer(client kubernetes.Interface, resyncP
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1.DaemonSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1.DaemonSet{}, f.defaultInformer)
 }
 
 func (f *daemonSetInformer) Lister() v1.DaemonSetLister {

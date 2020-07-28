@@ -19,9 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
-	policy_v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +62,16 @@ func NewFilteredPodDisruptionBudgetInformer(client kubernetes.Interface, namespa
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).List(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&policy_v1beta1.PodDisruptionBudget{},
+		&policyv1beta1.PodDisruptionBudget{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *podDisruptionBudgetInformer) defaultInformer(client kubernetes.Interfac
 }
 
 func (f *podDisruptionBudgetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policy_v1beta1.PodDisruptionBudget{}, f.defaultInformer)
+	return f.factory.InformerFor(&policyv1beta1.PodDisruptionBudget{}, f.defaultInformer)
 }
 
 func (f *podDisruptionBudgetInformer) Lister() v1beta1.PodDisruptionBudgetLister {

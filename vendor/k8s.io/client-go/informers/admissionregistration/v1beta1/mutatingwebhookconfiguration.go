@@ -19,9 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
-	admissionregistration_v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -60,16 +61,16 @@ func NewFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().List(options)
+				return client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Watch(options)
+				return client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Watch(context.TODO(), options)
 			},
 		},
-		&admissionregistration_v1beta1.MutatingWebhookConfiguration{},
+		&admissionregistrationv1beta1.MutatingWebhookConfiguration{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +81,7 @@ func (f *mutatingWebhookConfigurationInformer) defaultInformer(client kubernetes
 }
 
 func (f *mutatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration_v1beta1.MutatingWebhookConfiguration{}, f.defaultInformer)
+	return f.factory.InformerFor(&admissionregistrationv1beta1.MutatingWebhookConfiguration{}, f.defaultInformer)
 }
 
 func (f *mutatingWebhookConfigurationInformer) Lister() v1beta1.MutatingWebhookConfigurationLister {

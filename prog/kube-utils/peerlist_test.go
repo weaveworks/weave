@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -44,7 +45,7 @@ func TestPeerListBasic(t *testing.T) {
 
 	storedPeerList.remove(peerName1)
 	require.Equal(t, 1, len(storedPeerList.Peers))
-	err = cml.UpdatePeerList(*storedPeerList)
+	err = cml.UpdatePeerList(context.Background(), *storedPeerList)
 	require.NoError(t, err)
 	check1, err = checkIamInPeerList(cml, c, peerName1)
 	require.NoError(t, err)

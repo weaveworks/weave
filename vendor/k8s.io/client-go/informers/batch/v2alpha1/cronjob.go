@@ -19,9 +19,10 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"context"
 	time "time"
 
-	batch_v2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +62,16 @@ func NewFilteredCronJobInformer(client kubernetes.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BatchV2alpha1().CronJobs(namespace).List(options)
+				return client.BatchV2alpha1().CronJobs(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BatchV2alpha1().CronJobs(namespace).Watch(options)
+				return client.BatchV2alpha1().CronJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&batch_v2alpha1.CronJob{},
+		&batchv2alpha1.CronJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *cronJobInformer) defaultInformer(client kubernetes.Interface, resyncPer
 }
 
 func (f *cronJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&batch_v2alpha1.CronJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&batchv2alpha1.CronJob{}, f.defaultInformer)
 }
 
 func (f *cronJobInformer) Lister() v2alpha1.CronJobLister {
