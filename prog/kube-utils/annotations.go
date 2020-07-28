@@ -6,6 +6,7 @@ Kubernetes uses etcd to distribute and synchronise these annotations so we don't
 package main
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -38,29 +39,31 @@ const (
 	retryPeriod  = time.Second * 2
 	jitterFactor = 1.0
 
+	progName = "kube-peers.weave.works"
 	// Prefix all our annotation keys with this string so they don't clash with anyone else's
-	KubePeersPrefix = "kube-peers.weave.works/"
+	KubePeersPrefix = progName + "/"
 	// KubePeersAnnotationKey is the default annotation key
 	KubePeersAnnotationKey = KubePeersPrefix + "peers"
 )
 
 func (cml *configMapAnnotations) Init() error {
+	ctx := context.Background()
 	for {
 		// Since it's potentially racy to GET, then CREATE if not found, we wrap in a check loop
 		// so that if the configmap is created after our GET but before or CREATE, we'll gracefully
 		// re-try to get the configmap.
 		var err error
-		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Get(cml.ConfigMapName, api.GetOptions{})
+		cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Get(ctx, cml.ConfigMapName, api.GetOptions{})
 		if err != nil {
 			if !kubeErrors.IsNotFound(err) {
 				return errors.Wrapf(err, "Unable to fetch ConfigMap %s/%s", cml.Namespace, cml.ConfigMapName)
 			}
-			cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Create(&v1.ConfigMap{
+			cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: api.ObjectMeta{
 					Name:      cml.ConfigMapName,
 					Namespace: cml.Namespace,
 				},
-			})
+			}, api.CreateOptions{FieldManager: progName})
 			if err != nil {
 				if kubeErrors.IsAlreadyExists(err) {
 					continue
@@ -95,29 +98,29 @@ func (cml *configMapAnnotations) GetAnnotation(key string) (string, bool) {
 	return value, ok
 }
 
-func (cml *configMapAnnotations) UpdateAnnotation(key, value string) (err error) {
+func (cml *configMapAnnotations) UpdateAnnotation(ctx context.Context, key, value string) (err error) {
 	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
 	// from Update(), which will be the latest on the server, or nil if error
 	cml.cm.Annotations[cleanKey(key)] = value
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(ctx, cml.cm, api.UpdateOptions{FieldManager: progName})
 	return err
 }
 
-func (cml *configMapAnnotations) RemoveAnnotation(key string) (err error) {
+func (cml *configMapAnnotations) RemoveAnnotation(ctx context.Context, key string) (err error) {
 	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
 	// speculatively change the state, then replace with whatever comes back
 	// from Update(), which will be the latest on the server, or nil if error
 	delete(cml.cm.Annotations, cleanKey(key))
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(ctx, cml.cm, api.UpdateOptions{FieldManager: progName})
 	return err
 }
 
-func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string) (err error) {
+func (cml *configMapAnnotations) RemoveAnnotationsWithValue(ctx context.Context, valueToRemove string) (err error) {
 	if cml.cm == nil || cml.cm.Annotations == nil {
 		return errors.New("endpoint not initialized, call Init first")
 	}
@@ -128,7 +131,7 @@ func (cml *configMapAnnotations) RemoveAnnotationsWithValue(valueToRemove string
 			delete(cml.cm.Annotations, key) // don't need to clean this key as it came from the map
 		}
 	}
-	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(cml.cm)
+	cml.cm, err = cml.Client.ConfigMaps(cml.Namespace).Update(ctx, cml.cm, api.UpdateOptions{FieldManager: progName})
 	return err
 }
 

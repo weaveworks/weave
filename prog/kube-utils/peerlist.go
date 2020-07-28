@@ -4,6 +4,7 @@ This module deals with operations on the peerlist backed by Kubernetes' annotati
 package main
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
@@ -62,12 +63,12 @@ func (cml *configMapAnnotations) GetPeerList() (*peerList, error) {
 	return &record, nil
 }
 
-func (cml *configMapAnnotations) UpdatePeerList(list peerList) error {
+func (cml *configMapAnnotations) UpdatePeerList(ctx context.Context, list peerList) error {
 	recordBytes, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
-	return cml.UpdateAnnotation(KubePeersAnnotationKey, string(recordBytes))
+	return cml.UpdateAnnotation(ctx, KubePeersAnnotationKey, string(recordBytes))
 }
 
 // update the list of all peers that have gone through this code path
@@ -81,7 +82,7 @@ func addMyselfToPeerList(cml *configMapAnnotations, c kubernetes.Interface, peer
 		}
 		if !list.contains(peerName) {
 			list.add(peerName, name)
-			err = cml.UpdatePeerList(*list)
+			err = cml.UpdatePeerList(context.Background(), *list)
 			if err != nil {
 				return err
 			}

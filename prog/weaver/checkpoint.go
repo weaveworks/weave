@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -60,7 +61,7 @@ func checkForUpdates(dockerVersion string, router *weave.NetworkRouter, clusterS
 		"kernel-version": kernelVersion,
 	}
 
-	checkpointKubernetes(flags, clusterSize)
+	checkpointKubernetes(context.Background(), flags, clusterSize)
 
 	// Start background version checking
 	params := checkpoint.CheckParams{
@@ -88,7 +89,7 @@ func checkpointFlags(router *weave.NetworkRouter) []checkpoint.Flag {
 }
 
 // checkpoint Kubernetes specific details
-func checkpointKubernetes(flags map[string]string, clusterSize uint) {
+func checkpointKubernetes(ctx context.Context, flags map[string]string, clusterSize uint) {
 	// checks if weaver is running in Kubernetes
 	host := os.Getenv("KUBERNETES_SERVICE_HOST")
 	if len(host) == 0 {
@@ -112,7 +113,7 @@ func checkpointKubernetes(flags map[string]string, clusterSize uint) {
 	flags["kubernetes-version"] = k8sVersion.String()
 
 	// use UID of `weave-net` configmap as unique ID of the Kubenerets cluster
-	cm, err := c.CoreV1().ConfigMaps(configMapNamespace).Get(configMapName, api.GetOptions{})
+	cm, err := c.CoreV1().ConfigMaps(configMapNamespace).Get(ctx, configMapName, api.GetOptions{})
 	if err != nil {
 		Log.Printf("Unable to fetch ConfigMap %s/%s to infer unique cluster ID", configMapNamespace, configMapName)
 		return

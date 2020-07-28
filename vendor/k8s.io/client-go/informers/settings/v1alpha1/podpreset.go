@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
-	settings_v1alpha1 "k8s.io/api/settings/v1alpha1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +62,16 @@ func NewFilteredPodPresetInformer(client kubernetes.Interface, namespace string,
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SettingsV1alpha1().PodPresets(namespace).List(options)
+				return client.SettingsV1alpha1().PodPresets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SettingsV1alpha1().PodPresets(namespace).Watch(options)
+				return client.SettingsV1alpha1().PodPresets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&settings_v1alpha1.PodPreset{},
+		&settingsv1alpha1.PodPreset{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *podPresetInformer) defaultInformer(client kubernetes.Interface, resyncP
 }
 
 func (f *podPresetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&settings_v1alpha1.PodPreset{}, f.defaultInformer)
+	return f.factory.InformerFor(&settingsv1alpha1.PodPreset{}, f.defaultInformer)
 }
 
 func (f *podPresetInformer) Lister() v1alpha1.PodPresetLister {

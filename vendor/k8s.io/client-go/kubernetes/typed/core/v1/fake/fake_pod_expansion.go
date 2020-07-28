@@ -17,21 +17,35 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakePods) Bind(binding *v1.Binding) error {
+func (c *FakePods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
+	action.Namespace = binding.Namespace
 	action.Resource = podsResource
-	action.Subresource = "bindings"
+	action.Subresource = "binding"
 	action.Object = binding
 
 	_, err := c.Fake.Invokes(action, binding)
 	return err
+}
+
+func (c *FakePods) GetBinding(name string) (result *v1.Binding, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewGetSubresourceAction(podsResource, c.ns, "binding", name), &v1.Binding{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Binding), err
 }
 
 func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
@@ -39,16 +53,17 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Verb = "get"
 	action.Namespace = c.ns
 	action.Resource = podsResource
-	action.Subresource = "logs"
+	action.Subresource = "log"
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
 	return &restclient.Request{}
 }
 
-func (c *FakePods) Evict(eviction *policy.Eviction) error {
+func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
+	action.Namespace = c.ns
 	action.Resource = podsResource
 	action.Subresource = "eviction"
 	action.Object = eviction

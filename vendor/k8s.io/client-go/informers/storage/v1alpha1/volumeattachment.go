@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
-	storage_v1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -60,16 +61,16 @@ func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeri
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1alpha1().VolumeAttachments().List(options)
+				return client.StorageV1alpha1().VolumeAttachments().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1alpha1().VolumeAttachments().Watch(options)
+				return client.StorageV1alpha1().VolumeAttachments().Watch(context.TODO(), options)
 			},
 		},
-		&storage_v1alpha1.VolumeAttachment{},
+		&storagev1alpha1.VolumeAttachment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +81,7 @@ func (f *volumeAttachmentInformer) defaultInformer(client kubernetes.Interface, 
 }
 
 func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storage_v1alpha1.VolumeAttachment{}, f.defaultInformer)
+	return f.factory.InformerFor(&storagev1alpha1.VolumeAttachment{}, f.defaultInformer)
 }
 
 func (f *volumeAttachmentInformer) Lister() v1alpha1.VolumeAttachmentLister {
