@@ -37,17 +37,17 @@ setup_iptables_backend() {
 # Check whether xt_set actually exists
 xt_set_exists() {
     # Clean everything up in advance, in case there's leftovers
-    iptables -F WEAVE-KUBE-TEST 2>/dev/null || true
-    iptables -X WEAVE-KUBE-TEST 2>/dev/null || true
+    iptables -w -F WEAVE-KUBE-TEST 2>/dev/null || true
+    iptables -w -X WEAVE-KUBE-TEST 2>/dev/null || true
     ipset destroy weave-kube-test 2>/dev/null || true
 
     ipset create weave-kube-test hash:ip
-    iptables -t filter -N WEAVE-KUBE-TEST
-    if ! iptables -A WEAVE-KUBE-TEST -m set --match-set weave-kube-test src -j DROP; then
+    iptables -w -t filter -N WEAVE-KUBE-TEST
+    if ! iptables -w -A WEAVE-KUBE-TEST -m set --match-set weave-kube-test src -j DROP; then
         NOT_EXIST=1
     fi
-    iptables -F WEAVE-KUBE-TEST
-    iptables -X WEAVE-KUBE-TEST
+    iptables -w -F WEAVE-KUBE-TEST
+    iptables -w -X WEAVE-KUBE-TEST
     ipset destroy weave-kube-test
     [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
 }
