@@ -12,6 +12,10 @@ network_tester_status() {
     [ -n "$status" -a "$status" != "running" ]
 }
 
+established_metric() {
+    $SSH $HOST1 curl -sS http://127.0.0.1:6784/metrics | awk -e '/^weave_connections.*state="established"/ { print $2 }'
+}
+
 start_suite "Network test over cross-host weave network"
 
 weave_on $HOST1 launch
@@ -24,5 +28,6 @@ weave_on  $HOST2 attach $C2/24 c2
 
 wait_for_x network_tester_status "network tester status"
 assert "echo $status" "pass"
+assert "established_metric" "1"
 
 end_suite
