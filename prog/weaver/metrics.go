@@ -44,22 +44,29 @@ func uint64Counter(desc *prometheus.Desc, val uint64, labels ...string) promethe
 }
 
 var metrics = []metric{
-	{desc("weave_connections", "Number of peer-to-peer connections.", "state", "type"),
+	{desc("weave_connections", "Number of peer-to-peer connections.", "state", "type", "encryption"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			counts := make(map[ /*state*/ string]map[ /*type*/ string]int)
+			counts := make(map[ /*state*/ string]map[ /*type*/ string]struct{ encrypted, unencrypted int })
 			for _, state := range allConnectionStates {
-				counts[state] = make(map[string]int)
+				counts[state] = make(map[string]struct{ encrypted, unencrypted int })
 			}
 			for _, conn := range s.Router.Connections {
 				typeName := "unknown"
 				if t, ok := conn.Attrs["name"]; ok {
 					typeName = t.(string)
 				}
-				counts[conn.State][typeName]++
+				c := counts[conn.State][typeName]
+				if e, ok := conn.Attrs["encrypted"]; ok && e.(bool) {
+					c.encrypted++
+				} else {
+					c.unencrypted++
+				}
+				counts[conn.State][typeName] = c
 			}
 			for state, stateCounts := range counts {
 				for connType, count := range stateCounts {
-					ch <- intGauge(desc, count, state, connType)
+					ch <- intGauge(desc, count.encrypted, state, connType, "yes")
+					ch <- intGauge(desc, count.unencrypted, state, connType, "")
 				}
 			}
 		}},

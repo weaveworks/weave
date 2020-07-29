@@ -44,6 +44,7 @@ weave_on $HOST2 launch --password wfvAwt7sj $HOST1
 
 assert_raises "weave_on $HOST1 status connections | grep -P 'encrypted *fastdp'"
 assert_raises "weave_on $HOST2 status connections | grep -P 'encrypted *fastdp'"
+assert "connections_metric $HOST1 encryption=\\\"yes\\\"",state=\\\"established\\\" "1"
 
 PCAP1=$(mktemp)
 PCAP2=$(mktemp)
