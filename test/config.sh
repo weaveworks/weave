@@ -267,6 +267,10 @@ wait_for_attached() {
     wait_for_x "check_attached $1 $2" "$2 on $1 to be attached"
 }
 
+connections_metric() {
+    $SSH $1 curl -sS http://127.0.0.1:6784/metrics | awk -e "/^weave_connections.*$2/ { print \$2 }"
+}
+
 # assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
     local host=$1
