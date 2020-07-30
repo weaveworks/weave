@@ -13,9 +13,9 @@ start_suite "Resolve names in custom domain with subdomains"
 
 weave_on $HOST1 launch --log-level=debug --dns-domain $DOMAIN.
 
-start_container_with_dns $HOST1 $C1/24 --name=c1 -h foo.$SUBDOMAIN1
-start_container_with_dns $HOST1 $C2/24 --name=c2 -h foo.$SUBDOMAIN2
-start_container_with_dns $HOST1 $C3/24 --name=c3 -h tre.$SUBDOMAIN1 --dns-search=$SUBDOMAIN2
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C1/24 --name=c1 -h foo.$SUBDOMAIN1
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C2/24 --name=c2 -h foo.$SUBDOMAIN2
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C3/24 --name=c3 -h tre.$SUBDOMAIN1 --dns-search=$SUBDOMAIN2
 
 assert_dns_record   $HOST1 c1 foo.$SUBDOMAIN2 $C2
 assert_dns_a_record $HOST1 c3 foo             $C2 foo.$SUBDOMAIN2

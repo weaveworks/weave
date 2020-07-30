@@ -13,9 +13,9 @@ start_suite "Resolve unqualified names"
 
 weave_on $HOST1 launch
 
-start_container          $HOST1 $C1/24 --name=c1 -h $NAME
-start_container_with_dns $HOST1 $C2/24 --name=c2 -h seetwo.$DOMAIN
-start_container_with_dns $HOST1 $C3/24 --name=c3 --dns-search=$DOMAIN
+proxy_start_container          $HOST1 -e WEAVE_CIDR=$C1/24 --name=c1 -h $NAME
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C2/24 --name=c2 -h seetwo.$DOMAIN
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C3/24 --name=c3 --dns-search=$DOMAIN
 container=$(start_container_with_dns $HOST1 $C4/24)
 
 assert_dns_a_record $HOST1 c2           seeone     $C1 $NAME
