@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
+	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
 )
 
@@ -55,9 +55,9 @@ func newRuleSpec(policyType policyType, proto *string, srcHost, dstHost ruleHost
 
 func (spec *ruleSpec) iptChain() string {
 	if spec.policyType == policyTypeEgress {
-		return EgressCustomChain
+		return chains.EgressCustomChain
 	}
-	return IngressChain
+	return chains.IngressChain
 }
 
 func (spec *ruleSpec) iptRuleSpecs() [][]string {
@@ -71,7 +71,7 @@ func (spec *ruleSpec) iptRuleSpecs() [][]string {
 	// policyTypeEgress
 	ruleMark := make([]string, len(spec.args))
 	copy(ruleMark, spec.args)
-	ruleMark = append(ruleMark, "-j", EgressMarkChain)
+	ruleMark = append(ruleMark, "-j", chains.EgressMarkChain)
 	ruleReturn := make([]string, len(spec.args))
 	copy(ruleReturn, spec.args)
 	ruleReturn = append(ruleReturn, "-j", "RETURN")
@@ -80,14 +80,14 @@ func (spec *ruleSpec) iptRuleSpecs() [][]string {
 
 type ruleSet struct {
 	ipt   iptables.Interface
-	users map[string]map[types.UID]struct{}
+	users map[string]map[ipset.UID]struct{}
 }
 
 func newRuleSet(ipt iptables.Interface) *ruleSet {
-	return &ruleSet{ipt, make(map[string]map[types.UID]struct{})}
+	return &ruleSet{ipt, make(map[string]map[ipset.UID]struct{})}
 }
 
-func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*ruleSpec) error {
+func (rs *ruleSet) deprovision(user ipset.UID, current, desired map[string]*ruleSpec) error {
 	for key, spec := range current {
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
@@ -108,7 +108,7 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 	return nil
 }
 
-func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSpec) error {
+func (rs *ruleSet) provision(user ipset.UID, current, desired map[string]*ruleSpec) error {
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
@@ -119,7 +119,7 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 						return err
 					}
 				}
-				rs.users[key] = make(map[types.UID]struct{})
+				rs.users[key] = make(map[ipset.UID]struct{})
 			}
 			rs.users[key][user] = struct{}{}
 		}

@@ -84,7 +84,7 @@ func NewAWSVPCTracker(bridgeName string) (*AWSVPCTracker, error) {
 func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
 	t.debugf("replacing %q by %q; local(%t)", prevRanges, currRanges, local)
 
-	prev, curr := RemoveCommon(address.NewCIDRs(Merge(prevRanges)), address.NewCIDRs(Merge(currRanges)))
+	prev, curr := address.RemoveCommon(address.NewCIDRs(address.Merge(prevRanges)), address.NewCIDRs(address.Merge(currRanges)))
 
 	// It might make sense to do the removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might

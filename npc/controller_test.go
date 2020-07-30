@@ -8,11 +8,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/net/ipset"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -20,7 +20,7 @@ import (
 type mockSet struct {
 	name    ipset.Name
 	setType ipset.Type
-	subSets map[string]map[types.UID]bool
+	subSets map[string]map[ipset.UID]bool
 }
 
 type mockIPSet struct {
@@ -35,17 +35,17 @@ func (i *mockIPSet) Create(ipsetName ipset.Name, ipsetType ipset.Type) error {
 	if _, ok := i.sets[string(ipsetName)]; ok {
 		return errors.Errorf("ipset %s already exists", ipsetName)
 	}
-	i.sets[string(ipsetName)] = mockSet{name: ipsetName, setType: ipsetType, subSets: make(map[string]map[types.UID]bool)}
+	i.sets[string(ipsetName)] = mockSet{name: ipsetName, setType: ipsetType, subSets: make(map[string]map[ipset.UID]bool)}
 	return nil
 }
 
-func (i *mockIPSet) AddEntry(user types.UID, ipsetName ipset.Name, entry string, comment string) error {
+func (i *mockIPSet) AddEntry(user ipset.UID, ipsetName ipset.Name, entry string, comment string) error {
 	log.Printf("adding entry %s to %s for %s", entry, ipsetName, user)
 	if _, ok := i.sets[string(ipsetName)]; !ok {
 		return errors.Errorf("%s does not exist", entry)
 	}
 	if i.sets[string(ipsetName)].subSets[entry] == nil {
-		i.sets[string(ipsetName)].subSets[entry] = make(map[types.UID]bool)
+		i.sets[string(ipsetName)].subSets[entry] = make(map[ipset.UID]bool)
 	}
 	if _, ok := i.sets[string(ipsetName)].subSets[entry][user]; ok {
 		return errors.Errorf("user %s already owns entry %s", user, entry)
@@ -55,7 +55,7 @@ func (i *mockIPSet) AddEntry(user types.UID, ipsetName ipset.Name, entry string,
 	return nil
 }
 
-func (i *mockIPSet) DelEntry(user types.UID, ipsetName ipset.Name, entry string) error {
+func (i *mockIPSet) DelEntry(user ipset.UID, ipsetName ipset.Name, entry string) error {
 	log.Printf("deleting entry %s from %s for %s", entry, ipsetName, user)
 	if _, ok := i.sets[string(ipsetName)]; !ok {
 		return errors.Errorf("ipset %s does not exist", ipsetName)
@@ -72,7 +72,7 @@ func (i *mockIPSet) DelEntry(user types.UID, ipsetName ipset.Name, entry string)
 	return nil
 }
 
-func (i *mockIPSet) EntryExists(user types.UID, ipsetName ipset.Name, entry string) bool {
+func (i *mockIPSet) EntryExists(user ipset.UID, ipsetName ipset.Name, entry string) bool {
 	_, ok := i.sets[string(ipsetName)].subSets[entry][user]
 	return ok
 }
@@ -428,7 +428,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 
 	// Should be in default-allow as no netpol selects podBar
 	require.True(t, m.entriesExist(ingressDefaultAllowIPSetName, podIP))
-	require.True(t, m.EntryExists(podBar.ObjectMeta.UID, ingressDefaultAllowIPSetName, podIP))
+	require.True(t, m.EntryExists(uid(podBar), ingressDefaultAllowIPSetName, podIP))
 	// Should be in run=bar ipset
 	require.True(t, m.entriesExist(runBarIPSetName, podIP))
 
@@ -582,8 +582,8 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 	require.True(t, m.entriesExist(exceptIPSetName, "192.168.48.2/32"))
 
 	// Each egress rule is represented as two iptables rules (-J MARK and -J RETURN).
-	require.Equal(t, 2, len(ipt.rules[EgressCustomChain]))
-	for rule := range ipt.rules[EgressCustomChain] {
+	require.Equal(t, 2, len(ipt.rules[chains.EgressCustomChain]))
+	for rule := range ipt.rules[chains.EgressCustomChain] {
 		require.Contains(t, rule, "-d 192.168.48.0/24 -m set ! --match-set "+exceptIPSetName+" dst")
 	}
 
@@ -690,8 +690,8 @@ func TestIngressPolicyWithIPBlockAndPortSpecified(t *testing.T) {
 	require.Equal(t, 1, len(m.sets[runBarIPSetName].subSets))
 	require.True(t, m.entriesExist(runBarIPSetName, barPodIP))
 
-	require.Equal(t, 1, len(ipt.rules[IngressChain]))
-	for rule := range ipt.rules[IngressChain] {
+	require.Equal(t, 1, len(ipt.rules[chains.IngressChain]))
+	for rule := range ipt.rules[chains.IngressChain] {
 		require.Contains(t, rule, "-s 192.168.48.4/32 -m set --match-set "+runBarIPSetName+" dst --dport 80")
 	}
 }
