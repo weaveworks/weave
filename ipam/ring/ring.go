@@ -560,7 +560,7 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerN
 			break
 		}
 		// Ignore ranges with no free space
-		if entry.Free <= 0 {
+		if entry.Free == 0 {
 			continue
 		}
 

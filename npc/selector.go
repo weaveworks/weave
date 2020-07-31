@@ -59,7 +59,7 @@ func (spec *selectorSpec) getRuleSpec(src bool) ([]string, string) {
 	}
 	rule := []string{"-m", "set", "--match-set", string(spec.ipsetName), dir}
 
-	comment := "anywhere"
+	var comment string
 	if spec.nsName != "" {
 		comment = fmt.Sprintf("pods: namespace: %s, selector: %s", spec.nsName, spec.key)
 	} else {

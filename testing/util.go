@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,12 +26,6 @@ func AssertErrorType(t *testing.T, expected interface{}, actual error, desc stri
 			desc,
 		)
 	}
-}
-
-func stackTrace(all bool) string {
-	buf := make([]byte, 1<<20)
-	stacklen := runtime.Stack(buf, all)
-	return string(buf[:stacklen])
 }
 
 // TrimTestArgs finds the first -- in os.Args and trim all args before

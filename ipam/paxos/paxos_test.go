@@ -56,16 +56,6 @@ func (m *Model) addLink(a, b *TestNode) {
 	m.readyLinks = append(m.readyLinks, &ab, &ba)
 }
 
-func (m *Model) linkExists(a, b *TestNode) bool {
-	for _, l := range a.links {
-		if l.to == b {
-			return true
-		}
-	}
-
-	return false
-}
-
 type TestParams struct {
 	// Number of nodes
 	nodeCount uint

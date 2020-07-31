@@ -15,8 +15,6 @@ const (
 	caCertPath     = "ca.pem"
 	clientKeyPath  = "key.pem"
 	clientCertPath = "cert.pem"
-	serverKeyPath  = "server-key.pem"
-	serverCertPath = "server.pem"
 )
 
 func main() {

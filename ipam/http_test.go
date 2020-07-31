@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -158,11 +159,13 @@ func TestHTTPCancel(t *testing.T) {
 
 	// Ask the http server for a new address
 	req, _ := http.NewRequest("POST", allocURL(port, testCIDR1, containerID), nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
 	// On another goroutine, wait for a bit then cancel the request
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		common.Log.Debug("Cancelling allocate")
-		http.DefaultTransport.(*http.Transport).CancelRequest(req)
+		cancel()
 	}()
 
 	res, _ := http.DefaultClient.Do(req)

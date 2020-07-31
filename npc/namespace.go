@@ -158,13 +158,6 @@ func (ns *ns) addToDefaultAllowIfNoMatching(pod *coreapi.Pod, policyType policyT
 	return nil
 }
 
-func (ns *ns) checkLocalPod(obj *coreapi.Pod) bool {
-	if obj.Spec.NodeName != ns.nodeName {
-		return false
-	}
-	return true
-}
-
 func (ns *ns) addPod(obj *coreapi.Pod) error {
 	ns.pods[uid(obj)] = obj
 

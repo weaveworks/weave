@@ -17,8 +17,6 @@ import (
 
 const (
 	testStart1 = "10.0.1.0"
-	testStart2 = "10.0.2.0"
-	testStart3 = "10.0.3.0"
 )
 
 func returnFalse() bool { return false }

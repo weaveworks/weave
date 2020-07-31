@@ -430,14 +430,6 @@ func (ipsec *IPSec) removeDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inS
 	return ipsec.resetRules(rules, true)
 }
 
-func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI) error {
-	r := ruleMarkInboundESP(srcIP, dstIP, inSPI)
-	if err := ipsec.ipt.Delete(r.table, r.chain, r.rulespec...); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
-	}
-	return nil
-}
-
 // xfrm
 
 func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
