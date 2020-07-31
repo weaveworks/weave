@@ -13,7 +13,7 @@
 #   PROVIDER=aws ./run-integration-tests.sh
 #
 
-set -e
+set -eDIR
 DIR="$(dirname "$0")"
 . "$DIR/../tools/provisioning/setup.sh" # Import gcp_on, do_on, and aws_on.
 . "$DIR/config.sh"                      # Import greenly.
@@ -148,7 +148,7 @@ function create_image() {
         local begin_img=$(date +%s)
         local num_hosts=1
         terraform init "$DIR/../tools/provisioning/gcp"
-        terraform apply -auto-approve -input=false -var "app=$APP" -var "name=$NAME" -var "gcp_image=ubuntu-os-cloud/ubuntu-2004-lts" -var "num_hosts=$num_hosts" -var "$DIR/../tools/provisioning/gcp"
+        terraform apply -auto-approve -input=false -var "app=$APP" -var "name=$NAME" -var "gcp_image=ubuntu-os-cloud/ubuntu-2004-lts" -var "num_hosts=$num_hosts" "$DIR/../tools/provisioning/gcp"
         configure_with_ansible "$(terraform output username)" "$(terraform output public_ips)," "$(terraform output private_key_path)" $num_hosts
         local zone=$(terraform output zone)
         local name=$(terraform output instances_names)
