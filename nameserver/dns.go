@@ -90,7 +90,7 @@ type DNSServer struct {
 	ns      *Nameserver
 	domain  string
 	ttl     uint32
-	address string
+	address string // listen address and port, e.g. 1.2.3.4:53
 
 	servers   []*dns.Server
 	upstream  Upstream
@@ -99,6 +99,10 @@ type DNSServer struct {
 }
 
 func NewDNSServer(ns *Nameserver, domain, address string, upstream Upstream, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
+	if _, _, err := net.SplitHostPort(address); err != nil {
+		return nil, fmt.Errorf("invalid DNS listen address %q: %v", address, err)
+	}
+
 	s := &DNSServer{
 		ns:        ns,
 		domain:    dns.Fqdn(domain),

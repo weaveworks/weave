@@ -43,6 +43,7 @@ weave launch        [--password <pass>] [--trusted-subnets <cidr>,...]
                     [--host <ip_address>]
                     [--name <mac>] [--nickname <nickname>]
                     [--no-restart] [--resume] [--no-discovery] [--no-dns]
+                    [--dns-listen-address <address>:<port>]
                     [--ipalloc-init <mode>]
                     [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                     [--plugin=false] [--proxy=false]
@@ -775,52 +776,9 @@ dns_args() {
     DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null)} || retval=$?
     [ "$retval" -eq 4 ] && return 0
     DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
+    DNS_ADDRESS=${DNS_ADDRESS:-$(call_weave GET /dns-address 2>/dev/null)}
 
-    NAME_ARG=""
-    HOSTNAME_SPECIFIED=
-    DNS_SEARCH_SPECIFIED=
-    WITHOUT_DNS=
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            --without-dns)
-                WITHOUT_DNS=1
-                ;;
-            --name)
-                NAME_ARG="$2"
-                shift
-                ;;
-            --name=*)
-                NAME_ARG="${1#*=}"
-                ;;
-            -h|--hostname|--hostname=*)
-                HOSTNAME_SPECIFIED=1
-                ;;
-            --dns-search|--dns-search=*)
-                DNS_SEARCH_SPECIFIED=1
-                ;;
-        esac
-        shift
-    done
-    [ -n "$WITHOUT_DNS" ] && return 0
-
-    [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-    DNS_ARGS="--dns=$DOCKER_BRIDGE_IP"
-    if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
-        HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
-        if [ ${#HOSTNAME} -gt 64 ] ; then
-            echo "Container name too long to be used as hostname" >&2
-        else
-            DNS_ARGS="$DNS_ARGS --hostname=$HOSTNAME"
-            HOSTNAME_SPECIFIED=1
-        fi
-    fi
-    if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
-      if [ -z "$HOSTNAME_SPECIFIED" ] ; then
-        DNS_ARGS="$DNS_ARGS --dns-search=$DNS_DOMAIN"
-      else
-        DNS_ARGS="$DNS_ARGS --dns-search=."
-      fi
-    fi
+    DNS_ARGS="--dns=$DNS_ADDRESS --dns-search=$DNS_DOMAIN"
 }
 
 # Iff the container in $1 has an FQDN, invoke $2 as a command passing
@@ -1489,8 +1447,8 @@ case "$COMMAND" in
         ;;
     dns-lookup)
         [ $# -eq 1 ] || usage
-        DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
-        dig @$DOCKER_BRIDGE_IP +short $1
+        DNS_ADDRESS=${DNS_ADDRESS:-$(call_weave GET /dns-address-port 2>/dev/null)}
+        dig @${DNS_ADDRESS%:*} -p ${DNS_ADDRESS#*:} +short $1
         ;;
     expose)
         WITHOUT_MASQUERADE=

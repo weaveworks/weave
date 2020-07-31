@@ -55,10 +55,7 @@ type dnsConfig struct {
 
 // return the address part of the DNS listen address, without ":53" on the end
 func (c dnsConfig) addressOnly() string {
-	addr, _, err := net.SplitHostPort(c.ListenAddress)
-	if err != nil {
-		Log.Fatalf("Error when parsing DNS listen address %q: %s", c.ListenAddress, err)
-	}
+	addr, _, _ := net.SplitHostPort(c.ListenAddress)
 	return addr
 }
 
@@ -474,6 +471,7 @@ func main() {
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)
+			dnsserver.HandleHTTP(muxRouter)
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver, proxy, plugin, &waitReady)

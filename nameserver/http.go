@@ -3,6 +3,7 @@ package nameserver
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -82,5 +83,15 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 		if err := json.NewEncoder(w).Encode(n.entries); err != nil {
 			n.badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
 		}
+	})
+}
+
+func (d *DNSServer) HandleHTTP(router *mux.Router) {
+	router.Methods("GET").Path("/dns-address-port").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, d.address)
+	})
+	router.Methods("GET").Path("/dns-address").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, _ := net.SplitHostPort(d.address) // address is validated in NewDNSServer()
+		fmt.Fprint(w, host)
 	})
 }

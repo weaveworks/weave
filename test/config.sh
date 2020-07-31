@@ -189,7 +189,7 @@ start_container_image() {
     fi
     is_cidr "$1" && { cidr=$1; shift; }
     container=$(docker_on $host run $weave_dns_args $name_args "$@" -dt $image /bin/sh)
-    if ! weave_on $host attach $cidr $container >/dev/null ; then
+    if ! weave_on $host attach $cidr $ATTACH_ARGS $container >/dev/null ; then
         docker_on $host rm -f $container
         return 1
     fi
