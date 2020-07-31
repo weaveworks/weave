@@ -3,7 +3,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-IMAGE="weaveworks/docker-py:1.9.0-prime"
+IMAGE="weaveworks/docker-py3:1.9.0-prime"
 
 docker_py_test() {
     SHARD=$1
