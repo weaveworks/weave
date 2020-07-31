@@ -39,7 +39,7 @@ jobs:
 
   smoke-tests:
     machine:
-      image: circleci/classic:201709-01
+      image: ubuntu-1604:202007-01
     working_directory: /home/circleci/src/github.com/weaveworks/weave
     environment:
       SRCDIR: /home/circleci/src/github.com/weaveworks/weave
