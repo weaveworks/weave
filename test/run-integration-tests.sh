@@ -34,7 +34,7 @@ DOCKER_VERSION=${DOCKER_VERSION:-"$(grep -oP "(?<=DOCKER_VERSION=).*" "$DIR/../D
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-"$(grep -oP "(?<=KUBERNETES_VERSION=).*" "$DIR/../DEPENDENCIES")"}
 KUBERNETES_CNI_VERSION=${KUBERNETES_CNI_VERSION:-"$(grep -oP "(?<=KUBERNETES_CNI_VERSION=).*" "$DIR/../DEPENDENCIES")"}
 # Google Cloud Platform image's name & usage (only used when PROVIDER is gcp):
-IMAGE_NAME=${IMAGE_NAME:-"$(echo "$APP-docker$DOCKER_VERSION-k8s$KUBERNETES_VERSION-k8scni$KUBERNETES_CNI_VERSION" | sed -e 's/[\.\_]*//g')"}
+IMAGE_NAME=${IMAGE_NAME:-"$(echo "$APP-docker$DOCKER_VERSION-k8s$KUBERNETES_VERSION-k8scni$KUBERNETES_CNI_VERSION-U2004" | sed -e 's/[\.\_]*//g')"}
 DISK_NAME_PREFIX=${DISK_NAME_PREFIX:-$NAME}
 USE_IMAGE=${USE_IMAGE:-1}
 CREATE_IMAGE=${CREATE_IMAGE:-1}
@@ -148,7 +148,7 @@ function create_image() {
         local begin_img=$(date +%s)
         local num_hosts=1
         terraform init "$DIR/../tools/provisioning/gcp"
-        terraform apply -auto-approve -input=false -var "app=$APP" -var "name=$NAME" -var "num_hosts=$num_hosts" "$DIR/../tools/provisioning/gcp"
+        terraform apply -auto-approve -input=false -var "app=$APP" -var "name=$NAME" -var "gcp_image=ubuntu-os-cloud/ubuntu-2004-lts" -var "num_hosts=$num_hosts" -var "$DIR/../tools/provisioning/gcp"
         configure_with_ansible "$(terraform output username)" "$(terraform output public_ips)," "$(terraform output private_key_path)" $num_hosts
         local zone=$(terraform output zone)
         local name=$(terraform output instances_names)
