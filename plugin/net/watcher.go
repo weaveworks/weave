@@ -29,6 +29,12 @@ func (w *watcher) ContainerStarted(id string) {
 		w.driver.warn("ContainerStarted", "error inspecting container %s: %s", id, err)
 		return
 	}
+
+	domain, err := w.weave.DNSDomain()
+	if err != nil {
+		w.driver.warn("ContainerStarted", "unable to get weave dns domain: %s", err)
+	}
+
 	// check that it's on our network
 	for _, net := range info.NetworkSettings.Networks {
 		network, err := w.driver.findNetworkInfo(net.NetworkID)
@@ -39,8 +45,22 @@ func (w *watcher) ContainerStarted(id string) {
 		if network.isOurs {
 			if w.driver.dns {
 				fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
-				if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-					w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+
+				aliases := make([]string, 0, len(net.Aliases)+2)
+				aliases = append(aliases, fqdn)
+
+				if len(domain) > 0 && len(info.Name) > 1 && info.Name[0] == '/' {
+					name := fmt.Sprintf("%s.%s", info.Name[1:], domain)
+					aliases = append(aliases, name)
+				}
+
+				aliases = append(aliases, net.Aliases...)
+
+				for _, alias := range aliases {
+					w.driver.debug("ContainerStarted", "going to register %s with weaveDNS", alias)
+					if err := w.weave.RegisterWithDNS(id, alias, net.IPAddress); err != nil {
+						w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+					}
 				}
 			}
 			netNSPath := weavenet.NSPathByPidWithProc(w.driver.procPath, info.State.Pid)
