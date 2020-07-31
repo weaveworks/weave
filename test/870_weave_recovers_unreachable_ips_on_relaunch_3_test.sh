@@ -41,7 +41,7 @@ function setup_kubernetes_cluster {
 
     for host in $HOSTS; do
         if [ $host = $HOST1 ] ; then
-        run_on $host "sudo systemctl start kubelet && sudo kubeadm init --kubernetes-version=$k8s_version --token=$TOKEN"
+        run_on $host "sudo systemctl start kubelet && sudo kubeadm init --ignore-preflight-errors=NumCPU --kubernetes-version=$k8s_version --token=$TOKEN"
         else
         run_on $host "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN --discovery-token-unsafe-skip-ca-verification $HOST1IP:$KUBE_PORT"
         fi
