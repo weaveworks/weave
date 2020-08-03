@@ -17,6 +17,7 @@ weave_on $HOST1 launch --password wfvAwt7sj --trusted-subnets $HOST2_CIDR
 weave_on $HOST2 launch --password wfvAwt7sj $HOST1
 assert_raises "weave_on $HOST1 status connections | grep encrypted"
 assert_raises "weave_on $HOST2 status connections | grep encrypted"
+assert "connections_metric $HOST1 encryption=\\\"yes\\\"",state=\\\"established\\\" "1"
 
 weave_on $HOST1 stop
 weave_on $HOST2 stop
@@ -26,5 +27,6 @@ weave_on $HOST1 launch --password wfvAwt7sj --trusted-subnets $HOST2_CIDR
 weave_on $HOST2 launch --password wfvAwt7sj --trusted-subnets $HOST1_CIDR $HOST1
 assert_raises "weave_on $HOST1 status connections | grep unencrypted"
 assert_raises "weave_on $HOST2 status connections | grep unencrypted"
+assert "connections_metric $HOST1 encryption=\\\"\\\"",state=\\\"established\\\" "1"
 
 end_suite
