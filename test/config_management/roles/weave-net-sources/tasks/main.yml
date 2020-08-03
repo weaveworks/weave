@@ -1,0 +1,24 @@
+---
+# Set up Development Environment for Weave Net.
+
+- name: check if weave net has been checked out
+  become: false  # Run as SSH-user
+  stat:
+    path: $HOME/src/github.com/weaveworks/weave
+  register: weave
+  failed_when: false
+  changed_when: false
+
+- name: git clone weave net
+  become: false  # Run as SSH-user
+  git:
+    repo: https://github.com/weaveworks/weave.git
+    dest: $HOME/src/github.com/weaveworks/weave
+  when: not weave.stat.exists
+
+- name: create a convenience symlink to $HOME/src/github.com/weaveworks/weave
+  become: false  # Run as SSH-user
+  file:
+    src: $HOME/src/github.com/weaveworks/weave
+    dest: $HOME/weave
+    state: link

@@ -1,0 +1,18 @@
+---
+################################################################################
+# Install Docker from Docker's official repository and Weave Net.
+################################################################################
+
+- name: install docker and weave net for development
+  hosts: all
+  gather_facts: false  # required in case Python is not available on the host
+  become: true
+  become_user: root
+
+  pre_tasks:
+    - include: library/setup_ansible_dependencies.yml
+
+  roles:
+    - docker-install
+    - weave-net-utilities
+    - weave-net

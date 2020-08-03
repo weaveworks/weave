@@ -1,0 +1,56 @@
+---
+
+- name: install epel-release
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - epel-release
+  when: ansible_os_family == "RedHat"
+
+- name: install jq
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - jq
+
+- name: install ethtool (used by the weave script)
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - ethtool
+
+- name: install nsenter (used by the weave script)
+  command: docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+
+- name: install pip (for docker-py)
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - python-pip
+
+- name: install docker-py (for docker_image)
+  pip:
+    name: docker-py
+    state: present
+
+- name: docker pull images used by tests
+  docker_image:
+    name: '{{ item }}'
+    state: present
+  with_items:
+    - alpine
+    - aanand/docker-dnsutils
+    - weaveworks/hello-world
+
+- name: docker pull docker-py which is used by tests
+  docker_image:
+    name: joffrey/docker-py
+    tag: '{{ item }}'
+    state: present
+  with_items:
+    - '1.8.1'
+    - '1.9.0-rc2'

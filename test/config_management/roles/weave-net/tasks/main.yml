@@ -1,0 +1,26 @@
+---
+# Set up Weave Net.
+
+- name: install weave net
+  get_url:
+    url: https://git.io/weave
+    dest: /usr/local/bin/weave
+    mode: 0555
+
+- name: stop weave net
+  command: /usr/local/bin/weave stop
+
+- name: start weave net
+  command: /usr/local/bin/weave launch
+
+- name: get weave net's status
+  command: /usr/local/bin/weave status
+  changed_when: false
+  register: weave_status
+  tags:
+    - output
+
+- name: print outpout of `weave status`
+  debug: msg="{{ weave_status.stdout_lines }}"
+  tags:
+    - output
