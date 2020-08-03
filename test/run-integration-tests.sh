@@ -273,7 +273,7 @@ function configure_with_ansible() {
     ansible-playbook -u "$1" -i "$2" --private-key="$3" --forks="${4:-$NUM_HOSTS}" \
         --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
         --extra-vars "docker_version=$DOCKER_VERSION kubernetes_version=$KUBERNETES_VERSION kubernetes_cni_version=$KUBERNETES_CNI_VERSION docker_install_role=$PLAYBOOK_DOCKER_INSTALL_ROLE" \
-        "$DIR/../tools/config_management/$PLAYBOOK"
+        "$DIR/config_management/$PLAYBOOK"
 }
 
 # shellcheck disable=SC2155

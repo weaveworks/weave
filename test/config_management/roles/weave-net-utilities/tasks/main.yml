@@ -30,7 +30,7 @@
     name: "{{ item }}"
     state: present
   with_items:
-    - python-pip
+    - python3-pip
 
 - name: install docker-py (for docker_image)
   pip:
@@ -39,6 +39,7 @@
 
 - name: docker pull images used by tests
   docker_image:
+    source: pull
     name: '{{ item }}'
     state: present
   with_items:
@@ -48,9 +49,9 @@
 
 - name: docker pull docker-py which is used by tests
   docker_image:
-    name: joffrey/docker-py
+    source: pull
+    name: weaveworks/docker-py3
     tag: '{{ item }}'
     state: present
   with_items:
-    - '1.8.1'
-    - '1.9.0-rc2'
+    - '1.9.0-prime'
