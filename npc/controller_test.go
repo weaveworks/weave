@@ -160,6 +160,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	sourceNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "source",
+			UID:  "source",
 			Labels: map[string]string{
 				"app": "source",
 			},
@@ -169,6 +170,7 @@ func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	destinationNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "destination",
+			UID:  "destination",
 		},
 	}
 
@@ -249,6 +251,7 @@ func TestDefaultAllow(t *testing.T) {
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
+			UID:  "default",
 		},
 	}
 	controller.AddNamespace(defaultNamespace)
@@ -378,6 +381,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
+			UID:  "default",
 		},
 	}
 	client.CoreV1().Namespaces().Create(defaultNamespace)
@@ -462,6 +466,7 @@ func TestNewTargetSelector(t *testing.T) {
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
+			UID:  "default",
 		},
 	}
 	client.CoreV1().Namespaces().Create(defaultNamespace)
@@ -540,11 +545,13 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
+			UID:  "default",
 		},
 	}
 	nonDefaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "non-default",
+			UID:  "non-default",
 		},
 	}
 	client.CoreV1().Namespaces().Create(defaultNamespace)
@@ -635,6 +642,7 @@ func TestIngressPolicyWithIPBlockAndPortSpecified(t *testing.T) {
 	defaultNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
+			UID:  "default",
 		},
 	}
 
