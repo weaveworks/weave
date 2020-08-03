@@ -1,5 +1,5 @@
 ---
-title: Monitoring with Prometheus
+title: Monitoring Weave Net with Prometheus
 menu_order: 90
 search_type: Documentation
 ---
@@ -51,106 +51,102 @@ Set it to an empty string to disable.
 You can also pass the parameter `--metrics-addr=X.X.X.X:PORT` to
 `weave launch` to specify an address to listen for metrics only.
 
-# Static Configuration for Weave Net
+# Weave Net Monitoring Setup in Kubernetes using kube-prometheus
 
-The following YAML fragment can be used in your Prometheus configuration to
-scrape the router metrics endpoint:
+Weave Net monitoring can be setup in Kubernetes using the kube-prometheus [library](https://github.com/coreos/kube-prometheus/blob/master/jsonnet/kube-prometheus/kube-prometheus-weave-net.libsonnet) for Weave Net. You can read about the example document [here](https://github.com/coreos/kube-prometheus/blob/master/docs/weave-net-support.md).
 
+Let's setup weave monitoring using [kube-prometheus](https://github.com/coreos/kube-prometheus).
+
+#### Install golang
+Follow this [document](https://golang.org/doc/install/source)
+
+#### Install jssonet builder
 ```
-scrape_configs:
-- job_name: 'weave'
-  scrape_interval: 15s
-  static_configs:
-  - targets: ['localhost:6782']
+go get github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb
 ```
 
-# Discovery Configuration for Kubernetes
+#### Install jsonnet
+Follow this [document](https://github.com/google/jsonnet#building-jsonnet)
 
-If you're running Weave in conjunction with Kubernetes, it is possible
-to discover the endpoints for all nodes automatically. The following
-Kubernetes config will install and configure Prometheus 1.3 on your
-cluster and configure it to discover and scrape the Weave endpoints:
+#### Install gojsonyaml
+```
+go get github.com/brancz/gojsontoyaml
+```
 
+#### Update dependencies
 ```
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus
-data:
-  prometheus.yml: |-
-    global:
-      scrape_interval: 15s
-    scrape_configs:
-    - job_name: 'weave'
-      kubernetes_sd_configs:
-      - api_server:
-        role: pod
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_namespace,__meta_kubernetes_pod_label_name]
-        action: keep
-        regex: ^kube-system;weave-net$
-      - source_labels: [__meta_kubernetes_pod_container_name,__address__]
-        action: replace
-        target_label: __address__
-        regex: ^weave;(.+?)(?::\d+)?$
-        replacement: $1:6782
-      - source_labels: [__meta_kubernetes_pod_container_name,__address__]
-        action: replace
-        target_label: __address__
-        regex: ^weave-npc;(.+?)(?::\d+)?$
-        replacement: $1:6781
-      - source_labels: [__meta_kubernetes_pod_container_name]
-        action: replace
-        target_label: job
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    name: prometheus
-  name: prometheus
-spec:
-  selector:
-    app: prometheus
-  type: NodePort
-  ports:
-  - name: prometheus
-    protocol: TCP
-    port: 9090
-    nodePort: 30900
----
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: prometheus
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: prometheus
-  template:
-    metadata:
-      name: prometheus
-      labels:
-        app: prometheus
-    spec:
-      containers:
-      - name: prometheus
-        image: prom/prometheus:v1.3.0
-        args:
-          - '-config.file=/etc/prometheus/prometheus.yml'
-        ports:
-        - name: web
-          containerPort: 9090
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/prometheus
-      volumes:
-      - name: config-volume
-        configMap:
-          name: prometheus
+jb update
 ```
+
+#### Create weave-net.jsonnet
+**Note:** Some alert configurations are environment specific and may require modifications of alert thresholds.
+```
+cat << EOF > weave-net.jsonnet
+local kp =  (import 'kube-prometheus/kube-prometheus.libsonnet') +
+            (import 'kube-prometheus/kube-prometheus-weave-net.libsonnet') + {
+  _config+:: {
+    namespace: 'monitoring',
+  },
+  prometheusAlerts+:: {
+    groups: std.map(
+      function(group)
+        if group.name == 'weave-net' then
+          group {
+            rules: std.map(function(rule)
+              if rule.alert == "WeaveNetFastDPFlowsLow" then
+                rule {
+                  expr: "sum(weave_flows) < 20000"
+                }
+              else if rule.alert == "WeaveNetIPAMUnreachable" then
+                rule {
+                  expr: "weave_ipam_unreachable_percentage > 25"
+                }
+              else
+                rule
+              ,
+              group.rules
+            )
+          }
+        else
+          group,
+        super.groups
+      ),
+  },
+};
+
+{ ['00namespace-' + name]: kp.kubePrometheus[name] for name in std.objectFields(kp.kubePrometheus) } +
+{ ['0prometheus-operator-' + name]: kp.prometheusOperator[name] for name in std.objectFields(kp.prometheusOperator) } +
+{ ['node-exporter-' + name]: kp.nodeExporter[name] for name in std.objectFields(kp.nodeExporter) } +
+{ ['kube-state-metrics-' + name]: kp.kubeStateMetrics[name] for name in std.objectFields(kp.kubeStateMetrics) } +
+{ ['prometheus-' + name]: kp.prometheus[name] for name in std.objectFields(kp.prometheus) } +
+{ ['prometheus-adapter-' + name]: kp.prometheusAdapter[name] for name in std.objectFields(kp.prometheusAdapter) } +
+{ ['grafana-' + name]: kp.grafana[name] for name in std.objectFields(kp.grafana) }
+EOF
+```
+
+#### Create manifests
+```
+jsonnet -J vendor -m manifests weave-net.jsonnet | xargs -I{} sh -c 'cat $1 | gojsontoyaml > $1.yaml; rm -f $1' -- {}
+```
+
+#### Apply manifests
+Applying the created manifests will install the following components in your Kubernetes cluster:
+- [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) "monitoring"
+- [Prometheus](https://github.com/prometheus/prometheus)
+- [Kube State Metrics](https://github.com/kubernetes/kube-state-metrics)
+- [Prometheus Operator](https://github.com/coreos/prometheus-operator) Operator to manage prometheus
+- [Grafana](https://grafana.com) Dashboards on top of Prometheus metrics.
+- [Weave Net ServiceMonitor](https://github.com/coreos/kube-prometheus/blob/7a85d7d8a6a81eda1db090846759fd6ca6532884/jsonnet/kube-prometheus/kube-prometheus-weave-net.libsonnet#L12-L43) ServiceMonitor brings the weave net metrics to prometheus.
+- [Weave Net Service](https://github.com/coreos/kube-prometheus/blob/7a85d7d8a6a81eda1db090846759fd6ca6532884/jsonnet/kube-prometheus/kube-prometheus-weave-net.libsonnet#L7-L11) Weave Net Service which the ServiceMonitor scrapes.
+- [Weave Net Grafana Dashboard](https://grafana.com/grafana/dashboards/11789)
+- [Weave Net (Cluster) Grafana Dashboard](https://grafana.com/grafana/dashboards/11804)
+```
+cd manifests
+ls *.yaml | grep -e ^prometheus -e ^node -e ^grafana -e ^kube | xargs -I {} kubectl create -f {} -n monitoring
+kubectl create -f prometheus-serviceWeaveNet.yaml -n kube-system
+kubectl create -f prometheus-serviceMonitorWeaveNet.yaml -n monitoring
+```
+**Note:** If you want to make changes to the created yamls, please modify the weave-net.jsonnet and recreate the manifests before applying.
 
 # Weave Cloud Integration
 
