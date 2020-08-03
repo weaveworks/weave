@@ -21,11 +21,9 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 RUN apk add --update \
     curl \
-    ethtool \
     iptables \
     ipset \
     iproute2 \
-    util-linux \
     conntrack-tools \
     bind-tools \
     ca-certificates \

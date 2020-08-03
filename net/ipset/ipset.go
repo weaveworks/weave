@@ -9,12 +9,13 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type Name string
 
 type Type string
+
+type UID string
 
 const (
 	ListSet = Type("list:set")
@@ -24,9 +25,10 @@ const (
 
 type Interface interface {
 	Create(ipsetName Name, ipsetType Type) error
-	AddEntry(user types.UID, ipsetName Name, entry string, comment string) error
-	DelEntry(user types.UID, ipsetName Name, entry string) error
-	Exist(user types.UID, ipsetName Name, entry string) bool
+	AddEntry(user UID, ipsetName Name, entry string, comment string) error
+	DelEntry(user UID, ipsetName Name, entry string) error
+	EntryExists(user UID, ipsetName Name, entry string) bool
+	Exists(ipsetName Name) (bool, error)
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
 
@@ -49,7 +51,7 @@ type ipset struct {
 	// There might be multiple users for the same ipset & entry pair because
 	// events from k8s API server might be out of order causing duplicate IPs:
 	// https://github.com/weaveworks/weave/issues/2792.
-	users map[entryKey]map[types.UID]struct{}
+	users map[entryKey]map[UID]struct{}
 }
 
 func New(logger *log.Logger, maxListSize int) Interface {
@@ -57,7 +59,7 @@ func New(logger *log.Logger, maxListSize int) Interface {
 		Logger:         logger,
 		enableComments: true,
 		maxListSize:    maxListSize,
-		users:          make(map[entryKey]map[types.UID]struct{}),
+		users:          make(map[entryKey]map[UID]struct{}),
 	}
 
 	// Check for comment support
@@ -93,7 +95,7 @@ func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 	return doExec(args...)
 }
 
-func (i *ipset) AddEntry(user types.UID, ipsetName Name, entry string, comment string) error {
+func (i *ipset) AddEntry(user UID, ipsetName Name, entry string, comment string) error {
 	i.Logger.Printf("adding entry %s to %s of %s", entry, ipsetName, user)
 
 	if !i.addUser(user, ipsetName, entry) { // already in the set
@@ -109,7 +111,7 @@ func (i *ipset) AddEntry(user types.UID, ipsetName Name, entry string, comment s
 	return doExec(args...)
 }
 
-func (i *ipset) DelEntry(user types.UID, ipsetName Name, entry string) error {
+func (i *ipset) DelEntry(user UID, ipsetName Name, entry string) error {
 	i.Logger.Printf("deleting entry %s from %s of %s", entry, ipsetName, user)
 
 	if !i.delUser(user, ipsetName, entry) { // still needed
@@ -121,8 +123,22 @@ func (i *ipset) DelEntry(user types.UID, ipsetName Name, entry string) error {
 	return doExec("del", string(ipsetName), entry)
 }
 
-func (i *ipset) Exist(user types.UID, ipsetName Name, entry string) bool {
+func (i *ipset) EntryExists(user UID, ipsetName Name, entry string) bool {
 	return i.existUser(user, ipsetName, entry)
+}
+
+// Dummy way to check whether a given ipset exists.
+func (i *ipset) Exists(name Name) (bool, error) {
+	sets, err := i.List(string(name))
+	if err != nil {
+		return false, err
+	}
+	for _, s := range sets {
+		if s == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
@@ -131,7 +147,7 @@ func (i *ipset) Flush(ipsetName Name) error {
 }
 
 func (i *ipset) FlushAll() error {
-	i.users = make(map[entryKey]map[types.UID]struct{})
+	i.users = make(map[entryKey]map[UID]struct{})
 	return doExec("flush")
 }
 
@@ -141,7 +157,7 @@ func (i *ipset) Destroy(ipsetName Name) error {
 }
 
 func (i *ipset) DestroyAll() error {
-	i.users = make(map[entryKey]map[types.UID]struct{})
+	i.users = make(map[entryKey]map[UID]struct{})
 	return doExec("destroy")
 }
 
@@ -164,12 +180,12 @@ func (i *ipset) List(prefix string) ([]Name, error) {
 }
 
 // Returns true if entry does not exist in ipset (entry has to be inserted into ipset).
-func (i *ipset) addUser(user types.UID, ipsetName Name, entry string) bool {
+func (i *ipset) addUser(user UID, ipsetName Name, entry string) bool {
 	k := entryKey{ipsetName, entry}
 	add := false
 
 	if i.users[k] == nil {
-		i.users[k] = make(map[types.UID]struct{})
+		i.users[k] = make(map[UID]struct{})
 	}
 	if len(i.users[k]) == 0 {
 		add = true
@@ -180,7 +196,7 @@ func (i *ipset) addUser(user types.UID, ipsetName Name, entry string) bool {
 }
 
 // Returns true if user is the last owner of entry (entry has to be removed from ipset).
-func (i *ipset) delUser(user types.UID, ipsetName Name, entry string) bool {
+func (i *ipset) delUser(user UID, ipsetName Name, entry string) bool {
 	k := entryKey{ipsetName, entry}
 
 	oneLeft := len(i.users[k]) == 1
@@ -193,7 +209,7 @@ func (i *ipset) delUser(user types.UID, ipsetName Name, entry string) bool {
 	return oneLeft && (len(i.users[k]) == 0)
 }
 
-func (i *ipset) existUser(user types.UID, ipsetName Name, entry string) bool {
+func (i *ipset) existUser(user UID, ipsetName Name, entry string) bool {
 	_, ok := i.users[entryKey{ipsetName, entry}][user]
 	return ok
 }

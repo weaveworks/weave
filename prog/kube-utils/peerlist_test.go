@@ -16,8 +16,6 @@ const (
 	peerName3 = "03:00:00:00:00:00"
 	nodeName1 = "fake-node-1"
 	nodeName2 = "fake-node-2"
-
-	testIters = 1000
 )
 
 func TestPeerListBasic(t *testing.T) {

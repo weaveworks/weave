@@ -16,5 +16,6 @@ assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 assert_raises "weave_on $HOST1 status connections | grep -P 'encrypted *sleeve'"
 assert_raises "weave_on $HOST2 status connections | grep -P 'encrypted *sleeve'"
+assert "connections_metric $HOST1 encryption=\\\"yes\\\"",state=\\\"established\\\" "1"
 
 end_suite

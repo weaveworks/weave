@@ -39,6 +39,10 @@ the same time, the hostname takes precedence. In this circumstance, if
 the hostname is not in the weaveDNS domain, the container is *not*
 registered, but it will still use weaveDNS for resolution.
 
+By default, weaveDNS will listen on port 53 on the address of the
+Docker bridge. To make it listen on a different address or port use
+`weave launch --dns-listen-address <address>:<port>`
+
 To disable an application container's use of weaveDNS, add the
 `--without-dns` option to `weave launch`. To
 disable weaveDNS itself, launch weave with the `--no-dns` option.

@@ -11,14 +11,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/common/odp"
-	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/net/ipset"
-	"github.com/weaveworks/weave/npc"
 )
 
 /* This code implements three possible configurations to connect
@@ -262,7 +260,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 		break
 	}
 
-	if err := configureIPTables(config, ips); err != nil {
+	if err := ConfigureIPTables(config, ips); err != nil {
 		return bridgeType, errors.Wrap(err, "configuring iptables")
 	}
 
@@ -297,9 +295,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 		return bridgeType, errors.Wrapf(err, "configuring ARP cache on bridge %q", config.WeaveBridgeName)
 	}
 
-	// NB: No concurrent call to Expose is possible, as EnsureBridge is called
-	// before any service has been started.
-	if err := reexpose(config, log); err != nil {
+	if err := Reexpose(config, log); err != nil {
 		return bridgeType, err
 	}
 
@@ -431,10 +427,40 @@ func (f fastdpImpl) attach(veth *netlink.Veth) error {
 	return odp.AddDatapathInterfaceIfNotExist(f.datapathName, veth.Attrs().Name)
 }
 
-func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
+// ResetIPTables resets IPTables in case they're in a strange state from a previous run.
+func ResetIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	ipt, err := iptables.New()
 	if err != nil {
-		return errors.Wrap(err, "creating iptables object")
+		return errors.Wrap(err, "creating iptables object while resetting")
+	}
+
+	if !config.NPC {
+		// Create/Flush a chain for allowing ingress traffic when the bridge is exposed
+		if err := ipt.ClearChain("filter", "WEAVE-EXPOSE"); err != nil {
+			return errors.Wrap(err, "failed to clear/create filter/WEAVE-EXPOSE chain")
+		}
+	}
+
+	if err := ipt.ClearChain("nat", "WEAVE"); err != nil {
+		return errors.Wrap(err, "failed to clear/create nat/WEAVE chain")
+	}
+
+	if config.NoMasqLocal {
+		ips := ipset.New(common.LogLogger(), 0)
+		_ = ips.Destroy(NoMasqLocalIpset)
+		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ConfigureIPTables idempotently configures all the iptables!
+func ConfigureIPTables(config *BridgeConfig, ips ipset.Interface) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return errors.Wrap(err, "creating iptables object while configuring")
 	}
 
 	// The order among weave filter/FORWARD rules is important!
@@ -485,12 +511,12 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	if config.NPC {
 		// Steer traffic via the NPC.
 
-		if err = ensureChains(ipt, "filter", npc.MainChain, npc.EgressChain); err != nil {
+		if err = ensureChains(ipt, "filter", chains.MainChain, chains.EgressChain); err != nil {
 			return err
 		}
 
 		// Steer egress traffic destined to local node.
-		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", npc.EgressChain); err != nil {
+		if err = ipt.AppendUnique("filter", "INPUT", "-i", config.WeaveBridgeName, "-j", chains.EgressChain); err != nil {
 			return err
 		}
 		fwdRules = append(fwdRules,
@@ -499,11 +525,11 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 				// ACCEPT in WEAVE-NPC-EGRESS chain
 				{"-i", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", npc.EgressChain},
+					"-j", chains.EgressChain},
 				// The following rules are for ingress NPC processing
 				{"-o", config.WeaveBridgeName,
 					"-m", "comment", "--comment", "NOTE: this must go before '-j KUBE-FORWARD'",
-					"-j", npc.MainChain},
+					"-j", chains.MainChain},
 				{"-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"},
 				{"-o", config.WeaveBridgeName, "-j", "DROP"},
 			}...)
@@ -515,8 +541,8 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 
 	if !config.NPC {
 		// Create/Flush a chain for allowing ingress traffic when the bridge is exposed
-		if err := ipt.ClearChain("filter", "WEAVE-EXPOSE"); err != nil {
-			return errors.Wrap(err, "failed to clear/create filter/WEAVE-EXPOSE chain")
+		if err := ensureChains(ipt, "filter", "WEAVE-EXPOSE"); err != nil {
+			return errors.Wrap(err, "failed to ensure existence of filter/WEAVE-EXPOSE chain")
 		}
 
 		fwdRules = append(fwdRules, []string{"-o", config.WeaveBridgeName, "-j", "WEAVE-EXPOSE"})
@@ -532,26 +558,22 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 	}
 
 	// Create a chain for masquerading
-	if err := ipt.ClearChain("nat", "WEAVE"); err != nil {
-		return errors.Wrap(err, "failed to clear/create nat/WEAVE chain")
+	if err := ensureChains(ipt, "nat", "WEAVE"); err != nil {
+		return errors.Wrap(err, "failed to ensure existence of nat/WEAVE chain")
 	}
 	if err := ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
 		return err
 	}
 
 	// For the cases where the weave bridge is the default gateway for
-	// containers (e.g. Kubernetes): create the ipset to store CIDRs allocated
-	// by IPAM for local containers. In the case of Kubernetes, external traffic
-	// sent to these CIDRs avoids SNAT'ing so that NodePort with
-	// `"externalTrafficPolicy":"Local"` would receive packets with correct
-	// src IP addr.
+	// containers (e.g. Kubernetes): In `ResetIPTables` (which we assume
+	// to have been called at this point) we create an ipset to store CIDRs
+	// allocated by IPAM for local containers.
+	// In the case of Kubernetes, external traffic sent to these CIDRs
+	// avoids SNAT'ing so that NodePort with `"externalTrafficPolicy":"Local"`
+	// would receive packets with correct src IP addr.
 	if config.NoMasqLocal {
-		ips := ipset.New(common.LogLogger(), 0)
-		_ = ips.Destroy(NoMasqLocalIpset)
-		if err := ips.Create(NoMasqLocalIpset, ipset.HashNet); err != nil {
-			return err
-		}
-		if err := ipt.Insert("nat", "WEAVE", 1,
+		if err := ipt.AppendUnique("nat", "WEAVE",
 			"-m", "set", "--match-set", string(NoMasqLocalIpset), "dst",
 			"-m", "comment", "--comment", "Prevent SNAT to locally running containers",
 			"-j", "RETURN"); err != nil {
@@ -564,13 +586,13 @@ func configureIPTables(config *BridgeConfig, ips ipset.Interface) error {
 
 type NoMasqLocalTracker struct {
 	ips   ipset.Interface
-	owner types.UID
+	owner ipset.UID
 }
 
 func NewNoMasqLocalTracker(ips ipset.Interface) *NoMasqLocalTracker {
 	return &NoMasqLocalTracker{
 		ips:   ips,
-		owner: types.UID(0), // dummy ipset owner
+		owner: ipset.UID(0), // dummy ipset owner
 	}
 }
 
@@ -583,9 +605,9 @@ func (t *NoMasqLocalTracker) HandleUpdate(prevRanges, currRanges []address.Range
 		return nil
 	}
 
-	prev, curr := tracker.RemoveCommon(
-		address.NewCIDRs(tracker.Merge(prevRanges)),
-		address.NewCIDRs(tracker.Merge(currRanges)))
+	prev, curr := address.RemoveCommon(
+		address.NewCIDRs(address.Merge(prevRanges)),
+		address.NewCIDRs(address.Merge(currRanges)))
 
 	for _, cidr := range curr {
 		if err := t.ips.AddEntry(t.owner, NoMasqLocalIpset, cidr.String(), ""); err != nil {
@@ -609,7 +631,7 @@ func linkSetUpByName(linkName string) error {
 	return netlink.LinkSetUp(link)
 }
 
-func reexpose(config *BridgeConfig, log *logrus.Logger) error {
+func Reexpose(config *BridgeConfig, log *logrus.Logger) error {
 	// Get existing IP addrs of the weave bridge.
 	// If the bridge hasn't been exposed, then this functions does nothing.
 	//

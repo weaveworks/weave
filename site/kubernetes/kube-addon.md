@@ -82,7 +82,7 @@ This is a prerequisite to use use role-based access control on GKE. Please see t
 EKS by default installs `amazon-vpc-cni-k8s` CNI. Please follow below steps to use Weave-net as CNI
 
 - create EKS cluster in any of [prescribed](https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html) way
-- delete `amazon-vpc-cni-k8s` deamonset by running `kubectl delete ds aws-node -n kube-system` command
+- delete `amazon-vpc-cni-k8s` daemonset by running `kubectl delete ds aws-node -n kube-system` command
 - delete `/etc/cni/net.d/10-aws.conflist` on each of the node
 - edit instance security group to allow TCP 6783 and UDP 6783/6784 ports
 - flush iptables nat, mangle, filter tables to clear any iptables configurations done by `amazon-vpc-cni-k8s`

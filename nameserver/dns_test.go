@@ -41,9 +41,7 @@ func TestTruncation(t *testing.T) {
 	defer dnsserver.Stop()
 
 	// Add 100 mappings to nameserver
-	addrs := []address.Address{}
 	for i := address.Address(0); i < 100; i++ {
-		addrs = append(addrs, i)
 		nameserver.AddEntry("foo.weave.local.", "", mesh.UnknownPeerName, i)
 	}
 

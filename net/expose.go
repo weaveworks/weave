@@ -103,13 +103,8 @@ func addNatRule(ipt *iptables.IPTables, rulespec ...string) error {
 	// Loop until we get an exit code other than "temporarily unavailable"
 	for {
 		if err := ipt.AppendUnique("nat", "WEAVE", rulespec...); err != nil {
-			if ierr, ok := err.(*iptables.Error); ok {
-				if status, ok := ierr.ExitError.Sys().(syscall.WaitStatus); ok {
-					// (magic exit code 4 found in iptables source code; undocumented)
-					if status.ExitStatus() == 4 {
-						continue
-					}
-				}
+			if isResourceError(err) {
+				continue
 			}
 			return err
 		}

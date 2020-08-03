@@ -5,7 +5,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/ipset"
@@ -60,7 +59,7 @@ func (spec *selectorSpec) getRuleSpec(src bool) ([]string, string) {
 	}
 	rule := []string{"-m", "set", "--match-set", string(spec.ipsetName), dir}
 
-	comment := "anywhere"
+	var comment string
 	if spec.nsName != "" {
 		comment = fmt.Sprintf("pods: namespace: %s, selector: %s", spec.nsName, spec.key)
 	} else {
@@ -87,11 +86,11 @@ func (s *selector) matchesNamespacedPodSelector(podsLabelMap, namespaceLabelMap 
 	return s.spec.podSelector.Matches(labels.Set(podsLabelMap)) && s.spec.namespaceSelector.Matches(labels.Set(namespaceLabelMap))
 }
 
-func (s *selector) addEntry(user types.UID, entry string, comment string) error {
+func (s *selector) addEntry(user ipset.UID, entry string, comment string) error {
 	return s.ips.AddEntry(user, s.spec.ipsetName, entry, comment)
 }
 
-func (s *selector) delEntry(user types.UID, entry string) error {
+func (s *selector) delEntry(user ipset.UID, entry string) error {
 	return s.ips.DelEntry(user, s.spec.ipsetName, entry)
 }
 
@@ -107,7 +106,7 @@ type selectorSet struct {
 	// invoked after the last instance of target selector has been deprovisioned
 	onDestroyTargetSelector selectorWithPolicyTypeFn
 
-	users   map[string]map[types.UID]struct{} // list of users per selector
+	users   map[string]map[ipset.UID]struct{} // list of users per selector
 	entries map[string]*selector
 
 	// We need to keep track of target selector instances to be able to invoke
@@ -122,12 +121,12 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewTargetSe
 		onNewSelector:           onNewSelector,
 		onNewTargetSelector:     onNewTargetSelector,
 		onDestroyTargetSelector: onDestroyTargetSelector,
-		users:                make(map[string]map[types.UID]struct{}),
+		users:                make(map[string]map[ipset.UID]struct{}),
 		entries:              make(map[string]*selector),
 		targetSelectorsCount: make(map[string]map[policyType]int)}
 }
 
-func (ss *selectorSet) addToMatchingPodSelector(user types.UID, podLabelsMap map[string]string, entry string, comment string) (bool, bool, error) {
+func (ss *selectorSet) addToMatchingPodSelector(user ipset.UID, podLabelsMap map[string]string, entry string, comment string) (bool, bool, error) {
 	foundIngress := false
 	foundEgress := false
 	for _, s := range ss.entries {
@@ -146,7 +145,7 @@ func (ss *selectorSet) addToMatchingPodSelector(user types.UID, podLabelsMap map
 	return foundIngress, foundEgress, nil
 }
 
-func (ss *selectorSet) addToMatchingNamespaceSelector(user types.UID, namespaceLabelsMap map[string]string, entry string, comment string) error {
+func (ss *selectorSet) addToMatchingNamespaceSelector(user ipset.UID, namespaceLabelsMap map[string]string, entry string, comment string) error {
 	for _, s := range ss.entries {
 		if s.matchesNamespaceSelector(namespaceLabelsMap) {
 			if err := s.addEntry(user, entry, comment); err != nil {
@@ -157,7 +156,7 @@ func (ss *selectorSet) addToMatchingNamespaceSelector(user types.UID, namespaceL
 	return nil
 }
 
-func (ss *selectorSet) addToMatchingNamespacedPodSelector(user types.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string, comment string) error {
+func (ss *selectorSet) addToMatchingNamespacedPodSelector(user ipset.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string, comment string) error {
 	for _, s := range ss.entries {
 		if s.matchesNamespacedPodSelector(podLabelsMap, namespaceLabelsMap) {
 			if err := s.addEntry(user, entry, comment); err != nil {
@@ -168,7 +167,7 @@ func (ss *selectorSet) addToMatchingNamespacedPodSelector(user types.UID, podLab
 	return nil
 }
 
-func (ss *selectorSet) delFromMatchingPodSelector(user types.UID, podLabelsMap map[string]string, entry string) error {
+func (ss *selectorSet) delFromMatchingPodSelector(user ipset.UID, podLabelsMap map[string]string, entry string) error {
 	for _, s := range ss.entries {
 		if s.matchesPodSelector(podLabelsMap) {
 			if err := s.delEntry(user, entry); err != nil {
@@ -179,7 +178,7 @@ func (ss *selectorSet) delFromMatchingPodSelector(user types.UID, podLabelsMap m
 	return nil
 }
 
-func (ss *selectorSet) delFromMatchingNamespaceSelector(user types.UID, namespaceLabelsMap map[string]string, entry string) error {
+func (ss *selectorSet) delFromMatchingNamespaceSelector(user ipset.UID, namespaceLabelsMap map[string]string, entry string) error {
 	for _, s := range ss.entries {
 		if s.matchesNamespaceSelector(namespaceLabelsMap) {
 			if err := s.delEntry(user, entry); err != nil {
@@ -190,7 +189,7 @@ func (ss *selectorSet) delFromMatchingNamespaceSelector(user types.UID, namespac
 	return nil
 }
 
-func (ss *selectorSet) delFromMatchingNamespacedPodSelector(user types.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string) error {
+func (ss *selectorSet) delFromMatchingNamespacedPodSelector(user ipset.UID, podLabelsMap map[string]string, namespaceLabelsMap map[string]string, entry string) error {
 	for _, s := range ss.entries {
 		if s.matchesNamespacedPodSelector(podLabelsMap, namespaceLabelsMap) {
 			if err := s.delEntry(user, entry); err != nil {
@@ -205,7 +204,7 @@ func (ss *selectorSet) targetSelectorExist(s *selector, policyType policyType) b
 	return ss.targetSelectorsCount[s.spec.key][policyType] > 0
 }
 
-func (ss *selectorSet) deprovision(user types.UID, current, desired map[string]*selectorSpec) error {
+func (ss *selectorSet) deprovision(user ipset.UID, current, desired map[string]*selectorSpec) error {
 	for key, spec := range current {
 		if _, found := desired[key]; !found {
 			delete(ss.users[key], user)
@@ -233,7 +232,7 @@ func (ss *selectorSet) deprovision(user types.UID, current, desired map[string]*
 	return nil
 }
 
-func (ss *selectorSet) provision(user types.UID, current, desired map[string]*selectorSpec) error {
+func (ss *selectorSet) provision(user ipset.UID, current, desired map[string]*selectorSpec) error {
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			selector := &selector{ss.ips, spec}
@@ -246,7 +245,7 @@ func (ss *selectorSet) provision(user types.UID, current, desired map[string]*se
 				if err := ss.onNewSelector(selector); err != nil {
 					return err
 				}
-				ss.users[key] = make(map[types.UID]struct{})
+				ss.users[key] = make(map[ipset.UID]struct{})
 				ss.entries[key] = selector
 			}
 			ss.users[key][user] = struct{}{}

@@ -201,24 +201,6 @@ func (listener *listener) leaveEndpoint(w http.ResponseWriter, r *http.Request) 
 	emptyOrErrorResponse(w, listener.d.LeaveEndpoint(&l))
 }
 
-func (listener *listener) discoverNew(w http.ResponseWriter, r *http.Request) {
-	var disco api.DiscoveryNotification
-	if err := json.NewDecoder(r.Body).Decode(&disco); err != nil {
-		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
-		return
-	}
-	emptyOrErrorResponse(w, listener.d.DiscoverNew(&disco))
-}
-
-func (listener *listener) discoverDelete(w http.ResponseWriter, r *http.Request) {
-	var disco api.DiscoveryNotification
-	if err := json.NewDecoder(r.Body).Decode(&disco); err != nil {
-		sendError(w, "Could not decode JSON encoded payload", http.StatusBadRequest)
-		return
-	}
-	emptyOrErrorResponse(w, listener.d.DiscoverDelete(&disco))
-}
-
 // ===
 
 func (listener *listener) getIpamCapabilities(w http.ResponseWriter, r *http.Request) {

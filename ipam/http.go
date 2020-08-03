@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,7 +42,7 @@ func writeAddresses(w http.ResponseWriter, cidrs []address.CIDR) {
 	}
 }
 
-func hasBeenCancelled(dockerCli *docker.Client, closedChan <-chan bool, ident string, checkAlive bool) func() bool {
+func hasBeenCancelled(dockerCli *docker.Client, closedChan <-chan struct{}, ident string, checkAlive bool) func() bool {
 	return func() bool {
 		select {
 		case <-closedChan:
@@ -63,9 +64,9 @@ func cancellationErr(w http.ResponseWriter, err error) bool {
 	return false
 }
 
-func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
+func (alloc *Allocator) handleHTTPAllocate(ctx context.Context, dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	addr, err := alloc.Allocate(ident, subnet, checkAlive,
-		hasBeenCancelled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
+		hasBeenCancelled(dockerCli, ctx.Done(), ident, checkAlive))
 	if err != nil {
 		if !cancellationErr(w, err) {
 			badRequest(w, err)
@@ -75,9 +76,9 @@ func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.Resp
 	fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
 }
 
-func (alloc *Allocator) handleHTTPClaim(dockerCli *docker.Client, w http.ResponseWriter, ident string, cidr address.CIDR, checkAlive, noErrorOnUnknown bool) {
+func (alloc *Allocator) handleHTTPClaim(ctx context.Context, dockerCli *docker.Client, w http.ResponseWriter, ident string, cidr address.CIDR, checkAlive, noErrorOnUnknown bool) {
 	err := alloc.Claim(ident, cidr, checkAlive, noErrorOnUnknown,
-		hasBeenCancelled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
+		hasBeenCancelled(dockerCli, ctx.Done(), ident, checkAlive))
 	if err != nil {
 		if !cancellationErr(w, err) {
 			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
@@ -99,7 +100,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			ident := vars["id"]
 			checkAlive := r.FormValue("check-alive") == "true"
 			noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
-			alloc.handleHTTPClaim(dockerCli, w, ident, cidr, checkAlive, noErrorOnUnknown)
+			alloc.handleHTTPClaim(r.Context(), dockerCli, w, ident, cidr, checkAlive, noErrorOnUnknown)
 		}
 	})
 
@@ -164,13 +165,13 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], true); ok {
-			alloc.handleHTTPAllocate(dockerCli, w, vars["id"], r.FormValue("check-alive") == "true", subnet)
+			alloc.handleHTTPAllocate(r.Context(), dockerCli, w, vars["id"], r.FormValue("check-alive") == "true", subnet)
 		}
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		alloc.handleHTTPAllocate(dockerCli, w, vars["id"], r.FormValue("check-alive") == "true", defaultSubnet)
+		alloc.handleHTTPAllocate(r.Context(), dockerCli, w, vars["id"], r.FormValue("check-alive") == "true", defaultSubnet)
 	})
 
 	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,6 +204,6 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		if alloc.tracker != nil {
 			tracker = alloc.tracker.String()
 		}
-		fmt.Fprintf(w, tracker)
+		fmt.Fprintln(w, tracker)
 	})
 }

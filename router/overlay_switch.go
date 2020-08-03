@@ -334,13 +334,13 @@ func (fwd *overlaySwitchForwarder) healthCheck(index int, healthy bool) {
 	fwd.lock.Lock()
 	defer fwd.lock.Unlock()
 
-	if healthy == true && fwd.forwarders[index].onHold {
+	if healthy && fwd.forwarders[index].onHold {
 		log.Debug(fwd.logPrefix(), "Adding "+fwd.forwarders[index].overlayName+" to the list of forwarders")
 		fwd.forwarders[index].onHold = false
 		fwd.chooseBest()
 	}
 
-	if healthy == false && !fwd.forwarders[index].onHold {
+	if !healthy && !fwd.forwarders[index].onHold {
 		log.Debug(fwd.logPrefix(), "Removing "+fwd.forwarders[index].overlayName+" from the list of forwarders")
 		fwd.forwarders[index].onHold = true
 		fwd.chooseBest()

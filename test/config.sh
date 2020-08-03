@@ -189,7 +189,7 @@ start_container_image() {
     fi
     is_cidr "$1" && { cidr=$1; shift; }
     container=$(docker_on $host run $weave_dns_args $name_args "$@" -dt $image /bin/sh)
-    if ! weave_on $host attach $cidr $container >/dev/null ; then
+    if ! weave_on $host attach $cidr $ATTACH_ARGS $container >/dev/null ; then
         docker_on $host rm -f $container
         return 1
     fi
@@ -265,6 +265,10 @@ check_attached() {
 
 wait_for_attached() {
     wait_for_x "check_attached $1 $2" "$2 on $1 to be attached"
+}
+
+connections_metric() {
+    $SSH $1 curl -sS http://127.0.0.1:6784/metrics | awk -e "/^weave_connections.*$2/ { print \$2 }"
 }
 
 # assert_dns_record <host> <container> <name> [<ip> ...]

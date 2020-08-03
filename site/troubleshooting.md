@@ -335,3 +335,4 @@ and the container image versions as git hashes.
  * [Troubleshooting the Kubernetes Addon](/site/kubernetes/kube-addon.md#troubleshooting)
  * [Troubleshooting IPAM](/site/tasks/ipam/troubleshooting-ipam.md)
  * [Troubleshooting the Proxy](/site/tasks/weave-docker-api/using-proxy.md)
+ * [Weave Net monitoring setup in Kubernetes using kube-prometheus](https://github.com/weaveworks/weave/blob/master/site/tasks/manage/metrics.md#weave-net-monitoring-setup-in-kubernetes-using-kube-prometheus)

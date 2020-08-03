@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc/iptables"
 )
@@ -77,7 +78,7 @@ func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 			for _, pod := range ns.pods {
 				if hasIP(pod) {
 					if selector.matchesNamespacedPodSelector(pod.ObjectMeta.Labels, ns.namespaceLabels) {
-						if err := selector.addEntry(pod.ObjectMeta.UID, pod.Status.PodIP, podComment(pod)); err != nil {
+						if err := selector.addEntry(uid(pod), pod.Status.PodIP, podComment(pod)); err != nil {
 							return err
 						}
 
@@ -157,7 +158,7 @@ func (npc *controller) AddNetworkPolicy(obj interface{}) error {
 		}
 		if egressNetworkPolicy {
 			npc.defaultEgressDrop = true
-			if err := npc.ipt.Append(TableFilter, EgressChain,
+			if err := npc.ipt.Append(TableFilter, chains.EgressChain,
 				"-m", "mark", "!", "--mark", EgressMark, "-j", "DROP"); err != nil {
 				npc.defaultEgressDrop = false
 				return fmt.Errorf("Failed to add iptable rule to drop egress traffic from the pods by default due to %s", err.Error())
@@ -261,4 +262,12 @@ func isEgressNetworkPolicy(obj interface{}) (bool, error) {
 		return false, nil
 	}
 	return false, errInvalidNetworkPolicyObjType
+}
+
+func uid(pod *coreapi.Pod) ipset.UID {
+	return ipset.UID(pod.UID)
+}
+
+func nsuid(ns *coreapi.Namespace) ipset.UID {
+	return ipset.UID(ns.UID)
 }

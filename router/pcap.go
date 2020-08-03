@@ -147,7 +147,7 @@ func (p *Pcap) sniff(readHandle *pcap.Handle, consumer Consumer) {
 			// in order to prevent the next capture from
 			// overwriting the data
 			pktLen := len(pkt)
-			pktCopy := make([]byte, pktLen, pktLen)
+			pktCopy := make([]byte, pktLen)
 			copy(pktCopy, pkt)
 
 			fop.Process(pktCopy, dec, false)

@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/chains"
 	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/ipset"
 	"github.com/weaveworks/weave/npc"
@@ -52,27 +53,27 @@ func makeController(getter cache.Getter, resource string,
 
 func resetIPTables(ipt *iptables.IPTables) error {
 	// Flush chains first so there are no refs to extant ipsets
-	if err := ipt.ClearChain(npc.TableFilter, npc.IngressChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.IngressChain); err != nil {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.DefaultChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.DefaultChain); err != nil {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.MainChain); err != nil {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.EgressMarkChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.EgressMarkChain); err != nil {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.EgressCustomChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.EgressCustomChain); err != nil {
 		return err
 	}
 
-	if err := ipt.ClearChain(npc.TableFilter, npc.EgressDefaultChain); err != nil {
+	if err := ipt.ClearChain(npc.TableFilter, chains.EgressDefaultChain); err != nil {
 		return err
 	}
 
@@ -121,35 +122,35 @@ func resetIPSets(ips ipset.Interface) error {
 
 func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	// Configure main chain static rules
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+	if err := ipt.Append(npc.TableFilter, chains.MainChain,
 		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
 	if allowMcast {
-		if err := ipt.Append(npc.TableFilter, npc.MainChain,
+		if err := ipt.Append(npc.TableFilter, chains.MainChain,
 			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
 			return err
 		}
 	}
 
 	// If the destination address is not any of the local pods, let it through
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
+	if err := ipt.Append(npc.TableFilter, chains.MainChain,
 		"-m", "physdev", "--physdev-is-bridged", "--physdev-out="+bridgePortName, "-j", "ACCEPT"); err != nil {
 		return err
 	}
 
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.DefaultChain)); err != nil {
+	if err := ipt.Append(npc.TableFilter, chains.MainChain,
+		"-m", "state", "--state", "NEW", "-j", chains.DefaultChain); err != nil {
 		return err
 	}
 
-	if err := ipt.Append(npc.TableFilter, npc.MainChain,
-		"-m", "state", "--state", "NEW", "-j", string(npc.IngressChain)); err != nil {
+	if err := ipt.Append(npc.TableFilter, chains.MainChain,
+		"-m", "state", "--state", "NEW", "-j", chains.IngressChain); err != nil {
 		return err
 	}
 
-	if err := ipt.Append(npc.TableFilter, npc.EgressMarkChain,
+	if err := ipt.Append(npc.TableFilter, chains.EgressMarkChain,
 		"-j", "MARK", "--set-xmark", npc.EgressMark); err != nil {
 		return err
 	}
@@ -187,16 +188,16 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 		ruleSpecs = append(ruleSpecs, []string{"-d", "224.0.0.0/4", "-j", "RETURN"})
 	}
 	ruleSpecs = append(ruleSpecs, [][]string{
-		{"-m", "state", "--state", "NEW", "-j", string(npc.EgressDefaultChain)},
-		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", string(npc.EgressCustomChain)},
+		{"-m", "state", "--state", "NEW", "-j", chains.EgressDefaultChain},
+		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", chains.EgressCustomChain},
 		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
 	}...)
-	if err := net.AddChainWithRules(ipt, npc.TableFilter, npc.EgressChain, ruleSpecs); err != nil {
+	if err := net.AddChainWithRules(ipt, npc.TableFilter, chains.EgressChain, ruleSpecs); err != nil {
 		return err
 	}
 
 	// delete `weave-local-pods` ipset which is no longer used by weave-npc
-	weaveLocalPodExist, err := ipsetExist(ips, npc.LocalIpset)
+	weaveLocalPodExist, err := ips.Exists(npc.LocalIpset)
 	if err != nil {
 		common.Log.Errorf("Failed to look if ipset '%s' exists", npc.LocalIpset)
 	} else if weaveLocalPodExist {
@@ -207,22 +208,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	}
 
 	return nil
-}
-
-// Dummy way to check whether a given ipset exists.
-// TODO(brb) Use "ipset -exist create <..>" for our purpose instead (for some reasons
-// creating an ipset with -exist fails).
-func ipsetExist(ips ipset.Interface, name ipset.Name) (bool, error) {
-	sets, err := ips.List(string(name))
-	if err != nil {
-		return false, err
-	}
-	for _, s := range sets {
-		if s == name {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func root(cmd *cobra.Command, args []string) {
@@ -263,7 +248,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	npc := npc.New(nodeName, ipt, ips, client)
 
-	nsController := makeController(client.Core().RESTClient(), "namespaces", &coreapi.Namespace{},
+	nsController := makeController(client.CoreV1().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
@@ -283,7 +268,7 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
-	podController := makeController(client.Core().RESTClient(), "pods", &coreapi.Pod{},
+	podController := makeController(client.CoreV1().RESTClient(), "pods", &coreapi.Pod{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				handleError(npc.AddPod(obj.(*coreapi.Pod)))

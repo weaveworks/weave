@@ -207,21 +207,6 @@ func (alloc *Allocator) doOperation(op operation, ops *[]operation) {
 	}
 }
 
-// Given an operation, remove it from the pending queue
-//  Note the op may not be on the queue; it may have
-//  already succeeded.  If it is on the queue, we call
-//  cancel on it, allowing callers waiting for the resultChans
-//  to unblock.
-func (alloc *Allocator) cancelOp(opToCancel operation, ops *[]operation) {
-	for i, op := range *ops {
-		if op == opToCancel {
-			*ops = append((*ops)[:i], (*ops)[i+1:]...)
-			op.Cancel()
-			break
-		}
-	}
-}
-
 // Cancel all operations in a queue
 func (alloc *Allocator) cancelOps(ops *[]operation) {
 	for _, op := range *ops {

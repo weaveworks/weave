@@ -24,5 +24,6 @@ weave_on  $HOST2 attach $C2/24 c2
 
 wait_for_x network_tester_status "network tester status"
 assert "echo $status" "pass"
+assert "connections_metric $HOST1 encryption=\\\"\\\",state=\\\"established\\\"" "1"
 
 end_suite

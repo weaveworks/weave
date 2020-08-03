@@ -91,7 +91,7 @@ func (s *State) serveClientIP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	fmt.Fprintf(w, host)
+	fmt.Fprintln(w, host)
 }
 
 // serveRead writes our json encoded state
