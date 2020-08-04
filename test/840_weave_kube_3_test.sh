@@ -366,7 +366,6 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http
 
 CLIENT_IP_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
 
-WEAVE_ENV_VARS="${WEAVE_ENV_VARS}\\n                - name: NO_MASQ_LOCAL\\n                  value: \"1\""
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
