@@ -34,6 +34,17 @@ root@ubuntu:/# ping pingme
 ...
 ```
 
+Moreover, weaveDNS always register all network aliases (--network-alias option to docker run).
+
+```
+host1$ docker run --network weave --network-alias pingme --network-alias pingme2 -dti weaveworks/ubuntu
+host1$ docker run --network weave --hostname=ubuntu.weave.local -ti weaveworks/ubuntu
+root@ubuntu:/# ping pingme
+...
+root@ubuntu:/# ping pingme2
+...
+```
+
 > **Note** If both hostname and container name are specified at
 the same time, the hostname takes precedence. In this circumstance, if
 the hostname is not in the weaveDNS domain, the container is *not*
