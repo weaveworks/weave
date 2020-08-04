@@ -880,6 +880,29 @@ func StrategicMergeMapPatchUsingLookupPatchMeta(original, patch JSONMap, schema 
 	return mergeMap(original, patch, schema, mergeOptions)
 }
 
+// MergeStrategicMergeMapPatchUsingLookupPatchMeta merges strategic merge
+// patches retaining `null` fields and parallel lists. If 2 patches change the
+// same fields and the latter one will override the former one. If you don't
+// want that happen, you need to run func MergingMapsHaveConflicts before
+// merging these patches. Applying the resulting merged merge patch to a JSONMap
+// yields the same as merging each strategic merge patch to the JSONMap in
+// succession.
+func MergeStrategicMergeMapPatchUsingLookupPatchMeta(schema LookupPatchMeta, patches ...JSONMap) (JSONMap, error) {
+	mergeOptions := MergeOptions{
+		MergeParallelList:    false,
+		IgnoreUnmatchedNulls: false,
+	}
+	merged := JSONMap{}
+	var err error
+	for _, patch := range patches {
+		merged, err = mergeMap(merged, patch, schema, mergeOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return merged, nil
+}
+
 // handleDirectiveInMergeMap handles the patch directive when merging 2 maps.
 func handleDirectiveInMergeMap(directive interface{}, patch map[string]interface{}) (map[string]interface{}, error) {
 	if directive == replaceDirective {
@@ -991,7 +1014,7 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 		setOrderIndex++
 	}
 	// If patchIndex is inbound but setOrderIndex if out of bound mean there are items mismatching between the patch list and setElementOrder list.
-	// the second check is is a sanity check, and should always be true if the first is true.
+	// the second check is a sanity check, and should always be true if the first is true.
 	if patchIndex < len(nonDeleteList) && setOrderIndex >= len(typedSetOrderList) {
 		return fmt.Errorf("The order in patch list:\n%v\n doesn't match %s list:\n%v\n", typedPatchList, setElementOrderDirectivePrefix, setOrderList)
 	}
@@ -1853,7 +1876,7 @@ func mergingMapFieldsHaveConflicts(
 			return true, nil
 		}
 		return slicesHaveConflicts(leftType, rightType, schema, fieldPatchStrategy, fieldPatchMergeKey)
-	case string, float64, bool, int, int64, nil:
+	case string, float64, bool, int64, nil:
 		return !reflect.DeepEqual(left, right), nil
 	default:
 		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))

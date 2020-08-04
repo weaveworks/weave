@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
-	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -60,16 +61,16 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1alpha1().PriorityClasses().List(options)
+				return client.SchedulingV1alpha1().PriorityClasses().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1alpha1().PriorityClasses().Watch(options)
+				return client.SchedulingV1alpha1().PriorityClasses().Watch(context.TODO(), options)
 			},
 		},
-		&scheduling_v1alpha1.PriorityClass{},
+		&schedulingv1alpha1.PriorityClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +81,7 @@ func (f *priorityClassInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling_v1alpha1.PriorityClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&schedulingv1alpha1.PriorityClass{}, f.defaultInformer)
 }
 
 func (f *priorityClassInformer) Lister() v1alpha1.PriorityClassLister {

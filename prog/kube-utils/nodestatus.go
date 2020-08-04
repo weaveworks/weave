@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -24,6 +25,6 @@ func setNodeNetworkUnavailableFalse(c kubernetes.Interface, nodeName string) err
 		return err
 	}
 	patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw))
-	_, err = c.CoreV1().Nodes().PatchStatus(nodeName, patch)
+	_, err = c.CoreV1().Nodes().PatchStatus(context.Background(), nodeName, patch)
 	return err
 }

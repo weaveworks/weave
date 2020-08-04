@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -18,17 +19,17 @@ import (
 )
 
 type NetworkPolicyController interface {
-	AddNamespace(ns *coreapi.Namespace) error
-	UpdateNamespace(oldObj, newObj *coreapi.Namespace) error
-	DeleteNamespace(ns *coreapi.Namespace) error
+	AddNamespace(ctx context.Context, ns *coreapi.Namespace) error
+	UpdateNamespace(ctx context.Context, oldObj, newObj *coreapi.Namespace) error
+	DeleteNamespace(ctx context.Context, ns *coreapi.Namespace) error
 
-	AddPod(obj *coreapi.Pod) error
-	UpdatePod(oldObj, newObj *coreapi.Pod) error
-	DeletePod(obj *coreapi.Pod) error
+	AddPod(ctx context.Context, obj *coreapi.Pod) error
+	UpdatePod(ctx context.Context, oldObj, newObj *coreapi.Pod) error
+	DeletePod(ctx context.Context, obj *coreapi.Pod) error
 
-	AddNetworkPolicy(obj interface{}) error
-	UpdateNetworkPolicy(oldObj, newObj interface{}) error
-	DeleteNetworkPolicy(obj interface{}) error
+	AddNetworkPolicy(ctx context.Context, obj interface{}) error
+	UpdateNetworkPolicy(ctx context.Context, oldObj, newObj interface{}) error
+	DeleteNetworkPolicy(ctx context.Context, obj interface{}) error
 }
 
 type controller struct {
@@ -90,10 +91,10 @@ func (npc *controller) onNewNamespacePodsSelector(selector *selector) error {
 	return nil
 }
 
-func (npc *controller) withNS(name string, f func(ns *ns) error) error {
+func (npc *controller) withNS(ctx context.Context, name string, f func(ns *ns) error) error {
 	ns, found := npc.nss[name]
 	if !found {
-		namespace, err := npc.clientset.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+		namespace, err := npc.clientset.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -116,37 +117,37 @@ func (npc *controller) withNS(name string, f func(ns *ns) error) error {
 	return nil
 }
 
-func (npc *controller) AddPod(obj *coreapi.Pod) error {
+func (npc *controller) AddPod(ctx context.Context, obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Debugf("EVENT AddPod %s", js(obj))
-	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
+	return npc.withNS(ctx, obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.addPod(obj), "add pod")
 	})
 }
 
-func (npc *controller) UpdatePod(oldObj, newObj *coreapi.Pod) error {
+func (npc *controller) UpdatePod(ctx context.Context, oldObj, newObj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Debugf("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
-	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
+	return npc.withNS(ctx, oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updatePod(oldObj, newObj), "update pod")
 	})
 }
 
-func (npc *controller) DeletePod(obj *coreapi.Pod) error {
+func (npc *controller) DeletePod(ctx context.Context, obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Debugf("EVENT DeletePod %s", js(obj))
-	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
+	return npc.withNS(ctx, obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.deletePod(obj), "delete pod")
 	})
 }
 
-func (npc *controller) AddNetworkPolicy(obj interface{}) error {
+func (npc *controller) AddNetworkPolicy(ctx context.Context, obj interface{}) error {
 	npc.Lock()
 	defer npc.Unlock()
 
@@ -171,12 +172,12 @@ func (npc *controller) AddNetworkPolicy(obj interface{}) error {
 		return err
 	}
 	common.Log.Infof("EVENT AddNetworkPolicy %s", js(obj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	return npc.withNS(ctx, nsName, func(ns *ns) error {
 		return errors.Wrap(ns.addNetworkPolicy(obj), "add network policy")
 	})
 }
 
-func (npc *controller) UpdateNetworkPolicy(oldObj, newObj interface{}) error {
+func (npc *controller) UpdateNetworkPolicy(ctx context.Context, oldObj, newObj interface{}) error {
 	npc.Lock()
 	defer npc.Unlock()
 
@@ -186,12 +187,12 @@ func (npc *controller) UpdateNetworkPolicy(oldObj, newObj interface{}) error {
 	}
 
 	common.Log.Infof("EVENT UpdateNetworkPolicy %s %s", js(oldObj), js(newObj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	return npc.withNS(ctx, nsName, func(ns *ns) error {
 		return errors.Wrap(ns.updateNetworkPolicy(oldObj, newObj), "update network policy")
 	})
 }
 
-func (npc *controller) DeleteNetworkPolicy(obj interface{}) error {
+func (npc *controller) DeleteNetworkPolicy(ctx context.Context, obj interface{}) error {
 	npc.Lock()
 	defer npc.Unlock()
 
@@ -201,37 +202,37 @@ func (npc *controller) DeleteNetworkPolicy(obj interface{}) error {
 	}
 
 	common.Log.Infof("EVENT DeleteNetworkPolicy %s", js(obj))
-	return npc.withNS(nsName, func(ns *ns) error {
+	return npc.withNS(ctx, nsName, func(ns *ns) error {
 		return errors.Wrap(ns.deleteNetworkPolicy(obj), "delete network policy")
 	})
 }
 
-func (npc *controller) AddNamespace(obj *coreapi.Namespace) error {
+func (npc *controller) AddNamespace(ctx context.Context, obj *coreapi.Namespace) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Infof("EVENT AddNamespace %s", js(obj))
-	return npc.withNS(obj.ObjectMeta.Name, func(ns *ns) error {
+	return npc.withNS(ctx, obj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.addNamespace(obj), "add namespace")
 	})
 }
 
-func (npc *controller) UpdateNamespace(oldObj, newObj *coreapi.Namespace) error {
+func (npc *controller) UpdateNamespace(ctx context.Context, oldObj, newObj *coreapi.Namespace) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Infof("EVENT UpdateNamespace %s %s", js(oldObj), js(newObj))
-	return npc.withNS(oldObj.ObjectMeta.Name, func(ns *ns) error {
+	return npc.withNS(ctx, oldObj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.updateNamespace(oldObj, newObj), "update namespace")
 	})
 }
 
-func (npc *controller) DeleteNamespace(obj *coreapi.Namespace) error {
+func (npc *controller) DeleteNamespace(ctx context.Context, obj *coreapi.Namespace) error {
 	npc.Lock()
 	defer npc.Unlock()
 
 	common.Log.Infof("EVENT DeleteNamespace %s", js(obj))
-	return npc.withNS(obj.ObjectMeta.Name, func(ns *ns) error {
+	return npc.withNS(ctx, obj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.deleteNamespace(obj), "delete namespace")
 	})
 }

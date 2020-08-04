@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -210,6 +211,11 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	return nil
 }
 
+// Indirection in case we come up with a more interesting requirement
+func hCtx() context.Context {
+	return context.Background()
+}
+
 func root(cmd *cobra.Command, args []string) {
 	var npController cache.Controller
 
@@ -251,46 +257,46 @@ func root(cmd *cobra.Command, args []string) {
 	nsController := makeController(client.CoreV1().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
+				handleError(npc.AddNamespace(hCtx(), obj.(*coreapi.Namespace)))
 			},
 			DeleteFunc: func(obj interface{}) {
 				switch obj := obj.(type) {
 				case *coreapi.Namespace:
-					handleError(npc.DeleteNamespace(obj))
+					handleError(npc.DeleteNamespace(hCtx(), obj))
 				case cache.DeletedFinalStateUnknown:
 					// We know this object has gone away, but its final state is no longer
 					// available from the API server. Instead we use the last copy of it
 					// that we have, which is good enough for our cleanup.
-					handleError(npc.DeleteNamespace(obj.Obj.(*coreapi.Namespace)))
+					handleError(npc.DeleteNamespace(hCtx(), obj.Obj.(*coreapi.Namespace)))
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
-				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
+				handleError(npc.UpdateNamespace(hCtx(), old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
 	podController := makeController(client.CoreV1().RESTClient(), "pods", &coreapi.Pod{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				handleError(npc.AddPod(obj.(*coreapi.Pod)))
+				handleError(npc.AddPod(hCtx(), obj.(*coreapi.Pod)))
 			},
 			DeleteFunc: func(obj interface{}) {
 				switch obj := obj.(type) {
 				case *coreapi.Pod:
-					handleError(npc.DeletePod(obj))
+					handleError(npc.DeletePod(hCtx(), obj))
 				case cache.DeletedFinalStateUnknown:
 					// We know this object has gone away, but its final state is no longer
 					// available from the API server. Instead we use the last copy of it
 					// that we have, which is good enough for our cleanup.
-					handleError(npc.DeletePod(obj.Obj.(*coreapi.Pod)))
+					handleError(npc.DeletePod(hCtx(), obj.Obj.(*coreapi.Pod)))
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
-				handleError(npc.UpdatePod(old.(*coreapi.Pod), new.(*coreapi.Pod)))
+				handleError(npc.UpdatePod(hCtx(), old.(*coreapi.Pod), new.(*coreapi.Pod)))
 			}})
 
 	npHandlers := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			handleError(npc.AddNetworkPolicy(obj))
+			handleError(npc.AddNetworkPolicy(hCtx(), obj))
 		},
 		DeleteFunc: func(obj interface{}) {
 			switch obj := obj.(type) {
@@ -298,13 +304,13 @@ func root(cmd *cobra.Command, args []string) {
 				// We know this object has gone away, but its final state is no longer
 				// available from the API server. Instead we use the last copy of it
 				// that we have, which is good enough for our cleanup.
-				handleError(npc.DeleteNetworkPolicy(obj.Obj))
+				handleError(npc.DeleteNetworkPolicy(hCtx(), obj.Obj))
 			default:
-				handleError(npc.DeleteNetworkPolicy(obj))
+				handleError(npc.DeleteNetworkPolicy(hCtx(), obj))
 			}
 		},
 		UpdateFunc: func(old, new interface{}) {
-			handleError(npc.UpdateNetworkPolicy(old, new))
+			handleError(npc.UpdateNetworkPolicy(hCtx(), old, new))
 		},
 	}
 	npController = makeController(client.NetworkingV1().RESTClient(), "networkpolicies", &networkingv1.NetworkPolicy{}, npHandlers)

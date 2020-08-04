@@ -19,10 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
-	networking_v1 "k8s.io/api/networking/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -57,20 +58,20 @@ func NewNetworkPolicyInformer(client kubernetes.Interface, namespace string, res
 func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().NetworkPolicies(namespace).List(options)
+				return client.NetworkingV1().NetworkPolicies(namespace).List(context.TODO(), options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().NetworkPolicies(namespace).Watch(options)
+				return client.NetworkingV1().NetworkPolicies(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&networking_v1.NetworkPolicy{},
+		&networkingv1.NetworkPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *networkPolicyInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networking_v1.NetworkPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&networkingv1.NetworkPolicy{}, f.defaultInformer)
 }
 
 func (f *networkPolicyInformer) Lister() v1.NetworkPolicyLister {

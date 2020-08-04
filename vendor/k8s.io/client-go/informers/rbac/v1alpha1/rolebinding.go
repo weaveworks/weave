@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
-	rbac_v1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +62,16 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1alpha1().RoleBindings(namespace).List(options)
+				return client.RbacV1alpha1().RoleBindings(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1alpha1().RoleBindings(namespace).Watch(options)
+				return client.RbacV1alpha1().RoleBindings(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&rbac_v1alpha1.RoleBinding{},
+		&rbacv1alpha1.RoleBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +82,7 @@ func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1alpha1.RoleBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&rbacv1alpha1.RoleBinding{}, f.defaultInformer)
 }
 
 func (f *roleBindingInformer) Lister() v1alpha1.RoleBindingLister {
