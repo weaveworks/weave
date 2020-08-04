@@ -421,9 +421,9 @@ The list of variables you can set is:
   a larger size for better performance if your network supports jumbo
   frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
   details.
-* `NO_MASQ_LOCAL` - set to 1 to preserve the client source IP address when
+* `NO_MASQ_LOCAL` - set to 0 to disable preserving the client source IP address when
   accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
-  The feature works only with Weave IPAM (default).
+  This feature works only with Weave IPAM (default).
 * `IPTABLES_BACKEND` - set to `nft` to use `nftables` backend for `iptables` (default is `iptables`) 
 
 Example:
