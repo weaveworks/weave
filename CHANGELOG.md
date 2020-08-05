@@ -1,3 +1,39 @@
+## Release 2.7.0
+
+This release improves resiliency in a number of areas,
+and extends the Prometheus metrics exported by Weave Net.
+
+Change in behaviour: on Kubernetes, the client source IP is preserved 
+when calling from a pod to a service.
+This feature, introduced in version 2.4.0 and previously turned on by 
+setting `NO_MASQ_LOCAL=1` is now on by default. #3389, #3756
+
+### Features
+
+* Reload router iptables rules if they get cleared, e.g. when firewalld restarts. #3802
+  (weave-npc rules are not reloaded)
+* Add new `type` and `encryption` labels to `weave_connections` metric #3788, #3789
+* Weave Net now exports Go metrics for heap size, garbage collection, etc. #3838
+* Register container name and its network aliases with weaveDNS #3084, #3090
+* Make DNS listen address configurable #1770, #3231
+
+### Bug fixes
+
+* weave-npc could crash if you deleted a Kubernetes Namespace containing pods #3833, #3836
+* Ensure that weave-npc exits and restarts if it crashes #3764, #3792, #3841
+* Avoid weave-kube failing on startup due to iptables lock #3828, #3835
+
+### Build and test
+
+* Reduce size of containers (weaveworks/weave goes from 99MB to 83MB) #3624, #3726
+* Weave Net is now built with Go 1.14.4, which should improve performance #3838
+* CI tests are now run against Docker 19.03.1, Kubernetes 1.14.0 #3687
+
+Many thanks to contributors @berlic, @gobomb, @hairyhenderson, @naemono, @nesc58
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/81?closed=1)
+
+
 ## Release 2.6.5
 
 Fixes a bug that would leak memory every time a fast-datapath connection
