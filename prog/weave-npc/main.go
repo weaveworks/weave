@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	goruntime "runtime"
 	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -216,6 +218,14 @@ func hCtx() context.Context {
 	return context.Background()
 }
 
+func stopOnPanicRecover() {
+	if r := recover(); r != nil {
+		buf := make([]byte, 1<<20)
+		stacklen := goruntime.Stack(buf, false)
+		handleFatal(fmt.Errorf("panic: %v \n%s", r, buf[:stacklen]))
+	}
+}
+
 func root(cmd *cobra.Command, args []string) {
 	var npController cache.Controller
 
@@ -257,9 +267,11 @@ func root(cmd *cobra.Command, args []string) {
 	nsController := makeController(client.CoreV1().RESTClient(), "namespaces", &coreapi.Namespace{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				defer stopOnPanicRecover()
 				handleError(npc.AddNamespace(hCtx(), obj.(*coreapi.Namespace)))
 			},
 			DeleteFunc: func(obj interface{}) {
+				defer stopOnPanicRecover()
 				switch obj := obj.(type) {
 				case *coreapi.Namespace:
 					handleError(npc.DeleteNamespace(hCtx(), obj))
@@ -271,15 +283,18 @@ func root(cmd *cobra.Command, args []string) {
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
+				defer stopOnPanicRecover()
 				handleError(npc.UpdateNamespace(hCtx(), old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
 			}})
 
 	podController := makeController(client.CoreV1().RESTClient(), "pods", &coreapi.Pod{},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				defer stopOnPanicRecover()
 				handleError(npc.AddPod(hCtx(), obj.(*coreapi.Pod)))
 			},
 			DeleteFunc: func(obj interface{}) {
+				defer stopOnPanicRecover()
 				switch obj := obj.(type) {
 				case *coreapi.Pod:
 					handleError(npc.DeletePod(hCtx(), obj))
@@ -291,14 +306,17 @@ func root(cmd *cobra.Command, args []string) {
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
+				defer stopOnPanicRecover()
 				handleError(npc.UpdatePod(hCtx(), old.(*coreapi.Pod), new.(*coreapi.Pod)))
 			}})
 
 	npHandlers := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			defer stopOnPanicRecover()
 			handleError(npc.AddNetworkPolicy(hCtx(), obj))
 		},
 		DeleteFunc: func(obj interface{}) {
+			defer stopOnPanicRecover()
 			switch obj := obj.(type) {
 			case cache.DeletedFinalStateUnknown:
 				// We know this object has gone away, but its final state is no longer
@@ -310,6 +328,7 @@ func root(cmd *cobra.Command, args []string) {
 			}
 		},
 		UpdateFunc: func(old, new interface{}) {
+			defer stopOnPanicRecover()
 			handleError(npc.UpdateNetworkPolicy(hCtx(), old, new))
 		},
 	}
