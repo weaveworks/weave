@@ -21,6 +21,8 @@ xt_set_exists() {
     fi
     iptables -w -F WEAVE-KUBE-TEST
     iptables -w -X WEAVE-KUBE-TEST
+    # delay to allow kernel to clean up - see https://github.com/weaveworks/weave/issues/3847
+    sleep 1
     ipset destroy weave-kube-test
     [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
 }
