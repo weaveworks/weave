@@ -48,6 +48,7 @@ xt_set_exists() {
     fi
     iptables -w -F WEAVE-KUBE-TEST
     iptables -w -X WEAVE-KUBE-TEST
+    sleep 1
     ipset destroy weave-kube-test
     [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
 }
