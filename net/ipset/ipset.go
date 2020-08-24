@@ -7,6 +7,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -21,6 +22,8 @@ const (
 	ListSet = Type("list:set")
 	HashIP  = Type("hash:ip")
 	HashNet = Type("hash:net")
+
+	DestroyRetrySleepMs = 100
 )
 
 type Interface interface {
@@ -153,12 +156,22 @@ func (i *ipset) FlushAll() error {
 
 func (i *ipset) Destroy(ipsetName Name) error {
 	i.removeSetFromUsers(ipsetName)
-	return doExec("destroy", string(ipsetName))
+	err := doExec("destroy", string(ipsetName))
+	if err != nil {
+		time.Sleep(DestroyRetrySleepMs * time.Millisecond)
+		return doExec("destroy", string(ipsetName))
+	}
+	return err
 }
 
 func (i *ipset) DestroyAll() error {
 	i.users = make(map[entryKey]map[UID]struct{})
-	return doExec("destroy")
+	err := doExec("destroy")
+	if err != nil {
+		time.Sleep(DestroyRetrySleepMs * time.Millisecond)
+		return doExec("destroy")
+	}
+	return err
 }
 
 // Fetch a list of all existing sets with a given prefix
