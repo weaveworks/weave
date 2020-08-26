@@ -193,7 +193,6 @@ func createBaseRules(ipt *iptables.IPTables, ips ipset.Interface) error {
 	ruleSpecs = append(ruleSpecs, [][]string{
 		{"-m", "state", "--state", "NEW", "-j", chains.EgressDefaultChain},
 		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", chains.EgressCustomChain},
-		{"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", npc.EgressMark, "-j", "NFLOG", "--nflog-group", "86"},
 	}...)
 	if err := net.AddChainWithRules(ipt, npc.TableFilter, chains.EgressChain, ruleSpecs); err != nil {
 		return err
