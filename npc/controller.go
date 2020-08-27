@@ -158,12 +158,15 @@ func (npc *controller) AddNetworkPolicy(ctx context.Context, obj interface{}) er
 			return err
 		}
 		if egressNetworkPolicy {
-			npc.defaultEgressDrop = true
+			if err := npc.ipt.Append(TableFilter, chains.EgressChain,
+				"-m", "state", "--state", "NEW", "-m", "mark", "!", "--mark", EgressMark, "-j", "NFLOG", "--nflog-group", "86"); err != nil {
+				return fmt.Errorf("Failed to add iptable egress log rule: %w", err)
+			}
 			if err := npc.ipt.Append(TableFilter, chains.EgressChain,
 				"-m", "mark", "!", "--mark", EgressMark, "-j", "DROP"); err != nil {
-				npc.defaultEgressDrop = false
 				return fmt.Errorf("Failed to add iptable rule to drop egress traffic from the pods by default due to %s", err.Error())
 			}
+			npc.defaultEgressDrop = true
 		}
 	}
 
