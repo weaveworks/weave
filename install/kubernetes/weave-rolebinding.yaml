@@ -1,0 +1,16 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: weave-net
+  namespace: kube-system
+  labels:
+    name: weave-net
+roleRef:
+  kind: Role
+  name: weave-net
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: weave-net
+    namespace: kube-system
