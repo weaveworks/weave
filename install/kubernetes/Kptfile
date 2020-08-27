@@ -1,0 +1,13 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: Weave Net
+packageMetadata:
+  shortDescription: Peer-to-peer pod network
+openAPI:
+  definitions:
+    io.k8s.cli.setters.ipalloc-range:
+      x-k8s-cli:
+        setter:
+          name: ipalloc-range
+          value: 10.32.0.0/12

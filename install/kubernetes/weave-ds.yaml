@@ -27,6 +27,8 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            - name: IPALLOC_RANGE
+              value: 10.32.0.0/12 # {"$kpt-set":"ipalloc-range"}
           image: 'weaveworks/weave-kube:latest'
           imagePullPolicy: Always
           readinessProbe:
