@@ -52,7 +52,7 @@ fi
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../install/kubernetes/*.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+    "$(dirname "$0")"/../install/kubernetes/*.yaml | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 2
 
@@ -369,7 +369,7 @@ CLIENT_IP_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
 $SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../install/kubernetes/*.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+    "$(dirname "$0")"/../install/kubernetes/*.yaml | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 2
 assert_raises 'wait_for_x check_connections "connections to establish"'

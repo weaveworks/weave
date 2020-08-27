@@ -50,7 +50,7 @@ function setup_kubernetes_cluster {
     # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
     sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
         -e "s%env:%$COVERAGE_ARGS%" \
-        "$(dirname "$0")/../install/kubernetes/*.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
+        "$(dirname "$0")"/../install/kubernetes/*.yaml | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 }
 
 function weave_connected {
