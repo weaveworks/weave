@@ -16,7 +16,7 @@ KUBE_PORT=6443
 IMAGE=weaveworks/network-tester:latest
 
 if [ -n "$COVERAGE" ]; then
-    COVERAGE_ARGS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+    COVERAGE_ARGS="env:\\n            - name: EXTRA_ARGS\\n              value: \"-test.coverprofile=/home/weave/cover.prof --\""
 else
     COVERAGE_ARGS="env:"
 fi

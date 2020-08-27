@@ -44,7 +44,7 @@ for host in $HOSTS; do
 done
 
 if [ -n "$COVERAGE" ]; then
-    WEAVE_ENV_VARS="env:\\n                - name: EXTRA_ARGS\\n                  value: \"-test.coverprofile=/home/weave/cover.prof --\""
+    WEAVE_ENV_VARS="env:\\n            - name: EXTRA_ARGS\\n              value: \"-test.coverprofile=/home/weave/cover.prof --\""
 else
     WEAVE_ENV_VARS="env:"
 fi
