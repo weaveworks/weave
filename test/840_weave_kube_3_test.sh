@@ -361,18 +361,9 @@ sleep 2
 
 assert_raises "$SSH $HOST1 $KUBECTL exec $denyPodName -- curl -s -S -f -m 2 http://$DOMAIN:8080/status >/dev/null"
 
-# Passing --no-masq-local and setting externalTrafficPolicy to Local must preserve
-# the client source IP addr
+# Setting externalTrafficPolicy to Local must preserve the client source IP addr
 
 CLIENT_IP_MASQ="$($SSH $HOST1 curl -sS http://$HOST2:31138/client_ip)"
-
-$SSH $HOST1 "$KUBECTL delete ds weave-net -n=kube-system"
-sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
-    -e "s%env:%$WEAVE_ENV_VARS%" \
-    "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.9.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
-
-sleep 2
-assert_raises 'wait_for_x check_connections "connections to establish"'
 
 run_on $HOST1 "$KUBECTL patch svc netvirt -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
 
