@@ -148,7 +148,7 @@ items:
               securityContext:
                 privileged: true
           hostNetwork: true
-          hostPID: true
+          hostPID: false
           restartPolicy: Always
           securityContext:
             seLinuxOptions: {}

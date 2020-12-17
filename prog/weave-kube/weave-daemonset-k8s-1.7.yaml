@@ -164,7 +164,7 @@ items:
                   mountPath: /run/xtables.lock
                   readOnly: false
           hostNetwork: true
-          hostPID: true
+          hostPID: false
           restartPolicy: Always
           securityContext:
             seLinuxOptions: {}
