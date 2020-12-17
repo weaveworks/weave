@@ -144,15 +144,20 @@ items:
                 - name: weavedb
                   mountPath: /weavedb
                 - name: cni-bin
-                  mountPath: /host/opt
+                  mountPath: /host/opt/cni/bin
                 - name: cni-bin2
-                  mountPath: /host/home
-                - name: cni-conf
+                  mountPath: /host/home/kubernetes/bin
+                - name: etc
                   mountPath: /host/etc
+                  readOnly: true
+                - name: cni-conf
+                  mountPath: /host/etc/cni
                 - name: dbus
                   mountPath: /host/var/lib/dbus
+                  readOnly: true
                 - name: lib-modules
                   mountPath: /lib/modules
+                  readOnly: true
                 - name: xtables-lock
                   mountPath: /run/xtables.lock
                   readOnly: false
@@ -193,13 +198,18 @@ items:
                 path: /var/lib/weave
             - name: cni-bin
               hostPath:
-                path: /opt
+                path: /opt/cni/bin
             - name: cni-bin2
               hostPath:
-                path: /home
+                path: /home/kubernetes/bin
             - name: cni-conf
               hostPath:
+                path: /etc/cni
+                type: DirectoryOrCreate
+            - name: etc
+              hostPath:
                 path: /etc
+                type: Directory
             - name: dbus
               hostPath:
                 path: /var/lib/dbus
