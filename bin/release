@@ -89,8 +89,6 @@ build() {
     ## Inject the version numbers and build the distributables
     ## (library versions?)
     sed -i.bak "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
-    sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.6.yaml
-    sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.7.yaml
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.8.yaml
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.9.yaml
     sed -i.bak -e "s/:latest/:$VERSION/" -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset-k8s-1.11.yaml
@@ -161,20 +159,6 @@ draft() {
         --tag $LATEST_TAG \
         --name "weave" \
         --file "./weave"
-
-    github-release upload \
-        --user $GITHUB_USER \
-        --repo weave \
-        --tag $LATEST_TAG \
-        --name "weave-daemonset-k8s-1.6.yaml" \
-        --file "./prog/weave-kube/weave-daemonset-k8s-1.6.yaml"
-
-    github-release upload \
-        --user $GITHUB_USER \
-        --repo weave \
-        --tag $LATEST_TAG \
-        --name "weave-daemonset-k8s-1.7.yaml" \
-        --file "./prog/weave-kube/weave-daemonset-k8s-1.7.yaml"
 
     github-release upload \
         --user $GITHUB_USER \
@@ -283,20 +267,6 @@ publish() {
             --tag latest_release \
             --name "weave" \
             --file "./weave"
-
-        github-release upload \
-            --user $GITHUB_USER \
-            --repo weave \
-            --tag latest_release \
-            --name "weave-daemonset-k8s-1.6.yaml" \
-            --file "./prog/weave-kube/weave-daemonset-k8s-1.6.yaml"
-
-        github-release upload \
-            --user $GITHUB_USER \
-            --repo weave \
-            --tag latest_release \
-            --name "weave-daemonset-k8s-1.7.yaml" \
-            --file "./prog/weave-kube/weave-daemonset-k8s-1.7.yaml"
 
         github-release upload \
             --user $GITHUB_USER \
