@@ -1,10 +1,7 @@
 #!/bin/sh
+# Launch of Weave Net pod - requires that init.sh has been run previously
 
 set -e
-
-modprobe_safe() {
-    modprobe $1 || echo "Ignore the error if \"$1\" is built-in in the kernel" >&2
-}
 
 # Setup iptables backend to be legacy or nftable
 setup_iptables_backend() {
@@ -34,24 +31,6 @@ setup_iptables_backend() {
     fi
 }
 
-# Check whether xt_set actually exists
-xt_set_exists() {
-    # Clean everything up in advance, in case there's leftovers
-    iptables -w -F WEAVE-KUBE-TEST 2>/dev/null || true
-    iptables -w -X WEAVE-KUBE-TEST 2>/dev/null || true
-    ipset destroy weave-kube-test 2>/dev/null || true
-
-    ipset create weave-kube-test hash:ip
-    iptables -w -t filter -N WEAVE-KUBE-TEST
-    if ! iptables -w -A WEAVE-KUBE-TEST -m set --match-set weave-kube-test src -j DROP; then
-        NOT_EXIST=1
-    fi
-    iptables -w -F WEAVE-KUBE-TEST
-    iptables -w -X WEAVE-KUBE-TEST
-    ipset destroy weave-kube-test
-    [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
-}
-
 setup_iptables_backend
 
 # Default if not supplied - same as weave net default
@@ -67,23 +46,6 @@ DB_PREFIX=${DB_PREFIX:-/weavedb/weave-net}
 
 # Default for network policy
 EXPECT_NPC=${EXPECT_NPC:-1}
-NO_MASQ_LOCAL=${NO_MASQ_LOCAL:-1}
-
-# Ensure we have the required modules for NPC
-if [ "${EXPECT_NPC}" != "0" ]; then
-    modprobe_safe br_netfilter
-    modprobe_safe xt_set
-    xt_set_exists
-fi
-
-# kube-proxy requires that bridged traffic passes through netfilter
-if ! BRIDGE_NF_ENABLED=$(cat /proc/sys/net/bridge/bridge-nf-call-iptables); then
-    echo "Cannot detect bridge-nf support - network policy and iptables mode kubeproxy may not work reliably" >&2
-else
-    if [ "$BRIDGE_NF_ENABLED" != "1" ]; then
-        echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
-    fi
-fi
 
 STATUS_OPTS="--metrics-addr=$METRICS_ADDR"
 # --status-addr exposes internal information, so only turn it on if asked to.
@@ -160,20 +122,6 @@ post_start_actions() {
         sleep 1
     done
 
-    # Install CNI plugin binary to typical CNI bin location
-    # with fall-back to CNI directory used by kube-up on GCI OS
-    if ! mkdir -p $HOST_ROOT/opt/cni/bin ; then
-        if mkdir -p $HOST_ROOT/home/kubernetes/bin ; then
-            export WEAVE_CNI_PLUGIN_DIR=$HOST_ROOT/home/kubernetes/bin
-        else
-            echo "Failed to install the Weave CNI plugin" >&2
-            exit 1
-        fi
-    fi
-    mkdir -p $HOST_ROOT/etc/cni/net.d
-    export HOST_ROOT
-    /home/weave/weave --local setup-cni
-
     # Attempt to run the reclaim process, but don't halt the script if it fails
     /home/weave/kube-utils -reclaim -node-name="$HOSTNAME" -peer-name="$PEERNAME" -log-level=debug || true
 
@@ -190,7 +138,6 @@ post_start_actions &
 
 /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
      --name="$PEERNAME" \
-     --host-root=$HOST_ROOT \
      --http-addr=$HTTP_ADDR $STATUS_OPTS --docker-api='' --no-dns \
      --db-prefix="$DB_PREFIX" \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
