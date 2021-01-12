@@ -3,6 +3,9 @@
 
 set -e
 
+# If this is run from an older manifest, run the init script here
+[ "${INIT_CONTAINER}" = "true" ] || "$(dirname "$0")/init.sh"
+
 # Setup iptables backend to be legacy or nftable
 setup_iptables_backend() {
     if [ -n "${IPTABLES_BACKEND}" ]; then

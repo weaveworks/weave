@@ -141,6 +141,8 @@ items:
               command:
                 - /home/weave/launch.sh
               env:
+                - name: INIT_CONTAINER
+                  value: "true"
                 - name: HOSTNAME
                   valueFrom:
                     fieldRef:
