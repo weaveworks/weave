@@ -1,4 +1,4 @@
-FROM golang:1.14.6-buster
+FROM golang:1.15.6-buster
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
