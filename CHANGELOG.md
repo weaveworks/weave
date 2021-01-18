@@ -1,3 +1,18 @@
+## Release 2.8.0
+
+This release makes some important changes to trim the "attack surface" of the
+Kubernetes install, and improves a couple of reported issues.
+
+* Workaround to fix ipset conflict with iptables #3851, #3882
+* Kubernetes: move kernel and CNI setup to init container #3880
+* For K8s, stop running in host PID namespace #3876
+* NetworkPolicy: avoid logging dropped packets that were not actually dropped #3852
+* Build with Go version 1.15.6 #3883
+
+Many thanks to contributors @drigz, @KevDBG and @NeonSludge.
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/87?closed=1)
+
 ## Release 2.7.0
 
 This release improves resiliency in a number of areas,
