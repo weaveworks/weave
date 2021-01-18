@@ -592,7 +592,7 @@ type NoMasqLocalTracker struct {
 func NewNoMasqLocalTracker(ips ipset.Interface) *NoMasqLocalTracker {
 	return &NoMasqLocalTracker{
 		ips:   ips,
-		owner: ipset.UID(0), // dummy ipset owner
+		owner: ipset.UID("0"), // dummy ipset owner
 	}
 }
 
