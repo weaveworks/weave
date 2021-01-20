@@ -5,24 +5,15 @@ ENV GOARM 7
 
 # The names of the architectures that we're fetching cross-compilers for from the Debian packages
 ENV DEB_CROSSPLATFORMS \
-	armhf \
-	arm64 \
-	ppc64el \
-	s390x
+	armhf
 
 # The go platforms we are supporting to cross-compile
 ENV GO_CROSSPLATFORMS \
-	linux/arm \
-	linux/arm64 \
-	linux/ppc64le \
-	linux/s390x
+	linux/arm
 
 # The names of the gcc cross-compilers we have installed
 ENV GCC_CROSSCOMPILERS \
-	arm-linux-gnueabihf \
-	aarch64-linux-gnu \
-	powerpc64le-linux-gnu \
-	s390x-linux-gnu
+	arm-linux-gnueabihf
 
 # Install the build-essential and crossbuild-essential-ARCH packages
 RUN for platform in ${DEB_CROSSPLATFORMS}; do dpkg --add-architecture $platform; done \
@@ -56,9 +47,6 @@ RUN go get \
 	github.com/fzipp/gocyclo \
 	github.com/fatih/hclfmt \
 	github.com/client9/misspell/cmd/misspell
-
-# Allow full write access to the Go folders for anyone
-RUN chmod -R a+w /usr/local/go
 
 # The libpcap version from Debian packages is 1.6.2, matching that version here although newer versions of libpcap have been released
 # We have to cross-compile the libpcap library for the new architectures, that's what we're doing here

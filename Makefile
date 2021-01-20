@@ -210,6 +210,7 @@ ifeq ($(BUILD_IN_CONTAINER),true)
 # It bind-mounts the source into the container and passes all important variables
 exes $(EXES) tests lint: $(BUILD_UPTODATE)
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
+	    -v $(shell pwd)/.pkg:/go/pkg \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
 		-e GOARCH=$(ARCH) -e CGO_ENABLED=1 -e GOOS=linux -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW -e DEBUG \
 		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) CC=$(CC) QEMUARCH=$(QEMUARCH) CGO_LDFLAGS=$(CGO_LDFLAGS) $@
@@ -254,7 +255,6 @@ endif
 $(BUILD_UPTODATE): build/* tools/.git
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
 	$(SUDO) docker tag $(BUILD_IMAGE) $(BUILD_IMAGE):$(shell tools/image-tag)
-	$(SUDO) docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	touch $@
 
 # Creates the Dockerfile.your-user-here file from the template
