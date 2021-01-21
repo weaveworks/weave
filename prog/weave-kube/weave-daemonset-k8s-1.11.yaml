@@ -169,6 +169,9 @@ items:
                 - name: dbus
                   mountPath: /host/var/lib/dbus
                   readOnly: true
+                - mountPath: /host/etc/machine-id
+                  name: cni-machine-id
+                  readOnly: true
                 - name: xtables-lock
                   mountPath: /run/xtables.lock
                   readOnly: false
@@ -216,6 +219,9 @@ items:
             - name: cni-conf
               hostPath:
                 path: /etc
+            - name: cni-machine-id
+              hostPath:
+                path: /etc/machine-id
             - name: dbus
               hostPath:
                 path: /var/lib/dbus
