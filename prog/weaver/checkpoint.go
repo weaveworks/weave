@@ -10,9 +10,6 @@ import (
 
 	checkpoint "github.com/weaveworks/go-checkpoint"
 	weave "github.com/weaveworks/weave/router"
-	api "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 var checker *checkpoint.Checker
@@ -20,9 +17,7 @@ var newVersion atomic.Value
 var success atomic.Value
 
 const (
-	updateCheckPeriod  = 6 * time.Hour
-	configMapName      = "weave-net"
-	configMapNamespace = "kube-system"
+	updateCheckPeriod = 6 * time.Hour
 )
 
 func checkForUpdates(dockerVersion string, router *weave.NetworkRouter, clusterSize uint) {
@@ -88,36 +83,13 @@ func checkpointFlags(router *weave.NetworkRouter) []checkpoint.Flag {
 	return flags
 }
 
-// checkpoint Kubernetes specific details
+// checkpoint Kubernetes specific details, passed in from launch script
 func checkpointKubernetes(ctx context.Context, flags map[string]string, clusterSize uint) {
-	// checks if weaver is running in Kubernetes
-	host := os.Getenv("KUBERNETES_SERVICE_HOST")
-	if len(host) == 0 {
-		return
+	version := os.Getenv("WEAVE_KUBERNETES_VERSION")
+	if len(version) == 0 {
+		return // not running under Kubernetes
 	}
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		Log.Printf("Could not get Kubernetes in-cluster config: %v", err)
-		return
-	}
-	c, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		Log.Printf("Could not make Kubernetes client: %v", err)
-		return
-	}
-	k8sVersion, err := c.Discovery().ServerVersion()
-	if err != nil {
-		Log.Printf("Could not get Kubernetes version: %v", err)
-		return
-	}
-	flags["kubernetes-version"] = k8sVersion.String()
-
-	// use UID of `weave-net` configmap as unique ID of the Kubenerets cluster
-	cm, err := c.CoreV1().ConfigMaps(configMapNamespace).Get(ctx, configMapName, api.GetOptions{})
-	if err != nil {
-		Log.Printf("Unable to fetch ConfigMap %s/%s to infer unique cluster ID", configMapNamespace, configMapName)
-		return
-	}
-	flags["kubernetes-cluster-uid"] = string(cm.ObjectMeta.UID)
+	flags["kubernetes-version"] = version
+	flags["kubernetes-cluster-uid"] = string(os.Getenv("WEAVE_KUBERNETES_UID"))
 	flags["kubernetes-cluster-size"] = fmt.Sprint(clusterSize)
 }

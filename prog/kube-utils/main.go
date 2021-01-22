@@ -314,6 +314,8 @@ func main() {
 		justReclaim       bool
 		justCheck         bool
 		justSetNodeStatus bool
+		justVersion       bool
+		justUID           bool
 		peerName          string
 		nodeName          string
 		logLevel          string
@@ -323,6 +325,8 @@ func main() {
 	flag.BoolVar(&runReclaimDaemon, "run-reclaim-daemon", false, "run background process that reclaim IP space from dead peers ")
 	flag.BoolVar(&justCheck, "check-peer-new", false, "return success if peer name is not stored in annotation")
 	flag.BoolVar(&justSetNodeStatus, "set-node-status", false, "set NodeNetworkUnavailable to false")
+	flag.BoolVar(&justVersion, "print-k8s-version", false, "print the Kubernetes version and exit")
+	flag.BoolVar(&justUID, "print-uid", false, "print a UID for this installation and exit")
 	flag.StringVar(&peerName, "peer-name", "unknown", "name of this Weave Net peer")
 	flag.StringVar(&nodeName, "node-name", "unknown", "name of this Kubernetes node")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
@@ -370,6 +374,21 @@ func main() {
 			common.Log.Fatalf("[kube-peers] Error while reclaiming space: %v", err)
 		}
 		return
+	}
+	if justVersion {
+		k8sVersion, err := c.Discovery().ServerVersion()
+		if err != nil {
+			common.Log.Fatalf("[kube-peers] Could not get Kubernetes version: %v", err)
+		}
+		fmt.Println(k8sVersion.String())
+	}
+	if justUID {
+		// use UID of `weave-net` configmap as unique ID of the Kubernetes cluster
+		cm, err := c.CoreV1().ConfigMaps(configMapNamespace).Get(context.Background(), configMapName, api.GetOptions{})
+		if err != nil {
+			common.Log.Fatalf("Unable to fetch ConfigMap %s/%s to infer unique cluster ID", configMapNamespace, configMapName)
+		}
+		fmt.Println(cm.ObjectMeta.UID)
 	}
 	if runReclaimDaemon {
 		// Handle SIGINT and SIGTERM

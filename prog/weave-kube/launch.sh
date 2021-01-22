@@ -118,6 +118,10 @@ fi
 # weaver is running as the DB can only be opened by one process at a time
 /usr/bin/weaveutil set-db-flag "$DB_PREFIX" peer-reclaim ok
 
+# couple more variables
+WEAVE_KUBERNETES_VERSION=$(/home/weave/kube-utils -print-k8s-version)
+WEAVE_KUBERNETES_UID=$(/home/weave/kube-utils -print-uid)
+
 post_start_actions() {
     # Wait for weave process to become responsive
     while true ; do
