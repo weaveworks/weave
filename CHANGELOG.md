@@ -1,3 +1,11 @@
+## Release 2.8.1
+
+Fixes a problem introduced in 2.8.0 for machines whose ID is in /etc/machine-id #3886
+Many thanks to contributor @avestuk for this fix.
+
+Also move Kubernetes API calls out of Weave Net daemon #3885
+- this reduces the size of the 'weaver' binary and stops it crashing when run on 32-bit ARM.
+
 ## Release 2.8.0
 
 This release makes some important changes to trim the "attack surface" of the
