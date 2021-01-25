@@ -2,7 +2,7 @@
 
 . "$(dirname "$0")/config.sh"
 
-start_suite "Test CNI plugin"
+start_suite "Test CNI plugin with static IP allocation"
 
 cni_connect() {
     pid=$(container_pid $1 $2)
@@ -13,8 +13,8 @@ cni_connect() {
 
 run_on $HOST1 sudo mkdir -p /opt/cni/bin
 # setup-cni is a subset of 'weave setup', without doing any 'docker pull's
-weave_on $HOST1 setup-cni
-weave_on $HOST1 launch
+weave_on $HOST1 setup-cni --log-level=debug
+weave_on $HOST1 launch --log-level=debug
 
 C0=$(docker_on $HOST1 run --net=none --name=c0 --privileged -dt $SMALL_IMAGE /bin/sh)
 C1=$(docker_on $HOST1 run --net=none --name=c1 --privileged -dt $SMALL_IMAGE /bin/sh)
@@ -70,16 +70,32 @@ C0IP=$(container_ip $HOST1 c0)
 C1IP=$(container_ip $HOST1 c1)
 C2IP=$(container_ip $HOST1 c2)
 
-echo $C0IP
-echo $C1IP
-echo $C2IP
+assert_raises "[ "10.32.1.30" == $C0IP ]"
+assert_raises "[ "10.32.1.40" == $C1IP ]"
+assert_raises "[ "10.32.1.42" == $C2IP ]"
+
+BRIP=$(container_ip $HOST1 weave:expose)
+# Check the bridge IP is different from the container IPs
+assert_raises "[ $BRIP != $C0IP ]"
+assert_raises "[ $BRIP != $C1IP ]"
+assert_raises "[ $BRIP != $C2IP ]"
+
+# Containers should be able to reach one another
+assert_raises "exec_on $HOST1 c0 $PING $C1IP"
+assert_raises "exec_on $HOST1 c1 $PING $C2IP"
+assert_raises "exec_on $HOST1 c2 $PING $C1IP"
+
+# Containers should not have a default route to the world
+assert_raises "exec_on $HOST1 c0 sh -c '! $PING 8.8.8.8'"
+assert_raises "exec_on $HOST1 c1 sh -c '! $PING 8.8.8.8'"
+assert_raises "exec_on $HOST1 c2 sh -c '! $PING 8.8.8.8'"
 
 # Ensure existing containers can reclaim their IP addresses after CNI has been used -- see #2548
 stop_weave_on $HOST1
 
 # Ensure no warning is printed to the standard error:
-ACTUAL_OUTPUT=$(CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" $WEAVE launch 2>&1)
-EXPECTED_OUTPUT=$(docker inspect --format="{{.Id}}" weave)
+ACTUAL_OUTPUT=$(CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" DOCKER_HOST=tcp://$HOST1:$DOCKER_PORT $WEAVE launch 2>&1)
+EXPECTED_OUTPUT=$($SSH $HOST1 docker inspect --format="{{.Id}}" weave)
 
 assert_raises "[ $EXPECTED_OUTPUT == $ACTUAL_OUTPUT ]"
 

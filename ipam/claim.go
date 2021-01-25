@@ -128,6 +128,9 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// but we also cannot prove otherwise, so we let it reclaim the address:
 		alloc.debugln("Re-Claimed", c.cidr, "for ID", c.ident, "having existing ID as", existingIdent)
 		c.sendResult(nil)
+	case c.ident == "weave:expose":
+		alloc.debugln("Ignoring weave:expose")
+		c.sendResult(nil)
 	default:
 		// Addr already owned by container on this machine
 		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.cidr.String(), existingIdent))
