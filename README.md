@@ -33,6 +33,8 @@ If you have any questions about, feedback for or a problem with Weave Net:
 - Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area.
 - [File an issue](https://github.com/weaveworks/weave/issues/new).
 
+We follow the [CNCF Code of Conduct](code-of-conduct.md).
+
 Your feedback is always welcome!
 
 ## Further Information
