@@ -10,5 +10,3 @@ If you require a higher level of commitment, please [contact Weaveworks](https:/
 ## Reporting a Vulnerability
 
 To submit a security bug report please e-mail us at security@weave.works.
-
-We also operate a Bug Bounty programme; see https://www.weave.works/bug-bounty/
