@@ -73,6 +73,3 @@ test/images/network-tester/webserver
 terraform.tfstate
 terraform.tfstate.backup
 prog/net-plugin/rootfs/
-
-# Website
-site-build

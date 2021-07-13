@@ -428,14 +428,3 @@ integration-tests: all testrunner
 #     integration-tests
 #
 	RUNNER_ARGS="-parallel" ./test/run-integration-tests.sh
-
-# This target is only intended for use in Netlify CI environment for generating preview pages on feature branches and pull requests.
-# We need to obtain website repository (checked out under `site-build`) and place `site` directory into the context (`site-build/_weave_net_docs`).
-# We then run make in `site-build` and Netlify will publish the output (`site-build/_site`).
-netlify-site-preview:
-	@mkdir -p site-build
-	@curl --user $(WEBSITE_GITHUB_USER) --silent 'https://codeload.github.com/weaveworks/website-next/tar.gz/$(WEBSITE_BRANCH)' \
-	  | tar --extract --gunzip --directory site-build --strip 1
-	@cp -r site site-build/_weave_net_docs
-	@$(MAKE) -C site-build netlify_ensure_install
-	@$(MAKE) -C site-build BUILD_ENV=netlify
