@@ -9,8 +9,12 @@ function signal_failure() {
 }
 trap signal_failure ERR
 
+
 function install_terraform() {
-    curl -fsS https://releases.hashicorp.com/terraform/0.12.0/terraform_0.12.0_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
+    TF_SHA256SUM="42ffd2db97853d5249621d071f4babeed8f5fdba40e3685e6c1013b9b7b25830"
+    curl -fsS -o terraform.zip https://releases.hashicorp.com/terraform/0.12.0/terraform_0.11.14_linux_amd64.zip
+    echo "${TF_SHA256SUM} terraform.zip" | sha256sum -c
+    unzip terraform.zip -d /usr/bin
 }
 
 [ -n "$SECRET_KEY" ] || {
