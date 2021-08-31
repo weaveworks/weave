@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 # Signal failures in lock file, in order to fail fast:
 function signal_failure() {
