@@ -16,6 +16,7 @@ function install_terraform() {
     curl -fsS -o terraform.zip "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
     echo "${TF_SHA256SUM} terraform.zip" | sha256sum -c
     sudo unzip terraform.zip -d /usr/bin
+    rm terraform.zip
 }
 
 [ -n "$SECRET_KEY" ] || {
