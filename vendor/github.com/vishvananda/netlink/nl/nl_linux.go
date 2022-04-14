@@ -21,13 +21,22 @@ const (
 	FAMILY_ALL  = unix.AF_UNSPEC
 	FAMILY_V4   = unix.AF_INET
 	FAMILY_V6   = unix.AF_INET6
-	FAMILY_MPLS = AF_MPLS
+	FAMILY_MPLS = unix.AF_MPLS
+	// Arbitrary set value (greater than default 4k) to allow receiving
+	// from kernel more verbose messages e.g. for statistics,
+	// tc rules or filters, or other more memory requiring data.
+	RECEIVE_BUFFER_SIZE = 65536
+	// Kernel netlink pid
+	PidKernel uint32 = 0
 )
 
 // SupportedNlFamilies contains the list of netlink families this netlink package supports
 var SupportedNlFamilies = []int{unix.NETLINK_ROUTE, unix.NETLINK_XFRM, unix.NETLINK_NETFILTER}
 
 var nextSeqNr uint32
+
+// Default netlink socket timeout, 60s
+var SocketTimeoutTv = unix.Timeval{Sec: 60, Usec: 0}
 
 // GetIPFamily returns the family type of a net.IP.
 func GetIPFamily(ip net.IP) int {
@@ -42,7 +51,7 @@ func GetIPFamily(ip net.IP) int {
 
 var nativeEndian binary.ByteOrder
 
-// Get native endianness for the system
+// NativeEndian gets native endianness for the system
 func NativeEndian() binary.ByteOrder {
 	if nativeEndian == nil {
 		var x uint32 = 0x01020304
@@ -253,6 +262,29 @@ func NewIfInfomsgChild(parent *RtAttr, family int) *IfInfomsg {
 	return msg
 }
 
+type Uint32Attribute struct {
+	Type  uint16
+	Value uint32
+}
+
+func (a *Uint32Attribute) Serialize() []byte {
+	native := NativeEndian()
+	buf := make([]byte, rtaAlignOf(8))
+	native.PutUint16(buf[0:2], 8)
+	native.PutUint16(buf[2:4], a.Type)
+
+	if a.Type&NLA_F_NET_BYTEORDER != 0 {
+		binary.BigEndian.PutUint32(buf[4:], a.Value)
+	} else {
+		native.PutUint32(buf[4:], a.Value)
+	}
+	return buf
+}
+
+func (a *Uint32Attribute) Len() int {
+	return 8
+}
+
 // Extend RtAttr to handle data and children
 type RtAttr struct {
 	unix.RtAttr
@@ -271,15 +303,22 @@ func NewRtAttr(attrType int, data []byte) *RtAttr {
 	}
 }
 
-// Create a new RtAttr obj anc add it as a child of an existing object
+// NewRtAttrChild adds an RtAttr as a child to the parent and returns the new attribute
+//
+// Deprecated: Use AddRtAttr() on the parent object
 func NewRtAttrChild(parent *RtAttr, attrType int, data []byte) *RtAttr {
+	return parent.AddRtAttr(attrType, data)
+}
+
+// AddRtAttr adds an RtAttr as a child and returns the new attribute
+func (a *RtAttr) AddRtAttr(attrType int, data []byte) *RtAttr {
 	attr := NewRtAttr(attrType, data)
-	parent.children = append(parent.children, attr)
+	a.children = append(a.children, attr)
 	return attr
 }
 
-// AddChild adds an existing RtAttr as a child.
-func (a *RtAttr) AddChild(attr *RtAttr) {
+// AddChild adds an existing NetlinkRequestData as a child.
+func (a *RtAttr) AddChild(attr NetlinkRequestData) {
 	a.children = append(a.children, attr)
 }
 
@@ -360,16 +399,12 @@ func (req *NetlinkRequest) Serialize() []byte {
 }
 
 func (req *NetlinkRequest) AddData(data NetlinkRequestData) {
-	if data != nil {
-		req.Data = append(req.Data, data)
-	}
+	req.Data = append(req.Data, data)
 }
 
 // AddRawData adds raw bytes to the end of the NetlinkRequest object during serialization
 func (req *NetlinkRequest) AddRawData(data []byte) {
-	if data != nil {
-		req.RawData = append(req.RawData, data...)
-	}
+	req.RawData = append(req.RawData, data...)
 }
 
 // Execute the request against a the given sockType.
@@ -394,6 +429,14 @@ func (req *NetlinkRequest) Execute(sockType int, resType uint16) ([][]byte, erro
 		if err != nil {
 			return nil, err
 		}
+
+		if err := s.SetSendTimeout(&SocketTimeoutTv); err != nil {
+			return nil, err
+		}
+		if err := s.SetReceiveTimeout(&SocketTimeoutTv); err != nil {
+			return nil, err
+		}
+
 		defer s.Close()
 	} else {
 		s.Lock()
@@ -413,9 +456,12 @@ func (req *NetlinkRequest) Execute(sockType int, resType uint16) ([][]byte, erro
 
 done:
 	for {
-		msgs, err := s.Receive()
+		msgs, from, err := s.Receive()
 		if err != nil {
 			return nil, err
+		}
+		if from.Pid != PidKernel {
+			return nil, fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, PidKernel)
 		}
 		for _, m := range msgs {
 			if m.Header.Seq != req.Seq {
@@ -425,12 +471,9 @@ done:
 				return nil, fmt.Errorf("Wrong Seq nr %d, expected %d", m.Header.Seq, req.Seq)
 			}
 			if m.Header.Pid != pid {
-				return nil, fmt.Errorf("Wrong pid %d, expected %d", m.Header.Pid, pid)
+				continue
 			}
-			if m.Header.Type == unix.NLMSG_DONE {
-				break done
-			}
-			if m.Header.Type == unix.NLMSG_ERROR {
+			if m.Header.Type == unix.NLMSG_DONE || m.Header.Type == unix.NLMSG_ERROR {
 				native := NativeEndian()
 				error := int32(native.Uint32(m.Data[0:4]))
 				if error == 0 {
@@ -610,21 +653,31 @@ func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
 	return nil
 }
 
-func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
+func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetlink, error) {
 	fd := int(atomic.LoadInt32(&s.fd))
 	if fd < 0 {
-		return nil, fmt.Errorf("Receive called on a closed socket")
+		return nil, nil, fmt.Errorf("Receive called on a closed socket")
 	}
-	rb := make([]byte, unix.Getpagesize())
-	nr, _, err := unix.Recvfrom(fd, rb, 0)
+	var fromAddr *unix.SockaddrNetlink
+	var rb [RECEIVE_BUFFER_SIZE]byte
+	nr, from, err := unix.Recvfrom(fd, rb[:], 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	fromAddr, ok := from.(*unix.SockaddrNetlink)
+	if !ok {
+		return nil, nil, fmt.Errorf("Error converting to netlink sockaddr")
 	}
 	if nr < unix.NLMSG_HDRLEN {
-		return nil, fmt.Errorf("Got short response from netlink")
+		return nil, nil, fmt.Errorf("Got short response from netlink")
 	}
-	rb = rb[:nr]
-	return syscall.ParseNetlinkMessage(rb)
+	rb2 := make([]byte, nr)
+	copy(rb2, rb[:nr])
+	nl, err := syscall.ParseNetlinkMessage(rb2)
+	if err != nil {
+		return nil, nil, err
+	}
+	return nl, fromAddr, nil
 }
 
 // SetSendTimeout allows to set a send timeout on the socket

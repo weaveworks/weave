@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 )
@@ -28,6 +29,28 @@ type User struct {
 	Shell string
 }
 
+// userFromOS converts an os/user.(*User) to local User
+//
+// (This does not include Pass, Shell or Gecos)
+func userFromOS(u *user.User) (User, error) {
+	newUser := User{
+		Name: u.Username,
+		Home: u.HomeDir,
+	}
+	id, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return newUser, err
+	}
+	newUser.Uid = id
+
+	id, err = strconv.Atoi(u.Gid)
+	if err != nil {
+		return newUser, err
+	}
+	newUser.Gid = id
+	return newUser, nil
+}
+
 type Group struct {
 	Name string
 	Pass string
@@ -35,12 +58,46 @@ type Group struct {
 	List []string
 }
 
+// groupFromOS converts an os/user.(*Group) to local Group
+//
+// (This does not include Pass or List)
+func groupFromOS(g *user.Group) (Group, error) {
+	newGroup := Group{
+		Name: g.Name,
+	}
+
+	id, err := strconv.Atoi(g.Gid)
+	if err != nil {
+		return newGroup, err
+	}
+	newGroup.Gid = id
+
+	return newGroup, nil
+}
+
+// SubID represents an entry in /etc/sub{u,g}id
+type SubID struct {
+	Name  string
+	SubID int64
+	Count int64
+}
+
+// IDMap represents an entry in /proc/PID/{u,g}id_map
+type IDMap struct {
+	ID       int64
+	ParentID int64
+	Count    int64
+}
+
 func parseLine(line string, v ...interface{}) {
-	if line == "" {
+	parseParts(strings.Split(line, ":"), v...)
+}
+
+func parseParts(parts []string, v ...interface{}) {
+	if len(parts) == 0 {
 		return
 	}
 
-	parts := strings.Split(line, ":")
 	for i, p := range parts {
 		// Ignore cases where we don't have enough fields to populate the arguments.
 		// Some configuration files like to misbehave.
@@ -56,6 +113,8 @@ func parseLine(line string, v ...interface{}) {
 		case *int:
 			// "numbers", with conversion errors ignored because of some misbehaving configuration files.
 			*e, _ = strconv.Atoi(p)
+		case *int64:
+			*e, _ = strconv.ParseInt(p, 10, 64)
 		case *[]string:
 			// Comma-separated lists.
 			if p != "" {
@@ -65,7 +124,7 @@ func parseLine(line string, v ...interface{}) {
 			}
 		default:
 			// Someone goof'd when writing code using this function. Scream so they can hear us.
-			panic(fmt.Sprintf("parseLine only accepts {*string, *int, *[]string} as arguments! %#v is not a pointer!", e))
+			panic(fmt.Sprintf("parseLine only accepts {*string, *int, *int64, *[]string} as arguments! %#v is not a pointer!", e))
 		}
 	}
 }
@@ -103,10 +162,6 @@ func ParsePasswdFilter(r io.Reader, filter func(User) bool) ([]User, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		line := strings.TrimSpace(s.Text())
 		if line == "" {
 			continue
@@ -123,6 +178,9 @@ func ParsePasswdFilter(r io.Reader, filter func(User) bool) ([]User, error) {
 		if filter == nil || filter(p) {
 			out = append(out, p)
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 
 	return out, nil
@@ -162,10 +220,6 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		text := s.Text()
 		if text == "" {
 			continue
@@ -183,6 +237,9 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 			out = append(out, p)
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }
@@ -199,18 +256,16 @@ type ExecUser struct {
 // files cannot be opened for any reason, the error is ignored and a nil
 // io.Reader is passed instead.
 func GetExecUserPath(userSpec string, defaults *ExecUser, passwdPath, groupPath string) (*ExecUser, error) {
-	passwd, err := os.Open(passwdPath)
-	if err != nil {
-		passwd = nil
-	} else {
-		defer passwd.Close()
+	var passwd, group io.Reader
+
+	if passwdFile, err := os.Open(passwdPath); err == nil {
+		passwd = passwdFile
+		defer passwdFile.Close()
 	}
 
-	group, err := os.Open(groupPath)
-	if err != nil {
-		group = nil
-	} else {
-		defer group.Close()
+	if groupFile, err := os.Open(groupPath); err == nil {
+		group = groupFile
+		defer groupFile.Close()
 	}
 
 	return GetExecUser(userSpec, defaults, passwd, group)
@@ -343,7 +398,7 @@ func GetExecUser(userSpec string, defaults *ExecUser, passwd, group io.Reader) (
 			if len(groups) > 0 {
 				// First match wins, even if there's more than one matching entry.
 				user.Gid = groups[0].Gid
-			} else if groupArg != "" {
+			} else {
 				// If we can't find a group with the given name, the only other valid
 				// option is if it's a numeric group name with no associated entry in group.
 
@@ -411,7 +466,7 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 		// we asked for a group but didn't find it. let's check to see
 		// if we wanted a numeric group
 		if !found {
-			gid, err := strconv.Atoi(ag)
+			gid, err := strconv.ParseInt(ag, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("Unable to find group %s", ag)
 			}
@@ -419,7 +474,7 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 			if gid < minId || gid > maxId {
 				return nil, ErrRange
 			}
-			gidMap[gid] = struct{}{}
+			gidMap[int(gid)] = struct{}{}
 		}
 	}
 	gids := []int{}
@@ -433,9 +488,117 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 // that opens the groupPath given and gives it as an argument to
 // GetAdditionalGroups.
 func GetAdditionalGroupsPath(additionalGroups []string, groupPath string) ([]int, error) {
-	group, err := os.Open(groupPath)
-	if err == nil {
-		defer group.Close()
+	var group io.Reader
+
+	if groupFile, err := os.Open(groupPath); err == nil {
+		group = groupFile
+		defer groupFile.Close()
 	}
 	return GetAdditionalGroups(additionalGroups, group)
+}
+
+func ParseSubIDFile(path string) ([]SubID, error) {
+	subid, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer subid.Close()
+	return ParseSubID(subid)
+}
+
+func ParseSubID(subid io.Reader) ([]SubID, error) {
+	return ParseSubIDFilter(subid, nil)
+}
+
+func ParseSubIDFileFilter(path string, filter func(SubID) bool) ([]SubID, error) {
+	subid, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer subid.Close()
+	return ParseSubIDFilter(subid, filter)
+}
+
+func ParseSubIDFilter(r io.Reader, filter func(SubID) bool) ([]SubID, error) {
+	if r == nil {
+		return nil, fmt.Errorf("nil source for subid-formatted data")
+	}
+
+	var (
+		s   = bufio.NewScanner(r)
+		out = []SubID{}
+	)
+
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+
+		// see: man 5 subuid
+		p := SubID{}
+		parseLine(line, &p.Name, &p.SubID, &p.Count)
+
+		if filter == nil || filter(p) {
+			out = append(out, p)
+		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func ParseIDMapFile(path string) ([]IDMap, error) {
+	r, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return ParseIDMap(r)
+}
+
+func ParseIDMap(r io.Reader) ([]IDMap, error) {
+	return ParseIDMapFilter(r, nil)
+}
+
+func ParseIDMapFileFilter(path string, filter func(IDMap) bool) ([]IDMap, error) {
+	r, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return ParseIDMapFilter(r, filter)
+}
+
+func ParseIDMapFilter(r io.Reader, filter func(IDMap) bool) ([]IDMap, error) {
+	if r == nil {
+		return nil, fmt.Errorf("nil source for idmap-formatted data")
+	}
+
+	var (
+		s   = bufio.NewScanner(r)
+		out = []IDMap{}
+	)
+
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+
+		// see: man 7 user_namespaces
+		p := IDMap{}
+		parseParts(strings.Fields(line), &p.ID, &p.ParentID, &p.Count)
+
+		if filter == nil || filter(p) {
+			out = append(out, p)
+		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }

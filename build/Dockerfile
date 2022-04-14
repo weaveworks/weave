@@ -1,4 +1,4 @@
-FROM golang:1.15.6-buster
+FROM golang:1.17.9-buster
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
@@ -43,8 +43,8 @@ RUN apt-get update \
 		flex \
 		bison
 
-RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v1.3.0/shfmt_v1.3.0_linux_amd64 && \
-	echo "b1925c2c405458811f0c227266402cf1868b4de529f114722c2e3a5af4ac7bb2  shfmt" | sha256sum -c && \
+RUN curl -fsSLo shfmt https://github.com/mvdan/sh/releases/download/v3.4.3/shfmt_v3.4.3_linux_amd64 && \
+	echo "713ef49db9a60a00636814a507da851b58da6b4b98a3627188fba0a61b60f9a8  shfmt" | sha256sum -c && \
 	chmod +x shfmt && \
 	mv shfmt /usr/bin
 
@@ -76,7 +76,7 @@ RUN curl -sSL https://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.t
 		&& make clean; done
 
 # Install Docker
-RUN curl -fsSL https://get.docker.com | VERSION=18.06.0-ce /bin/sh
+RUN curl -fsSL https://get.docker.com | VERSION=20.10.9 /bin/sh
 
 COPY build.sh /
 ENTRYPOINT ["sh", "/build.sh"]

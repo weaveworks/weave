@@ -13,7 +13,7 @@ ARCH?=amd64
 
 # We're using QEMU to be able to build Docker images for other architectures
 # from amd64 machines.
-QEMU_VERSION=v2.7.0
+QEMU_VERSION=v6.1.0-8
 
 # A list of all supported architectures here. Should be named as Go is naming platforms
 # All supported architectures must have an "ifeq" block below that customizes the parameters
@@ -25,7 +25,7 @@ ifeq ($(ARCH),amd64)
 	WEAVEEXEC_DOCKER_ARCH?=x86_64
 
 # The name of the alpine baseimage to use as the base for weave images
-	ALPINE_BASEIMAGE?=alpine:3.10
+	ALPINE_BASEIMAGE?=alpine:3.15
 
 # The extension for the made images
 # Specifying none means for example weaveworks/weave:latest
@@ -42,7 +42,7 @@ ifeq ($(ARCH),arm)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=arm32v6/alpine:3.8
+	ALPINE_BASEIMAGE?=arm32v6/alpine:3.15
 
 # arm images have the -arm suffix, for instance weaveworks/weave-arm:latest
 	ARCH_EXT?=-arm
@@ -62,7 +62,7 @@ ifeq ($(ARCH),arm64)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=arm64v8/alpine:3.8
+	ALPINE_BASEIMAGE?=arm64v8/alpine:3.15
 
 # arm64 images have the -arm64 suffix, for instance weaveworks/weave-arm64:latest
 	ARCH_EXT?=-arm64
@@ -82,7 +82,7 @@ ifeq ($(ARCH),ppc64le)
 	WEAVEEXEC_DOCKER_ARCH?=ppc64le
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=ppc64le/alpine:3.8
+	ALPINE_BASEIMAGE?=ppc64le/alpine:3.15
 
 # ppc64le images have the -ppc64le suffix, for instance weaveworks/weave-ppc64le:latest
 	ARCH_EXT?=-ppc64le
@@ -102,7 +102,7 @@ ifeq ($(ARCH),s390x)
 	WEAVEEXEC_DOCKER_ARCH?=s390x
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=s390x/alpine:3.6
+	ALPINE_BASEIMAGE?=s390x/alpine:3.15
 
 # s390x images have the -s390x suffix, for instance weaveworks/weave-s390x:latest
 	ARCH_EXT?=-s390x

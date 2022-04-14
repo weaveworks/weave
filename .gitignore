@@ -36,6 +36,9 @@ coverage.html
 # Sed backup files
 *.bak
 
+# Cache files
+.cache
+
 # Project specific
 prog/weaver/weaver
 prog/weavedns/weavedns

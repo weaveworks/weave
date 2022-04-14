@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containernetworking/cni/pkg/ipam"
+	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -174,6 +174,11 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 		}
 	}
 	return nil
+}
+
+func (c *CNIPlugin) CmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement
+	return fmt.Errorf("not implemented")
 }
 
 // As of CNI 0.5 spec:

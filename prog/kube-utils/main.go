@@ -79,7 +79,7 @@ func isLocalNodeIP(ip string) bool {
 		return false
 	}
 	for _, addr := range addrs {
-		if addr.Peer.IP.String() == ip {
+		if addr.Peer != nil && addr.Peer.IP.String() == ip {
 			return true
 		}
 	}

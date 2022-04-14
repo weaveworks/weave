@@ -2,6 +2,7 @@ package cobra
 
 import (
 	"fmt"
+	"strings"
 )
 
 type PositionalArgs func(cmd *Command, args []string) error
@@ -16,14 +17,14 @@ func legacyArgs(cmd *Command, args []string) error {
 		return nil
 	}
 
-	// root command with subcommands, do subcommand checking
+	// root command with subcommands, do subcommand checking.
 	if !cmd.HasParent() && len(args) > 0 {
 		return fmt.Errorf("unknown command %q for %q%s", args[0], cmd.CommandPath(), cmd.findSuggestions(args[0]))
 	}
 	return nil
 }
 
-// NoArgs returns an error if any args are included
+// NoArgs returns an error if any args are included.
 func NoArgs(cmd *Command, args []string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
@@ -31,11 +32,18 @@ func NoArgs(cmd *Command, args []string) error {
 	return nil
 }
 
-// OnlyValidArgs returns an error if any args are not in the list of ValidArgs
+// OnlyValidArgs returns an error if any args are not in the list of ValidArgs.
 func OnlyValidArgs(cmd *Command, args []string) error {
 	if len(cmd.ValidArgs) > 0 {
+		// Remove any description that may be included in ValidArgs.
+		// A description is following a tab character.
+		var validArgs []string
+		for _, v := range cmd.ValidArgs {
+			validArgs = append(validArgs, strings.Split(v, "\t")[0])
+		}
+
 		for _, v := range args {
-			if !stringInSlice(v, cmd.ValidArgs) {
+			if !stringInSlice(v, validArgs) {
 				return fmt.Errorf("invalid argument %q for %q%s", v, cmd.CommandPath(), cmd.findSuggestions(args[0]))
 			}
 		}
@@ -43,21 +51,12 @@ func OnlyValidArgs(cmd *Command, args []string) error {
 	return nil
 }
 
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
-}
-
-// ArbitraryArgs never returns an error
+// ArbitraryArgs never returns an error.
 func ArbitraryArgs(cmd *Command, args []string) error {
 	return nil
 }
 
-// MinimumNArgs returns an error if there is not at least N args
+// MinimumNArgs returns an error if there is not at least N args.
 func MinimumNArgs(n int) PositionalArgs {
 	return func(cmd *Command, args []string) error {
 		if len(args) < n {
@@ -67,7 +66,7 @@ func MinimumNArgs(n int) PositionalArgs {
 	}
 }
 
-// MaximumNArgs returns an error if there are more than N args
+// MaximumNArgs returns an error if there are more than N args.
 func MaximumNArgs(n int) PositionalArgs {
 	return func(cmd *Command, args []string) error {
 		if len(args) > n {
@@ -77,7 +76,7 @@ func MaximumNArgs(n int) PositionalArgs {
 	}
 }
 
-// ExactArgs returns an error if there are not exactly n args
+// ExactArgs returns an error if there are not exactly n args.
 func ExactArgs(n int) PositionalArgs {
 	return func(cmd *Command, args []string) error {
 		if len(args) != n {
@@ -87,7 +86,19 @@ func ExactArgs(n int) PositionalArgs {
 	}
 }
 
-// RangeArgs returns an error if the number of args is not within the expected range
+// ExactValidArgs returns an error if
+// there are not exactly N positional args OR
+// there are any positional args that are not in the `ValidArgs` field of `Command`
+func ExactValidArgs(n int) PositionalArgs {
+	return func(cmd *Command, args []string) error {
+		if err := ExactArgs(n)(cmd, args); err != nil {
+			return err
+		}
+		return OnlyValidArgs(cmd, args)
+	}
+}
+
+// RangeArgs returns an error if the number of args is not within the expected range.
 func RangeArgs(min int, max int) PositionalArgs {
 	return func(cmd *Command, args []string) error {
 		if len(args) < min || len(args) > max {

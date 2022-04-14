@@ -21,6 +21,22 @@ type Handle struct {
 	lookupByDump bool
 }
 
+// SetSocketTimeout configures timeout for default netlink sockets
+func SetSocketTimeout(to time.Duration) error {
+	if to < time.Microsecond {
+		return fmt.Errorf("invalid timeout, minimul value is %s", time.Microsecond)
+	}
+
+	nl.SocketTimeoutTv = unix.NsecToTimeval(to.Nanoseconds())
+	return nil
+}
+
+// GetSocketTimeout returns the timeout value used by default netlink sockets
+func GetSocketTimeout() time.Duration {
+	nsec := unix.TimevalToNsec(nl.SocketTimeoutTv)
+	return time.Duration(nsec) * time.Nanosecond
+}
+
 // SupportsNetlinkFamily reports whether the passed netlink family is supported by this Handle
 func (h *Handle) SupportsNetlinkFamily(nlFamily int) bool {
 	_, ok := h.sockets[nlFamily]
@@ -91,7 +107,7 @@ func (h *Handle) GetSocketReceiveBufferSize() ([]int, error) {
 	return results, nil
 }
 
-// NewHandle returns a netlink handle on the network namespace
+// NewHandleAt returns a netlink handle on the network namespace
 // specified by ns. If ns=netns.None(), current network namespace
 // will be assumed
 func NewHandleAt(ns netns.NsHandle, nlFamilies ...int) (*Handle, error) {

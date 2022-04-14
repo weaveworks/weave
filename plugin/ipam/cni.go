@@ -7,7 +7,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 )
 
 func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
@@ -52,14 +52,19 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 		return nil, err
 	}
 	result := &current.Result{
+		CNIVersion: current.ImplementedSpecVersion,
 		IPs: []*current.IPConfig{{
-			Version: "4",
 			Address: *ipnet,
 			Gateway: conf.Gateway,
 		}},
 		Routes: conf.Routes,
 	}
 	return result, nil
+}
+
+func (i *Ipam) CmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement
+	return fmt.Errorf("not implemented")
 }
 
 func (i *Ipam) CmdDel(args *skel.CmdArgs) error {
