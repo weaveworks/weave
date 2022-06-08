@@ -19,6 +19,7 @@ The following topics are discussed:
    * [Reading the logs](#logs)
    * [Troubleshooting Blocked Connections](#blocked-connections)
    * [Things to watch out for](#key-points)
+   * [Troubleshooting FailedCreatePodSandBox errors](#failedcreatepodsandbox)
 * [Changing Configuration Options](#configuration-options)
 * [Securing The Setup](#securing-the-setup)
 
@@ -370,6 +371,49 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 - Weave Net can be run on minikube v0.28 or later with the default CNI config shipped with minikube
   being disabled. See [#3124](https://github.com/weaveworks/weave/issues/3124#issuecomment-397820940)
   for more details.
+- Weave Net has a problem with containerd versions 1.6.0 through 1.6.4. See [Troubleshooting FailedCreatePodSandBox errors](#failedcreatepodsandbox) below.
+
+### <a name="failedcreatepodsandbox"></a> Troubleshooting FailedCreatePodSandBox errors
+
+If your Kubernetes cluster uses the `containerd` runtime (versions 1.6.0 through 1.6.4), Weave Net will not be able to allocate IP addresses to pods. Your pods, execept the ones that use HostNetworking, will be stuck at `ContainerCreating` status.
+
+You can examine any pod so affected  by running `kubectl describe`, for example:
+
+```
+$ kubectl describe pod -n kube-system coredns-78fcd69978-dbxs9
+```
+
+The events section will repeatedly show errors like the following:
+
+```
+  Warning  FailedCreatePodSandBox  3m6s                  kubelet            Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox "09a23f79c96333b9f54e12df54e817837c8021cbaa32bdfeefbe2a1fb215d9ef": plugin type="weave-net" name="weave" failed (add): unable to allocate IP address: Post "http://127.0.0.1:6784/ip/09a23f79c96333b9f54e12df54e817837c8021cbaa32bdfeefbe2a1fb215d9ef": dial tcp 127.0.0.1:6784: connect: connection refused
+```
+
+You can verify that you are running an affected version of containerd by using the following:
+
+```
+$ kubectl get nodes -o wide
+
+NAME     STATUS   ROLES                  AGE   VERSION    INTERNAL-IP      EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION    CONTAINER-RUNTIME
+host-1   Ready    control-plane,master   13m   v1.22.10   172.21.107.129   <none>        Debian GNU/Linux 11 (bullseye)   5.10.0-14-amd64   containerd://1.6.4
+```
+
+The last column shows the container runtime and version.
+
+Alternatively, you can run:
+
+```
+$ containerd -v
+containerd containerd.io 1.6.4 212e8b6fa2f44b9c21b2798135fc6fb7c53efc16
+```
+
+The problem can be solved by upgrading containerd to v1.6.5 or above. For example, on Debian Linux, using the docker official repositories, you can use:
+
+```
+sudo apt install containerd.io=1.6.6-1
+```
+
+The problem occurs because of a behaviour change in cni v1.1.0, which caused a regression issue in Weave. It was corrected in cni v1.1.1. Containerd 1.6.5 onwards uses cni1.1.1. 
 
 ## <a name="configuration-options"></a> Changing Configuration Options
 
