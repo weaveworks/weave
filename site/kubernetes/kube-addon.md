@@ -375,7 +375,7 @@ UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 
 ### <a name="failedcreatepodsandbox"></a> Troubleshooting FailedCreatePodSandBox errors
 
-If your Kubernetes cluster uses the `containerd` runtime (versions 1.6.0 through 1.6.4), Weave Net will not be able to allocate IP addresses to pods. Your pods, execept the ones that use HostNetworking, will be stuck at `ContainerCreating` status.
+If your Kubernetes cluster uses the `containerd` runtime (versions 1.6.0 through 1.6.4), Weave Net will not be able to allocate IP addresses to pods. Your pods, except the ones that use HostNetworking, will be stuck at `ContainerCreating` status.
 
 You can examine any pod so affected  by running `kubectl describe`, for example:
 
@@ -383,7 +383,7 @@ You can examine any pod so affected  by running `kubectl describe`, for example:
 $ kubectl describe pod -n kube-system coredns-78fcd69978-dbxs9
 ```
 
-The events section will repeatedly show errors like the following:
+The events section will show repeated errors like the following:
 
 ```
   Warning  FailedCreatePodSandBox  3m6s                  kubelet            Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox "09a23f79c96333b9f54e12df54e817837c8021cbaa32bdfeefbe2a1fb215d9ef": plugin type="weave-net" name="weave" failed (add): unable to allocate IP address: Post "http://127.0.0.1:6784/ip/09a23f79c96333b9f54e12df54e817837c8021cbaa32bdfeefbe2a1fb215d9ef": dial tcp 127.0.0.1:6784: connect: connection refused
@@ -413,7 +413,7 @@ The problem can be solved by upgrading containerd to v1.6.5 or above. For exampl
 sudo apt install containerd.io=1.6.6-1
 ```
 
-The problem occurs because of a behaviour change in cni v1.1.0, which caused a regression issue in Weave. It was corrected in cni v1.1.1. Containerd 1.6.5 onwards uses cni1.1.1. 
+The problem occurs because of a behaviour change in cni v1.1.0, which caused a regression issue in Weave. It was corrected in cni v1.1.1. Containerd 1.6.5 onwards uses cni 1.1.1 and above. 
 
 ## <a name="configuration-options"></a> Changing Configuration Options
 
