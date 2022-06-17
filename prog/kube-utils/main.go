@@ -180,7 +180,7 @@ func reclaimPeer(weave weaveClient, cml *configMapAnnotations, peerName string, 
 				return false, err
 			}
 			// handle an edge case where peer claimed to own the action to reclaim but no longer
-			// exists hence lock persists foever
+			// exists hence lock persists forever
 			if !storedPeerList.contains(existingAnnotation) {
 				nonExistentPeer = true
 				common.Log.Debugln("[kube-peers] Existing annotation", existingAnnotation, " has a non-existent peer so owning the reclaim action")
@@ -262,7 +262,7 @@ func resetPeers(kube kubernetes.Interface) error {
 	return nil
 }
 
-// regiesters with Kubernetes API server for node delete events. Node delete event handler
+// registers with Kubernetes API server for node delete events. Node delete event handler
 // invokes reclaimRemovedPeers to remove it from IPAM so that IP space is reclaimed
 func registerForNodeUpdates(client *kubernetes.Clientset, stopCh <-chan struct{}, nodeName, peerName string) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
