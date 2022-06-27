@@ -447,6 +447,8 @@ The list of variables you can set is:
   by setting `HAIRPIN_MODE=false`.
 * `IPALLOC_RANGE` - the range of IP addresses used by Weave Net
   and the subnet they are placed in (CIDR format; default `10.32.0.0/12`)
+* `IPALLOC_DEFAULT_SUBNET` - a subnet of IPALLOC_RANGE from which IP addresses
+  are automatically assigned (CIDR format; default to value of IPALLOC_RANGE).
 * `EXPECT_NPC` - set to 0 to disable Network Policy Controller (default is on)
 * `KUBE_PEERS` - list of addresses of peers in the Kubernetes cluster
   (default is to fetch the list from the api-server)
