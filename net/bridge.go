@@ -278,7 +278,7 @@ func EnsureBridge(procPath string, config *BridgeConfig, log *logrus.Logger, ips
 			return bridgeType, errors.Wrap(err, "setting proxy_arp")
 		}
 	}
-	// No ipv6 router advertisments please
+	// No ipv6 router advertisements please
 	if err := sysctlIfExists(procPath, "net/ipv6/conf/"+config.WeaveBridgeName+"/accept_ra", "0"); err != nil {
 		return bridgeType, errors.Wrap(err, "setting accept_ra to 0")
 	}
