@@ -33,8 +33,10 @@ For more details, see the [FAQ](/site/faq.md#ports).*
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
+Notice that [cloud.weave.works](https://www.weave.works/blog/weave-cloud-end-of-service) has reaced its end of life. You 
+could install weave net.  
 ```
-$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+$ kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s-1.11.yaml
 ```
 
 **Important:** this configuration won't enable encryption by default. If your data plane traffic isn't secured that could allow malicious actors to access your pod network. Read on to see the alternatives.
