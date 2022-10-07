@@ -147,21 +147,3 @@ kubectl create -f prometheus-serviceWeaveNet.yaml -n kube-system
 kubectl create -f prometheus-serviceMonitorWeaveNet.yaml -n monitoring
 ```
 **Note:** If you want to make changes to the created yamls, please modify the weave-net.jsonnet and recreate the manifests before applying.
-
-# Weave Cloud Integration
-
-Finally, you can configure your local Prometheus instance to push
-metrics to Weave Cloud by including the following fragment in the
-`prometheus.yml` above (after replacing `<WEAVE_CLOUD_TOKEN>` with
-your own token):
-
-```
-remote_write:
-  url: http://frontend.dev.weave.works/api/prom/push
-  basic_auth:
-    password: <WEAVE_CLOUD_TOKEN>
-```
-
-For information on getting started with Weave Cloud metrics, including
-on how to obtain your Weave Cloud token, please go
-[here](https://github.com/weaveworks/cortex).
