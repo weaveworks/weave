@@ -11,12 +11,6 @@
 
 This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, with over 8 million downloads to date. Weave Net enables you to get started with Docker clusters and portable apps in a fraction of the time required by other solutions.
 
-## Weave Cloud:
-
-[Weave Cloud](https://www.weave.works/product/cloud/) is software-as-a-service that simplifies deployment, monitoring and management for containers and microservices. It extends and complements popular orchestrators, and enables developers and DevOps to realize faster deployments, insightful monitoring, visualization and networking.
-
-Weave Cloud is built using these Open Source projects: [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container visualization tool that automatically maps Docker containers and their interactions, [Weave Cortex](https://github.com/weaveworks/cortex), a horizontally-scalable version of Prometheus, and [Weave Flux](https://www.weave.works/products/weave-flux/), a continuous deployment tool that works with Kubernetes.
-
 # Weave Net
 
 Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, ambassadors or links.
