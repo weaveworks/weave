@@ -4,16 +4,14 @@ menu_order: 30
 search_type: Documentation
 ---
 
-Install Weave Net from the command line on its own or if you are using Docker, Kubernetes or Mesosphere as a Docker or a CNI plugin. Weave Net can also be launched as a cloud agent within Weave Cloud to visualize and troubleshoot peer connections.
+Install Weave Net from the command line on its own or if you are using Docker, Kubernetes or Mesosphere as a Docker or a CNI plugin.
 
 
-## Installing Weave Net Stand-alone and in Weave Cloud
+## Installing Weave Net
 
 * [Installing Weave Net](https://www.weave.works/docs/net/latest/install/installing-weave/)
 * [Launching Weave Net](https://www.weave.works/docs/net/latest/install/using-weave/)
-* [Visualizing Weave Net in Weave Cloud](https://www.weave.works/docs/net/latest/install/weave-cloud/)
 * [Using Weave with Systemd](https://www.weave.works/docs/net/latest/install/systemd/)
-
 
 ## Weave Net Docker Plugin
 
