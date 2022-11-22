@@ -426,6 +426,41 @@ For example,
               value: 10.0.0.0/16
 ```
 
+The list of variables you can set is:
+
+* `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
+  versions (default is blank, i.e. check is enabled)
+* `CONN_LIMIT` - soft limit on the number of connections between
+  peers. Defaults to 200.
+* `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
+  the `veth` pair for containers attached. If you need to disable hairpin, e.g. your
+  kernel is one of those that can panic if hairpin is enabled, then you can disable it
+  by setting `HAIRPIN_MODE=false`.
+* `IPALLOC_RANGE` - the range of IP addresses used by Weave Net
+  and the subnet they are placed in (CIDR format; default `10.32.0.0/12`)
+* `EXPECT_NPC` - set to 0 to disable Network Policy Controller (default is on)
+* `KUBE_PEERS` - list of addresses of peers in the Kubernetes cluster
+  (default is to fetch the list from the api-server)
+* `IPALLOC_INIT` - set the initialization mode of the [IP Address
+  Manager](/site/operational-guide/concepts.md#ip-address-manager)
+  (defaults to consensus amongst the `KUBE_PEERS`)
+* `WEAVE_EXPOSE_IP` - set the IP address used as a gateway from the
+  Weave network to the host network - this is useful if you are
+  configuring the addon as a static pod.
+* `WEAVE_METRICS_ADDR` - address and port that the Weave Net
+  daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
+* `WEAVE_STATUS_ADDR` - address and port that the Weave Net
+  daemon will serve status requests on (defaults to disabled)
+* `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
+  smaller size if your underlying network has a tighter limit, or set
+  a larger size for better performance if your network supports jumbo
+  frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
+  details.
+* `NO_MASQ_LOCAL` - set to 0 to disable preserving the client source IP address when
+  accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
+  This feature works only with Weave IPAM (default).
+* `IPTABLES_BACKEND` - set to `nft` to use `nftables` backend for `iptables` (default is `iptables`)
+
 ## <a name="securing-the-setup"></a> Securing the Setup
 
 You must pass the `password-secret` option as noted in the previous section to enable the data plane encryption; this is a recommended option in case you cannot be sure about the security of the fabric between your nodes.
