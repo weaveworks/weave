@@ -449,8 +449,10 @@ The list of variables you can set is:
   configuring the addon as a static pod.
 * `WEAVE_METRICS_ADDR` - address and port that the Weave Net
   daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
+* `WEAVE_PASSWORD` - password to use during session key generation to encrypt
+traffic between peers.
 * `WEAVE_STATUS_ADDR` - address and port that the Weave Net
-  daemon will serve status requests on (defaults to disabled)
+  daemon will serve status requests on (defaults to disabled).
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
@@ -463,7 +465,8 @@ The list of variables you can set is:
 
 ## <a name="securing-the-setup"></a> Securing the Setup
 
-You must pass the `password-secret` option as noted in the previous section to enable the data plane encryption; this is a recommended option in case you cannot be sure about the security of the fabric between your nodes.
+You should set `WEAVE_PASSWORD` in the previous section to enable the data plane encryption; 
+this is a recommended option in case you cannot be sure about the security of the fabric between your nodes.
 
 A different option is to use `trusted-subnets` and whitelist only the subnets that host your k8s nodes. Mind that depending on your circumstances that might allow a malicious container running in your cluster to access the weave dataplane, still.
 
