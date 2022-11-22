@@ -465,7 +465,7 @@ traffic between peers.
 
 ## <a name="securing-the-setup"></a> Securing the Setup
 
-You should set `WEAVE_PASSWORD` in the previous section to enable the data plane encryption; 
+You should set the environment variable `WEAVE_PASSWORD` as stated in the previous section to enable the data plane encryption; 
 this is a recommended option in case you cannot be sure about the security of the fabric between your nodes.
 
 A different option is to use `trusted-subnets` and whitelist only the subnets that host your k8s nodes. Mind that depending on your circumstances that might allow a malicious container running in your cluster to access the weave dataplane, still.
