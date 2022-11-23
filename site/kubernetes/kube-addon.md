@@ -449,7 +449,7 @@ The list of variables you can set is:
   configuring the addon as a static pod.
 * `WEAVE_METRICS_ADDR` - address and port that the Weave Net
   daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
-* `WEAVE_PASSWORD` - password to use during session key generation to encrypt
+* `WEAVE_PASSWORD` - shared key to use during session key generation to encrypt
 traffic between peers.
 * `WEAVE_STATUS_ADDR` - address and port that the Weave Net
   daemon will serve status requests on (defaults to disabled).
