@@ -25,7 +25,7 @@ var (
 	PolicyEnforcementErrors = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "weavenpc_policy_enforcement_errors",
-			Help: "Errors occured in enforcing the network policies.",
+			Help: "Errors occurred in enforcing the network policies.",
 		},
 	)
 )
