@@ -11,9 +11,6 @@ github.com/Nvveen/Gotty
 # github.com/andybalholm/go-bit v0.0.0-20150501193155-34813fe0e46a
 ## explicit
 github.com/andybalholm/go-bit
-# github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-## explicit
-github.com/armon/go-socks5
 # github.com/aws/aws-sdk-go v1.13.22
 ## explicit
 github.com/aws/aws-sdk-go/aws
@@ -201,21 +198,12 @@ github.com/jmespath/go-jmespath
 github.com/json-iterator/go
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
-# github.com/mattn/go-colorable v0.0.9
-## explicit
-github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.3
-## explicit
-github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9
 ## explicit
 github.com/mdlayher/raw
-# github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
-## explicit
-github.com/mgutz/ansi
-# github.com/miekg/dns v1.0.4
+# github.com/miekg/dns v1.1.25
 ## explicit
 github.com/miekg/dns
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
@@ -340,9 +328,6 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
-## explicit
-golang.org/x/tools/cover
 # google.golang.org/appengine v1.5.0
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/base
