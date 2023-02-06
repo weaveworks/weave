@@ -21,8 +21,6 @@ require (
 	github.com/docker/machine v0.14.0
 	github.com/fsouza/go-dockerclient v1.2.0
 	github.com/go-ini/ini v1.33.0 // indirect
-	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
-	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/google/gopacket v1.1.16
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
 	github.com/gorilla/mux v1.6.1
@@ -47,19 +45,19 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v0.0.1
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
 	github.com/weaveworks/common v0.0.0-20180321110636-ebab3a78900a
 	github.com/weaveworks/go-checkpoint v0.0.0-20170503165305-ebbb8b0518ab
 	github.com/weaveworks/go-odp v0.0.0-20181017121109-6b0aa22550d9
 	github.com/weaveworks/mesh v0.0.0-20191105120815-58dbcc3e8e63
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
-	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	golang.org/x/tools v0.0.0-20200304193943-95d2e580d8eb
 	gopkg.in/ini.v1 v1.57.0 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
-	k8s.io/api v0.18.6
-	k8s.io/apimachinery v0.18.6
-	k8s.io/client-go v0.18.6
+	k8s.io/api v0.20.0
+	k8s.io/apimachinery v0.20.0
+	k8s.io/client-go v0.20.0
 )
