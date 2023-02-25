@@ -54,9 +54,9 @@ require (
 	github.com/weaveworks/go-checkpoint v0.0.0-20170503165305-ebbb8b0518ab
 	github.com/weaveworks/go-odp v0.0.0-20181017121109-6b0aa22550d9
 	github.com/weaveworks/mesh v0.0.0-20191105120815-58dbcc3e8e63
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
-	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
+	golang.org/x/crypto v0.1.0
+	golang.org/x/sys v0.1.0
+	golang.org/x/tools v0.1.12
 	gopkg.in/ini.v1 v1.57.0 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.18.6
