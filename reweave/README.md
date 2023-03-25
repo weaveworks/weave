@@ -12,7 +12,7 @@ The current focus of this effort is running weave net as a CNI plugin on Kuberne
 
 ## Tasks
 
-* Document the old build process
+* ~~Document the old build process~~Old build process documented in [BUILDING-OLD.md](BUILDING-OLD.md)
 * Create a new build process
 * Build, generate and test current images
 * Upgrade Go compiler version
