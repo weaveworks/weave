@@ -1,1 +1,1 @@
-weave-npc CVE Count: 77
+weave-npc CVE Count: 15

@@ -14,8 +14,8 @@ The current focus of this effort is running weave net as a CNI plugin on Kuberne
 
 * ~~Document the old build process~~Old build process documented in [BUILDING-OLD.md](BUILDING-OLD.md)
 * ~~Create a image scanning process and scan current image~~Image scanning process created, scan reports generated for 2.8.1
-* Create a new build process
-* Build, generate and test current images
+* ~~Create a new build process~~New build process created, documented in [BUILDING.md](BUILDING.md)
+* ~~Build, generate and test current images~~Built and scanned v2.8.2-beta0
 * Upgrade Go compiler version
 * Scan images for CVEs
 * While there are fixable CVEs: 
