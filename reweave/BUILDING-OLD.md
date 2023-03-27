@@ -50,6 +50,7 @@ The Makefile includes rules to push these images, which involve pushing all arch
 The Makefile also includes rules to build a Docker plugin, and to run tests.
 
 ## Important Makefile parameters
+
 |Name|Description|Default|
 |---|---|---|
 |ARCH|The build target architecture. Can be one of: `amd64` `arm` `arm64` `ppc64le` `s390x`|`amd64`|

@@ -1,0 +1,79 @@
+NAME                                 INSTALLED                           FIXED-IN                           TYPE       VULNERABILITY        SEVERITY 
+apk-tools                            2.10.4-r2                           2.10.6-r0                          apk        CVE-2021-30139       High      
+apk-tools                            2.10.4-r2                           2.10.7-r0                          apk        CVE-2021-36159       Critical  
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42374       Medium    
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42376       Medium    
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42378       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42379       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42380       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42381       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42382       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42384       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42385       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2021-42386       High      
+busybox                              1.30.1-r3                                                              apk        CVE-2022-28391       High      
+busybox                              1.30.1-r3                           1.30.1-r5                          apk        CVE-2021-28831       High      
+github.com/gogo/protobuf             v1.3.1                              1.3.2                              go-module  GHSA-c3h9-896r-86jm  High      
+github.com/prometheus/client_golang  v1.7.1                                                                 go-module  CVE-2022-21698       High      
+github.com/prometheus/client_golang  v1.7.1                              1.11.1                             go-module  GHSA-cg3q-j54f-5p7p  High      
+golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20201216223049-8b5274cf687f  go-module  GHSA-3vm4-22fp-5rfm  High      
+golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20211202192323-5770296d904e  go-module  GHSA-gwc9-m7rh-j2ww  High      
+golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20220314234659-1baeb1ce4c0b  go-module  GHSA-8c26-wmh5-6g9v  High      
+golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20210428140749-89ef3d95e781  go-module  GHSA-h86h-8ppg-mxmh  Medium    
+golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20210520170846-37e1c6afe023  go-module  GHSA-83g2-8m93-v3w7  High      
+golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20220906165146-f3363e06e74c  go-module  GHSA-69cg-p879-7622  High      
+golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.7.0                              go-module  GHSA-vvpx-j8f3-3w6h  High      
+golang.org/x/sys                     v0.0.0-20200615200032-f1bc736245b1  0.0.0-20220412211240-33da011f77ad  go-module  GHSA-p782-xgp4-8hr8  Medium    
+golang.org/x/text                    v0.3.2                              0.3.7                              go-module  GHSA-ppp9-7jff-5vj2  High      
+golang.org/x/text                    v0.3.2                              0.3.8                              go-module  GHSA-69ch-w2m2-3vjp  High      
+k8s.io/client-go                     v0.18.6                             0.20.0-alpha.2                     go-module  GHSA-8cfg-vx93-jvxw  Medium    
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2021-3711        Critical  
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2021-3712        High      
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2021-4160        Medium    
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-0778        High      
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-1292        Critical  
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-2068        Critical  
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-2097        Medium    
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-4304        Medium    
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2022-4450        High      
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2023-0215        High      
+libcrypto1.1                         1.1.1g-r0                                                              apk        CVE-2023-0286        High      
+libcrypto1.1                         1.1.1g-r0                           1.1.1i-r0                          apk        CVE-2020-1971        Medium    
+libcrypto1.1                         1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23839       Low       
+libcrypto1.1                         1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23840       High      
+libcrypto1.1                         1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23841       Medium    
+libcrypto1.1                         1.1.1g-r0                           1.1.1k-r0                          apk        CVE-2021-3449        Medium    
+libcrypto1.1                         1.1.1g-r0                           1.1.1k-r0                          apk        CVE-2021-3450        High      
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2021-3711        Critical  
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2021-3712        High      
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2021-4160        Medium    
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-0778        High      
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-1292        Critical  
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-2068        Critical  
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-2097        Medium    
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-4304        Medium    
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2022-4450        High      
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2023-0215        High      
+libssl1.1                            1.1.1g-r0                                                              apk        CVE-2023-0286        High      
+libssl1.1                            1.1.1g-r0                           1.1.1i-r0                          apk        CVE-2020-1971        Medium    
+libssl1.1                            1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23839       Low       
+libssl1.1                            1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23840       High      
+libssl1.1                            1.1.1g-r0                           1.1.1j-r0                          apk        CVE-2021-23841       Medium    
+libssl1.1                            1.1.1g-r0                           1.1.1k-r0                          apk        CVE-2021-3449        Medium    
+libssl1.1                            1.1.1g-r0                           1.1.1k-r0                          apk        CVE-2021-3450        High      
+musl                                 1.1.22-r3                           1.1.22-r4                          apk        CVE-2020-28928       Medium    
+musl-utils                           1.1.22-r3                           1.1.22-r4                          apk        CVE-2020-28928       Medium    
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42374       Medium    
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42376       Medium    
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42378       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42379       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42380       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42381       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42382       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42384       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42385       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2021-42386       High      
+ssl_client                           1.30.1-r3                                                              apk        CVE-2022-28391       High      
+ssl_client                           1.30.1-r3                           1.30.1-r5                          apk        CVE-2021-28831       High      
+zlib                                 1.2.11-r1                                                              apk        CVE-2018-25032       High      
+zlib                                 1.2.11-r1                                                              apk        CVE-2022-37434       Critical  
