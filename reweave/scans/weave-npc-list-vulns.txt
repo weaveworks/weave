@@ -1,17 +1,3 @@
-NAME                                 INSTALLED                           FIXED-IN                           TYPE       VULNERABILITY        SEVERITY 
-github.com/gogo/protobuf             v1.3.1                              1.3.2                              go-module  GHSA-c3h9-896r-86jm  High      
-github.com/prometheus/client_golang  v1.7.1                                                                 go-module  CVE-2022-21698       High      
-github.com/prometheus/client_golang  v1.7.1                              1.11.1                             go-module  GHSA-cg3q-j54f-5p7p  High      
-golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20201216223049-8b5274cf687f  go-module  GHSA-3vm4-22fp-5rfm  High      
-golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20211202192323-5770296d904e  go-module  GHSA-gwc9-m7rh-j2ww  High      
-golang.org/x/crypto                  v0.0.0-20200220183623-bac4c82f6975  0.0.0-20220314234659-1baeb1ce4c0b  go-module  GHSA-8c26-wmh5-6g9v  High      
-golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20210428140749-89ef3d95e781  go-module  GHSA-h86h-8ppg-mxmh  Medium    
-golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20210520170846-37e1c6afe023  go-module  GHSA-83g2-8m93-v3w7  High      
-golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.0.0-20220906165146-f3363e06e74c  go-module  GHSA-69cg-p879-7622  High      
-golang.org/x/net                     v0.0.0-20200520004742-59133d7f0dd7  0.7.0                              go-module  GHSA-vvpx-j8f3-3w6h  High      
-golang.org/x/sys                     v0.0.0-20200615200032-f1bc736245b1  0.0.0-20220412211240-33da011f77ad  go-module  GHSA-p782-xgp4-8hr8  Medium    
-golang.org/x/text                    v0.3.2                              0.3.7                              go-module  GHSA-ppp9-7jff-5vj2  High      
-golang.org/x/text                    v0.3.2                              0.3.8                              go-module  GHSA-69ch-w2m2-3vjp  High      
-k8s.io/client-go                     v0.18.6                             0.20.0-alpha.2                     go-module  GHSA-8cfg-vx93-jvxw  Medium    
-libcrypto3                           3.0.8-r0                            3.0.8-r1                           apk        CVE-2023-0464        Unknown   
-libssl3                              3.0.8-r0                            3.0.8-r1                           apk        CVE-2023-0464        Unknown   
+NAME        INSTALLED  FIXED-IN  TYPE  VULNERABILITY  SEVERITY 
+libcrypto3  3.0.8-r0   3.0.8-r1  apk   CVE-2023-0464  Unknown   
+libssl3     3.0.8-r0   3.0.8-r1  apk   CVE-2023-0464  Unknown   

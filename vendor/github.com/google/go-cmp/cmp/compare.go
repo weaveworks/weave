@@ -1,6 +1,6 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 // Package cmp determines equality of values.
 //
@@ -36,10 +36,11 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp/internal/diff"
-	"github.com/google/go-cmp/cmp/internal/flags"
 	"github.com/google/go-cmp/cmp/internal/function"
 	"github.com/google/go-cmp/cmp/internal/value"
 )
+
+// TODO(≥go1.18): Use any instead of interface{}.
 
 // Equal reports whether x and y are equal by recursively applying the
 // following rules in the given order to x and y and all of their sub-values:
@@ -95,13 +96,13 @@ func Equal(x, y interface{}, opts ...Option) bool {
 	return s.result.Equal()
 }
 
-// Diff returns a human-readable report of the differences between two values.
-// It returns an empty string if and only if Equal returns true for the same
-// input values and options.
+// Diff returns a human-readable report of the differences between two values:
+// y - x. It returns an empty string if and only if Equal returns true for the
+// same input values and options.
 //
 // The output is displayed as a literal in pseudo-Go syntax.
 // At the start of each line, a "-" prefix indicates an element removed from x,
-// a "+" prefix to indicates an element added to y, and the lack of a prefix
+// a "+" prefix to indicates an element added from y, and the lack of a prefix
 // indicates an element common to both x and y. If possible, the output
 // uses fmt.Stringer.String or error.Error methods to produce more humanly
 // readable outputs. In such cases, the string is prefixed with either an
@@ -319,7 +320,6 @@ func (s *state) tryMethod(t reflect.Type, vx, vy reflect.Value) bool {
 }
 
 func (s *state) callTRFunc(f, v reflect.Value, step Transform) reflect.Value {
-	v = sanitizeValue(v, f.Type().In(0))
 	if !s.dynChecker.Next() {
 		return f.Call([]reflect.Value{v})[0]
 	}
@@ -343,8 +343,6 @@ func (s *state) callTRFunc(f, v reflect.Value, step Transform) reflect.Value {
 }
 
 func (s *state) callTTBFunc(f, x, y reflect.Value) bool {
-	x = sanitizeValue(x, f.Type().In(0))
-	y = sanitizeValue(y, f.Type().In(1))
 	if !s.dynChecker.Next() {
 		return f.Call([]reflect.Value{x, y})[0].Bool()
 	}
@@ -370,19 +368,6 @@ func detectRaces(c chan<- reflect.Value, f reflect.Value, vs ...reflect.Value) {
 		c <- ret
 	}()
 	ret = f.Call(vs)[0]
-}
-
-// sanitizeValue converts nil interfaces of type T to those of type R,
-// assuming that T is assignable to R.
-// Otherwise, it returns the input value as is.
-func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
-	// TODO(≥go1.10): Workaround for reflect bug (https://golang.org/issue/22143).
-	if !flags.AtLeastGo110 {
-		if v.Kind() == reflect.Interface && v.IsNil() && v.Type() != t {
-			return reflect.New(t).Elem()
-		}
-	}
-	return v
 }
 
 func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {

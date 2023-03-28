@@ -1,7 +1,4 @@
 NAME                                  INSTALLED                                                   FIXED-IN                                 TYPE       VULNERABILITY        SEVERITY 
-github.com/aws/aws-sdk-go             v1.13.22                                                    1.34.0                                   go-module  GHSA-76wf-9vgp-pj7w  Medium    
-github.com/aws/aws-sdk-go             v1.13.22                                                    1.34.0                                   go-module  GHSA-7f33-f4f5-xwgw  Low       
-github.com/aws/aws-sdk-go             v1.13.22                                                    1.34.0                                   go-module  GHSA-f5pg-7wfw-84q9  Medium    
 github.com/containernetworking/cni    v0.5.2                                                      0.8.1                                    go-module  GHSA-xjqr-g762-pxwp  High      
 github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.7.0-rc.0                               go-module  GHSA-h62f-wm92-2cmw  High      
 github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.8.0                                    go-module  GHSA-qq97-vm5h-rrhg  Low       
@@ -13,7 +10,6 @@ github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-385886567
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2020-27534       Medium    
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21284       Medium    
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21285       Medium    
-github.com/gogo/protobuf              v1.3.1                                                      1.3.2                                    go-module  GHSA-c3h9-896r-86jm  High      
 github.com/miekg/dns                  v1.0.4                                                      1.0.10                                   go-module  GHSA-9jcx-pr2f-qvq5  High      
 github.com/miekg/dns                  v1.0.4                                                      1.1.25                                   go-module  GHSA-44r7-7p62-q3fr  Medium    
 github.com/opencontainers/image-spec  v1.0.1                                                      1.0.2                                    go-module  GHSA-77vh-xpmg-72qh  Low       
@@ -25,18 +21,5 @@ github.com/opencontainers/runc        v0.1.1                                    
 github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc95                               go-module  GHSA-c3xm-pvg7-gh7r  High      
 github.com/opencontainers/runc        v0.1.1                                                      1.0.3                                    go-module  GHSA-v95c-p5hm-xq8f  Medium    
 github.com/opencontainers/runc        v0.1.1                                                      1.1.2                                    go-module  GHSA-f3fp-gc8g-vw66  Medium    
-github.com/prometheus/client_golang   v1.7.1                                                                                               go-module  CVE-2022-21698       High      
-github.com/prometheus/client_golang   v1.7.1                                                      1.11.1                                   go-module  GHSA-cg3q-j54f-5p7p  High      
-golang.org/x/crypto                   v0.0.0-20200220183623-bac4c82f6975                          0.0.0-20201216223049-8b5274cf687f        go-module  GHSA-3vm4-22fp-5rfm  High      
-golang.org/x/crypto                   v0.0.0-20200220183623-bac4c82f6975                          0.0.0-20211202192323-5770296d904e        go-module  GHSA-gwc9-m7rh-j2ww  High      
-golang.org/x/crypto                   v0.0.0-20200220183623-bac4c82f6975                          0.0.0-20220314234659-1baeb1ce4c0b        go-module  GHSA-8c26-wmh5-6g9v  High      
-golang.org/x/net                      v0.0.0-20200520004742-59133d7f0dd7                          0.0.0-20210428140749-89ef3d95e781        go-module  GHSA-h86h-8ppg-mxmh  Medium    
-golang.org/x/net                      v0.0.0-20200520004742-59133d7f0dd7                          0.0.0-20210520170846-37e1c6afe023        go-module  GHSA-83g2-8m93-v3w7  High      
-golang.org/x/net                      v0.0.0-20200520004742-59133d7f0dd7                          0.0.0-20220906165146-f3363e06e74c        go-module  GHSA-69cg-p879-7622  High      
-golang.org/x/net                      v0.0.0-20200520004742-59133d7f0dd7                          0.7.0                                    go-module  GHSA-vvpx-j8f3-3w6h  High      
-golang.org/x/sys                      v0.0.0-20200615200032-f1bc736245b1                          0.0.0-20220412211240-33da011f77ad        go-module  GHSA-p782-xgp4-8hr8  Medium    
-golang.org/x/text                     v0.3.2                                                      0.3.7                                    go-module  GHSA-ppp9-7jff-5vj2  High      
-golang.org/x/text                     v0.3.2                                                      0.3.8                                    go-module  GHSA-69ch-w2m2-3vjp  High      
-k8s.io/client-go                      v0.18.6                                                     0.20.0-alpha.2                           go-module  GHSA-8cfg-vx93-jvxw  Medium    
 libcrypto3                            3.0.8-r0                                                    3.0.8-r1                                 apk        CVE-2023-0464        Unknown   
 libssl3                               3.0.8-r0                                                    3.0.8-r1                                 apk        CVE-2023-0464        Unknown   

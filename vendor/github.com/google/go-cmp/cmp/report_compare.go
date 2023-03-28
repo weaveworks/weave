@@ -1,6 +1,6 @@
 // Copyright 2019, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
@@ -79,7 +79,7 @@ func (opts formatOptions) verbosity() uint {
 	}
 }
 
-const maxVerbosityPreset = 3
+const maxVerbosityPreset = 6
 
 // verbosityPreset modifies the verbosity settings given an index
 // between 0 and maxVerbosityPreset, inclusive.
@@ -100,7 +100,7 @@ func verbosityPreset(opts formatOptions, i int) formatOptions {
 func (opts formatOptions) FormatDiff(v *valueNode, ptrs *pointerReferences) (out textNode) {
 	if opts.DiffMode == diffIdentical {
 		opts = opts.WithVerbosity(1)
-	} else {
+	} else if opts.verbosity() < 3 {
 		opts = opts.WithVerbosity(3)
 	}
 
@@ -116,7 +116,10 @@ func (opts formatOptions) FormatDiff(v *valueNode, ptrs *pointerReferences) (out
 	}
 
 	// For leaf nodes, format the value based on the reflect.Values alone.
-	if v.MaxDepth == 0 {
+	// As a special case, treat equal []byte as a leaf nodes.
+	isBytes := v.Type.Kind() == reflect.Slice && v.Type.Elem() == reflect.TypeOf(byte(0))
+	isEqualBytes := isBytes && v.NumDiff+v.NumIgnored+v.NumTransformed == 0
+	if v.MaxDepth == 0 || isEqualBytes {
 		switch opts.DiffMode {
 		case diffUnknown, diffIdentical:
 			// Format Equal.

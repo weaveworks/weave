@@ -2,6 +2,18 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta2
+
+So low-impact vulnerable dependencies were upgraded here
+
+### Changed
+
+* Upgraded golang.org/x/net to v0.8.0
+* Upgraded golang.org/x/crypto to v0.0.0-20220314234659-1baeb1ce4c0b 
+* Upgraded github.com/aws/aws-sdk-go to **v1.34.0**
+* Upgraded github.com/prometheus/client_golang to **v1.14.0**
+* Upgraded k8s.io/client-go to **v0.23.0**
+
 ## 2.8.2-beta1
 
 ### Changed
