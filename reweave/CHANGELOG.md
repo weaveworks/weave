@@ -2,6 +2,13 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta1
+
+### Changed
+
+* Bumped go version in `go.mod` to `1.20`. This caused an error in `go mod tidy`
+* Manually ran `go get github.com/andybalholm/go-bit@v1.0.1`. `go mod tidy` and `go mod vendor` worked
+
 ## 2.8.2-beta0
 
 A new build process was created here.
