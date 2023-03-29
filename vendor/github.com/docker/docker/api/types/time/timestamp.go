@@ -82,11 +82,14 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 	}
 
 	if err != nil {
-		// if there is a `-` then it's an RFC3339 like timestamp otherwise assume unixtimestamp
+		// if there is a `-` then it's an RFC3339 like timestamp
 		if strings.Contains(value, "-") {
 			return "", err // was probably an RFC3339 like timestamp but the parser failed with an error
 		}
-		return value, nil // unixtimestamp in and out case (meaning: the value passed at the command line is already in the right format for passing to the server)
+		if _, _, err := parseTimestamp(value); err != nil {
+			return "", fmt.Errorf("failed to parse value as time or duration: %q", value)
+		}
+		return value, nil // unix timestamp in and out case (meaning: the value passed at the command line is already in the right format for passing to the server)
 	}
 
 	return fmt.Sprintf("%d.%09d", t.Unix(), int64(t.Nanosecond())), nil
@@ -97,13 +100,19 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 // if the incoming nanosecond portion is longer or shorter than 9 digits it is
 // converted to nanoseconds.  The expectation is that the seconds and
 // seconds will be used to create a time variable.  For example:
-//     seconds, nanoseconds, err := ParseTimestamp("1136073600.000000001",0)
-//     if err == nil since := time.Unix(seconds, nanoseconds)
+//
+//	seconds, nanoseconds, err := ParseTimestamp("1136073600.000000001",0)
+//	if err == nil since := time.Unix(seconds, nanoseconds)
+//
 // returns seconds as def(aultSeconds) if value == ""
 func ParseTimestamps(value string, def int64) (int64, int64, error) {
 	if value == "" {
 		return def, 0, nil
 	}
+	return parseTimestamp(value)
+}
+
+func parseTimestamp(value string) (int64, int64, error) {
 	sa := strings.SplitN(value, ".", 2)
 	s, err := strconv.ParseInt(sa[0], 10, 64)
 	if err != nil {

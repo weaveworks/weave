@@ -1,6 +1,7 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,22 +11,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/net/context"
-
 	"github.com/docker/docker/api/types"
 )
 
-// ContainerStatPath returns Stat information about a path inside the container filesystem.
+// ContainerStatPath returns stat information about a path inside the container filesystem.
 func (cli *Client) ContainerStatPath(ctx context.Context, containerID, path string) (types.ContainerPathStat, error) {
 	query := url.Values{}
 	query.Set("path", filepath.ToSlash(path)) // Normalize the paths used in the API.
 
 	urlStr := "/containers/" + containerID + "/archive"
 	response, err := cli.head(ctx, urlStr, query, nil)
-	if err != nil {
-		return types.ContainerPathStat{}, wrapResponseError(err, response, "container:path", containerID+":"+path)
-	}
 	defer ensureReaderClosed(response)
+	if err != nil {
+		return types.ContainerPathStat{}, err
+	}
 	return getContainerPathStatFromHeader(response.header)
 }
 
@@ -46,13 +45,9 @@ func (cli *Client) CopyToContainer(ctx context.Context, containerID, dstPath str
 	apiPath := "/containers/" + containerID + "/archive"
 
 	response, err := cli.putRaw(ctx, apiPath, query, content, nil)
-	if err != nil {
-		return wrapResponseError(err, response, "container:path", containerID+":"+dstPath)
-	}
 	defer ensureReaderClosed(response)
-
-	if response.statusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code from daemon: %d", response.statusCode)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -67,11 +62,7 @@ func (cli *Client) CopyFromContainer(ctx context.Context, containerID, srcPath s
 	apiPath := "/containers/" + containerID + "/archive"
 	response, err := cli.get(ctx, apiPath, query, nil)
 	if err != nil {
-		return nil, types.ContainerPathStat{}, wrapResponseError(err, response, "container:path", containerID+":"+srcPath)
-	}
-
-	if response.statusCode != http.StatusOK {
-		return nil, types.ContainerPathStat{}, fmt.Errorf("unexpected status code from daemon: %d", response.statusCode)
+		return nil, types.ContainerPathStat{}, err
 	}
 
 	// In order to get the copy behavior right, we need to know information

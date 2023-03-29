@@ -52,7 +52,7 @@ func (opts *ListOpts) Set(value string) error {
 		}
 		value = v
 	}
-	(*opts.values) = append((*opts.values), value)
+	*opts.values = append(*opts.values, value)
 	return nil
 }
 
@@ -60,7 +60,7 @@ func (opts *ListOpts) Set(value string) error {
 func (opts *ListOpts) Delete(key string) {
 	for i, k := range *opts.values {
 		if k == key {
-			(*opts.values) = append((*opts.values)[:i], (*opts.values)[i+1:]...)
+			*opts.values = append((*opts.values)[:i], (*opts.values)[i+1:]...)
 			return
 		}
 	}
@@ -78,7 +78,7 @@ func (opts *ListOpts) GetMap() map[string]struct{} {
 
 // GetAll returns the values of slice.
 func (opts *ListOpts) GetAll() []string {
-	return (*opts.values)
+	return *opts.values
 }
 
 // GetAllOrEmpty returns the values of the slice
@@ -103,7 +103,7 @@ func (opts *ListOpts) Get(key string) bool {
 
 // Len returns the amount of element in the slice.
 func (opts *ListOpts) Len() int {
-	return len((*opts.values))
+	return len(*opts.values)
 }
 
 // Type returns a string name for this Option type
@@ -254,12 +254,23 @@ func validateDomain(val string) (string, error) {
 	return "", fmt.Errorf("%s is not a valid domain", val)
 }
 
-// ValidateLabel validates that the specified string is a valid label, and returns it.
+// ValidateLabel validates that the specified string is a valid label,
+// it does not use the reserved namespaces com.docker.*, io.docker.*, org.dockerproject.*
+// and returns it.
 // Labels are in the form on key=value.
 func ValidateLabel(val string) (string, error) {
 	if strings.Count(val, "=") < 1 {
 		return "", fmt.Errorf("bad attribute format: %s", val)
 	}
+
+	lowered := strings.ToLower(val)
+	if strings.HasPrefix(lowered, "com.docker.") || strings.HasPrefix(lowered, "io.docker.") ||
+		strings.HasPrefix(lowered, "org.dockerproject.") {
+		return "", fmt.Errorf(
+			"label %s is not allowed: the namespaces com.docker.*, io.docker.*, and org.dockerproject.* are reserved for internal use",
+			val)
+	}
+
 	return val, nil
 }
 

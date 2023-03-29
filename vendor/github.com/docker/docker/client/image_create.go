@@ -1,17 +1,16 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"strings"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 )
 
-// ImageCreate creates a new image based in the parent options.
+// ImageCreate creates a new image based on the parent options.
 // It returns the JSON content in the response body.
 func (cli *Client) ImageCreate(ctx context.Context, parentReference string, options types.ImageCreateOptions) (io.ReadCloser, error) {
 	ref, err := reference.ParseNormalizedNamed(parentReference)

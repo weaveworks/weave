@@ -17,6 +17,8 @@ const (
 	TypeTmpfs Type = "tmpfs"
 	// TypeNamedPipe is the type for mounting Windows named pipes
 	TypeNamedPipe Type = "npipe"
+	// TypeCluster is the type for Swarm Cluster Volumes.
+	TypeCluster Type = "cluster"
 )
 
 // Mount represents a mount (volume).
@@ -30,9 +32,10 @@ type Mount struct {
 	ReadOnly    bool        `json:",omitempty"`
 	Consistency Consistency `json:",omitempty"`
 
-	BindOptions   *BindOptions   `json:",omitempty"`
-	VolumeOptions *VolumeOptions `json:",omitempty"`
-	TmpfsOptions  *TmpfsOptions  `json:",omitempty"`
+	BindOptions    *BindOptions    `json:",omitempty"`
+	VolumeOptions  *VolumeOptions  `json:",omitempty"`
+	TmpfsOptions   *TmpfsOptions   `json:",omitempty"`
+	ClusterOptions *ClusterOptions `json:",omitempty"`
 }
 
 // Propagation represents the propagation of a mount.
@@ -79,7 +82,9 @@ const (
 
 // BindOptions defines options specific to mounts of type "bind".
 type BindOptions struct {
-	Propagation Propagation `json:",omitempty"`
+	Propagation      Propagation `json:",omitempty"`
+	NonRecursive     bool        `json:",omitempty"`
+	CreateMountpoint bool        `json:",omitempty"`
 }
 
 // VolumeOptions represents the options for a mount of type volume.
@@ -112,7 +117,7 @@ type TmpfsOptions struct {
 	// TODO(stevvooe): There are several more tmpfs flags, specified in the
 	// daemon, that are accepted. Only the most basic are added for now.
 	//
-	// From docker/docker/pkg/mount/flags.go:
+	// From https://github.com/moby/sys/blob/mount/v0.1.1/mount/flags.go#L47-L56
 	//
 	// var validFlags = map[string]bool{
 	// 	"":          true,
@@ -127,4 +132,9 @@ type TmpfsOptions struct {
 	//
 	// Some of these may be straightforward to add, but others, such as
 	// uid/gid have implications in a clustered system.
+}
+
+// ClusterOptions specifies options for a Cluster volume.
+type ClusterOptions struct {
+	// intentionally empty
 }

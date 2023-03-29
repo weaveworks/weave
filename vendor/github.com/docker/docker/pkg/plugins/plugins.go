@@ -11,9 +11,9 @@
 // The plugins need to implement an HTTP server and bind this to the UNIX socket
 // or the address specified in the spec files.
 // A handshake is send at /Plugin.Activate, and plugins are expected to return
-// a Manifest with a list of of Docker subsystems which this plugin implements.
+// a Manifest with a list of Docker subsystems which this plugin implements.
 //
-// In order to use a plugins, you can use the ``Get`` with the name of the
+// In order to use a plugins, you can use the `Get` with the name of the
 // plugin and the subsystem it implements.
 //
 //	plugin, err := plugins.Get("example", "VolumeDriver")
@@ -24,12 +24,16 @@ package plugins // import "github.com/docker/docker/pkg/plugins"
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/sirupsen/logrus"
 )
+
+// ProtocolSchemeHTTPV1 is the name of the protocol used for interacting with plugins using this package.
+const ProtocolSchemeHTTPV1 = "moby.plugins.http/v1"
 
 var (
 	// ErrNotImplements is returned if the plugin does not implement the requested driver.
@@ -88,6 +92,11 @@ func (p *Plugin) Client() *Client {
 	return p.client
 }
 
+// Protocol returns the protocol name/version used for plugins in this package.
+func (p *Plugin) Protocol() string {
+	return ProtocolSchemeHTTPV1
+}
+
 // IsV1 returns true for V1 plugins and false otherwise.
 func (p *Plugin) IsV1() bool {
 	return true
@@ -142,7 +151,6 @@ func (p *Plugin) runHandlers() {
 		p.handlersRun = true
 	}
 	handlers.RUnlock()
-
 }
 
 // activated returns if the plugin has already been activated.
@@ -246,6 +254,9 @@ func get(name string) (*Plugin, error) {
 
 // Get returns the plugin given the specified name and requested implementation.
 func Get(name, imp string) (*Plugin, error) {
+	if name == "" {
+		return nil, errors.New("Unable to find plugin without name")
+	}
 	pl, err := get(name)
 	if err != nil {
 		return nil, err
@@ -254,7 +265,7 @@ func Get(name, imp string) (*Plugin, error) {
 		logrus.Debugf("%s implements: %s", name, imp)
 		return pl, nil
 	}
-	return nil, ErrNotImplements
+	return nil, fmt.Errorf("%w: plugin=%q, requested implementation=%q", ErrNotImplements, name, imp)
 }
 
 // Handle adds the specified function to the extpointHandlers.

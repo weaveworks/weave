@@ -2,9 +2,20 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta5
+
+Docker, containerd and runc dependencies were upgraded here.
+
+### Changed
+
+* Upgraded github.com/containerd/containerd to v1.7.0
+* Upgraded github.com/opencontainers/runc to v1.1.4
+* Upgraded github.com/docker/docker to v23.0.1+incompatible
+* Upgraded github.com/docker/distribution to v2.8.1+incompatible
+
 ## 2.8.2-beta4
 
-CNI, which introduced breaking changes, was upgraded here. The majority of this work was already done in the unmerged pull request [3939](https://github.com/weaveworks/weave/pull/3939)
+CNI, which introduced breaking changes, was upgraded here. The majority of this work was already done in the unmerged pull request [3939](https://github.com/weaveworks/weave/pull/3939) by by @hswong3i. All credit to them
 
 ### Changed
 

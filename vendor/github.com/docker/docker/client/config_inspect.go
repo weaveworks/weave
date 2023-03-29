@@ -2,11 +2,11 @@ package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // ConfigInspectWithRaw returns the config information with raw data
@@ -18,12 +18,12 @@ func (cli *Client) ConfigInspectWithRaw(ctx context.Context, id string) (swarm.C
 		return swarm.Config{}, nil, err
 	}
 	resp, err := cli.get(ctx, "/configs/"+id, nil, nil)
-	if err != nil {
-		return swarm.Config{}, nil, wrapResponseError(err, resp, "config", id)
-	}
 	defer ensureReaderClosed(resp)
+	if err != nil {
+		return swarm.Config{}, nil, err
+	}
 
-	body, err := ioutil.ReadAll(resp.body)
+	body, err := io.ReadAll(resp.body)
 	if err != nil {
 		return swarm.Config{}, nil, err
 	}

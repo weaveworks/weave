@@ -1,22 +1,6 @@
-NAME                                  INSTALLED                                                   FIXED-IN                                 TYPE       VULNERABILITY        SEVERITY 
-github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.7.0-rc.0                               go-module  GHSA-h62f-wm92-2cmw  High      
-github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.8.0                                    go-module  GHSA-qq97-vm5h-rrhg  Low       
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2018-10892       Medium    
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2019-13139       High      
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2019-13509       High      
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2019-16884       High      
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2019-5736        High      
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2020-27534       Medium    
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21284       Medium    
-github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21285       Medium    
-github.com/opencontainers/image-spec  v1.0.1                                                      1.0.2                                    go-module  GHSA-77vh-xpmg-72qh  Low       
-github.com/opencontainers/runc        v0.1.1                                                                                               go-module  GHSA-vpvm-3wq2-2wvm  High      
-github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc3                                go-module  GHSA-gp4j-w3vj-7299  Medium    
-github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc8.0.20190930145003-cad42f6e0932  go-module  GHSA-fgv8-vj5c-2ppq  High      
-github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc9.0.20200122160610-2fc03cc11c77  go-module  GHSA-fh74-hm69-rqjw  Medium    
-github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc91                               go-module  GHSA-g54h-m393-cpwq  Low       
-github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc95                               go-module  GHSA-c3xm-pvg7-gh7r  High      
-github.com/opencontainers/runc        v0.1.1                                                      1.0.3                                    go-module  GHSA-v95c-p5hm-xq8f  Medium    
-github.com/opencontainers/runc        v0.1.1                                                      1.1.2                                    go-module  GHSA-f3fp-gc8g-vw66  Medium    
-libcrypto3                            3.0.8-r0                                                    3.0.8-r1                                 apk        CVE-2023-0464        Unknown   
-libssl3                               3.0.8-r0                                                    3.0.8-r1                                 apk        CVE-2023-0464        Unknown   
+NAME                            INSTALLED  FIXED-IN  TYPE       VULNERABILITY        SEVERITY 
+github.com/opencontainers/runc  v1.1.4               go-module  GHSA-vpvm-3wq2-2wvm  High      
+libcrypto3                      3.0.8-r0   3.0.8-r1  apk        CVE-2023-0464        Unknown   
+libcrypto3                      3.0.8-r0   3.0.8-r2  apk        CVE-2023-0465        Unknown   
+libssl3                         3.0.8-r0   3.0.8-r1  apk        CVE-2023-0464        Unknown   
+libssl3                         3.0.8-r0   3.0.8-r2  apk        CVE-2023-0465        Unknown   
