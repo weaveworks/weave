@@ -2,12 +2,13 @@ package ipamplugin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 )
 
 func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
@@ -20,6 +21,13 @@ func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 	return types.PrintResult(result, conf.CNIVersion)
+}
+
+func (i *Ipam) CmdCheck(args *skel.CmdArgs) error {
+	// TODO: Figure out how to do a proper CNI check here
+	// For now, return not implemented error
+
+	return errors.New("CNI plugin check not implemented")
 }
 
 func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
@@ -52,8 +60,8 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 		return nil, err
 	}
 	result := &current.Result{
+		CNIVersion: current.ImplementedSpecVersion,
 		IPs: []*current.IPConfig{{
-			Version: "4",
 			Address: *ipnet,
 			Gateway: conf.Gateway,
 		}},

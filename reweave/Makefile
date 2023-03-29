@@ -1,4 +1,4 @@
-IMAGE_VERSION ?= 2.8.2-beta3
+IMAGE_VERSION ?= 2.8.2-beta4
 REGISTRY_USER ?= weaveworks
 
 # Targets

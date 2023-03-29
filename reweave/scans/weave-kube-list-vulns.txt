@@ -1,5 +1,4 @@
 NAME                                  INSTALLED                                                   FIXED-IN                                 TYPE       VULNERABILITY        SEVERITY 
-github.com/containernetworking/cni    v0.5.2                                                      0.8.1                                    go-module  GHSA-xjqr-g762-pxwp  High      
 github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.7.0-rc.0                               go-module  GHSA-h62f-wm92-2cmw  High      
 github.com/docker/distribution        v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible      2.8.0                                    go-module  GHSA-qq97-vm5h-rrhg  Low       
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2018-10892       Medium    

@@ -2,6 +2,25 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta4
+
+CNI, which introduced breaking changes, was upgraded here. The majority of this work was already done in the unmerged pull request [3939](https://github.com/weaveworks/weave/pull/3939)
+
+### Changed
+
+* Upgraded github.com/containernetworking/cni to v1.1.2
+
+### Added
+
+* Added github.com/containernetworking/plugins, v1.2.0
+
+### Fixed
+
+* Changed `plugin/ipam/cni.go` and `plugin/net/cni.go` as per [CNI spec-upgrades](https://www.cni.dev/docs/spec-upgrades/)
+* Changed `prog/weaveutil/cni.go` to accommodate above changes
+* Changed `prog/kube-utils/main.go` due to an observed change in behavior
+* Changed `weave` script in project root, to add `disableCheck: true` in cni config. This is as per information found [here](https://www.cni.dev/docs/spec-upgrades/#changes-in-cni-v04) and [here](https://www.cni.dev/docs/spec/#configuration-format)
+
 ## 2.8.2-beta3
 
 github.com/miekg/dns was upgraded here
