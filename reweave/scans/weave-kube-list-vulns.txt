@@ -10,8 +10,6 @@ github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-385886567
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2020-27534       Medium    
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21284       Medium    
 github.com/docker/docker              v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible                                           go-module  CVE-2021-21285       Medium    
-github.com/miekg/dns                  v1.0.4                                                      1.0.10                                   go-module  GHSA-9jcx-pr2f-qvq5  High      
-github.com/miekg/dns                  v1.0.4                                                      1.1.25                                   go-module  GHSA-44r7-7p62-q3fr  Medium    
 github.com/opencontainers/image-spec  v1.0.1                                                      1.0.2                                    go-module  GHSA-77vh-xpmg-72qh  Low       
 github.com/opencontainers/runc        v0.1.1                                                                                               go-module  GHSA-vpvm-3wq2-2wvm  High      
 github.com/opencontainers/runc        v0.1.1                                                      1.0.0-rc3                                go-module  GHSA-gp4j-w3vj-7299  Medium    

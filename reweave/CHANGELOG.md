@@ -2,9 +2,26 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta3
+
+github.com/miekg/dns was upgraded here
+
+### Changed
+
+* Upgraded github.com/miekg/dns to v1.1.52. This caused the following build error:
+```
+../../nameserver/dns.go:276:32: undefined: dns.ErrTruncated
+```
+
+### Fixed
+
+* Found references to the above error [here](https://github.com/miekg/dns/issues/814) and [here](https://github.com/miekg/dns/issues/423)
+ * Deleted check for ErrTruncated in nameserver/dns.go:276:32
+ * Modified nameserver/dns_test.go to remove dns.ErrTruncated-based tests
+
 ## 2.8.2-beta2
 
-So low-impact vulnerable dependencies were upgraded here
+Some low-impact vulnerable dependencies were upgraded here
 
 ### Changed
 
