@@ -7,7 +7,7 @@ ARG ALPINE_BASEIMAGE=alpine:3.17.2
 # It will be built only once for a given build platform. Subsequent
 # stages will start from this and cross-compile for each target
 # architecture.
-FROM --platform=$BUILDPLATFORM golang:1.20.2-bullseye AS builderbase
+FROM --platform=${BUILDPLATFORM} golang:1.20.2-bullseye AS builderbase
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7
@@ -77,7 +77,7 @@ EOMAKE
 # Stage 3: Alpine Base
 # This stage exists in case there are any additional tweaks 
 # required in the alpine base image.
-FROM ${ALPINE_BASEIMAGE} as alpinebase
+FROM --platform=linux/${TARGETARCH} ${ALPINE_BASEIMAGE} as alpinebase
 # Any additional tweaks will appear here
 # End Stage 3
 ########
@@ -250,7 +250,7 @@ LABEL org.opencontainers.image.revision="${revision}" \
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM bash AS networktesterimage
+FROM --platform=linux/${TARGETARCH} bash AS networktesterimage
 RUN apk add --no-cache curl bind-tools
 COPY --from=builder /root/weave/test/images/network-tester/webserver webserver
 EXPOSE 8080
