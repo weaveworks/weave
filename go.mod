@@ -16,13 +16,11 @@ require (
 	github.com/docker/distribution v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible // indirect
 	github.com/docker/docker v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible
 	github.com/docker/go-connections v0.3.0 // indirect
-	github.com/docker/go-units v0.3.2 // indirect
 	github.com/docker/libnetwork v0.8.0-dev.2.0.20180212220201-119badbd737b
 	github.com/docker/machine v0.14.0
 	github.com/fsouza/go-dockerclient v1.2.0
 	github.com/go-ini/ini v1.33.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
-	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/google/gopacket v1.1.16
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
 	github.com/gorilla/mux v1.6.1
@@ -39,23 +37,22 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
-	github.com/opencontainers/runc v0.1.1 // indirect
-	github.com/opencontainers/selinux v1.6.0 // indirect
+	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.7.1
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v0.0.1
 	github.com/stretchr/testify v1.4.0
-	github.com/vishvananda/netlink v1.0.0
-	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
+	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	github.com/weaveworks/common v0.0.0-20180321110636-ebab3a78900a
 	github.com/weaveworks/go-checkpoint v0.0.0-20170503165305-ebbb8b0518ab
 	github.com/weaveworks/go-odp v0.0.0-20181017121109-6b0aa22550d9
 	github.com/weaveworks/mesh v0.0.0-20191105120815-58dbcc3e8e63
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
+	golang.org/x/sys v0.0.0-20211116061358-0a5406a5449c
 	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
 	gopkg.in/ini.v1 v1.57.0 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
