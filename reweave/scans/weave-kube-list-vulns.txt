@@ -1,6 +1,2 @@
 NAME                            INSTALLED  FIXED-IN  TYPE       VULNERABILITY        SEVERITY 
-github.com/opencontainers/runc  v1.1.4               go-module  GHSA-vpvm-3wq2-2wvm  High      
-libcrypto3                      3.0.8-r0   3.0.8-r1  apk        CVE-2023-0464        Unknown   
-libcrypto3                      3.0.8-r0   3.0.8-r2  apk        CVE-2023-0465        Unknown   
-libssl3                         3.0.8-r0   3.0.8-r1  apk        CVE-2023-0464        Unknown   
-libssl3                         3.0.8-r0   3.0.8-r2  apk        CVE-2023-0465        Unknown   
+github.com/opencontainers/runc  v1.1.4     1.1.5     go-module  GHSA-vpvm-3wq2-2wvm  High      

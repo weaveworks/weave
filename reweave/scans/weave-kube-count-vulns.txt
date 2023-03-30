@@ -1,1 +1,1 @@
-weave-kube CVE Count: 4
+weave-kube CVE Count: 0

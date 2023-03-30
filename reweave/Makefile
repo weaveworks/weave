@@ -1,11 +1,14 @@
-IMAGE_VERSION ?= 2.8.2-beta5
+IMAGE_VERSION ?= 2.8.2-beta6
 REGISTRY_USER ?= weaveworks
+
+ALPINE_BASEIMAGE ?= alpine:3.17.3
 
 # Targets
 .PHONY: build
 build: submodule
 	REGISTRY_USER=${REGISTRY_USER} IMAGE_VERSION=${IMAGE_VERSION} \
 	PLATFORMS="$$(docker version -f '{{ .Server.Arch }}')" \
+	ALPINE_BASEIMAGE=$(ALPINE_BASEIMAGE) \
 	POSTBUILD=--load \
 	tools/build-images.sh
 
@@ -17,6 +20,7 @@ scan:
 .PHONY: publish
 publish: submodule
 	REGISTRY_USER=${REGISTRY_USER} IMAGE_VERSION=${IMAGE_VERSION} \
+	ALPINE_BASEIMAGE=$(ALPINE_BASEIMAGE) \
 	POSTBUILD=--push tools/build-images.sh
 
 .PHONY: clean-images

@@ -13,7 +13,7 @@ fi
 
 # These variables are used to control the build process
 # Change with care.
-: "${ALPINE_BASEIMAGE:=alpine:3.17.2}"
+: "${ALPINE_BASEIMAGE:=alpine:3.17.3}"
 : "${WEAVE_VERSION=git-$(git rev-parse --short=12 HEAD)}"
 : "${GIT_REVISION=$(git rev-parse HEAD)}"
 : "${PLATFORMS:=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x}"

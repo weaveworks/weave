@@ -4,16 +4,21 @@ This new build process is based on a multi-stage Dockerfile, which combines the 
 
 > NOTE: The new process currently does not build the weave Docker plugin. Nor does it run any tests. This may change in the future.
 
+The new process is controlled by a Makefile, located at `reweave/Makefile`. This calls scripts located at `reweave/tools`. In the future, we should try to maintain this "harness", and only add/change the scripts as required. So, going forward, all anyone has to do is `cd reweave && make build && make scan`, no matter how the build process is evolved.
+
 ## What you need
 
 * Docker v23.0.1 or later
 * An account on an image registry, like the Docker Hub
+* `make`
 * [grype](https://github.com/anchore/grype) 0.59.0 or later for image scanning
 * The `tools` directory contents. Run `git submodule update --init`.
 
-## During development
+## Build steps
 
-At the start of each development cycle, edit [reweave/Makefile](Makefile) and set `IMAGE_VERSION` should be set to something later than the currently published version, perhaps with a prerelease suffix. Also, set `REGISTRY_USER` to a your registry user account.
+### During development
+
+At the start of each development cycle, edit [reweave/Makefile](Makefile) and set `IMAGE_VERSION` should be set to something later than the currently published version, perhaps with a prerelease suffix. Also, set `REGISTRY_USER` to *your* registry user account.
 
 After you make code or configurations changes, run the following in the `reweave` directory:
 
@@ -31,11 +36,11 @@ make scan
 
 This will scan the images and generate reports in the [scans](scans/) directory.
 
-## To publish images
+### To publish images
 
 1. Change `IMAGE_VERSION` and `REGISTRY_USER` variables in [reweave/Makefile](Makefile) to their final, publishable versions.
 2. Build and scan as you would for development.
-3. Commit and tag your changes.
+3. When satisfied, commit and tag your changes. **Do this before the next steps**.
 4. Login to your registry account using `docker login`.
 5. Run the following:
 
@@ -47,11 +52,13 @@ This will build multi-architecture images, and push them to your registry.
 
 Don't forget to `docker logout` afterwards.
 
-## Multi-stage Dockerfile
+## Build Artifacts
+
+### Multi-stage Dockerfile
 
 The Dockerfile can be found at [reweave/build/Dockerfile](build/Dockerfile). It, and the companion [Makefile](#makefile), build multi-arch images for all weave components.
 
-### Stage 1 (builderbase)
+#### Stage 1 (builderbase)
 
 The first stage creates a build environment for cross-compiling all weave net executables for all supported architectures. It is built only once for a given build platform. It starts with `golang:1.20.2-bullseye` as a base, and does the following:
 
@@ -59,7 +66,7 @@ The first stage creates a build environment for cross-compiling all weave net ex
 * Adds the Debian buster repositories. This is because the last supported version of `libpcap` that allows static linking (1.8.1) is not present in the Debian bullseye repos.
 * Installs `libpcap-dev`, pinned to v1.8.1.
 
-### Stage 2 (builder)
+#### Stage 2 (builder)
 
 The second stage is where the weave net executables are built. It is built once for each target architecture.
 
@@ -70,19 +77,39 @@ It starts from `builderbase` as the base, and does the following:
 * Downloads modules
 * Uses the [Makefile](#makefile) to build all weave net executables for the target architecture
 
-### Stage 3 (alpinebase)
+#### Stage 3 (alpinebase)
 
 All weave net images ultimately derive from an Alpine base image. This stage allows customization of an official Alpine image, and using the customized image as the base for the weave net images. Currently, there is no customization required.
 
-### Subsequent stages
+#### Subsequent stages
 
 Each of the subsequent stages builds one image, corresponding to one component of weave net. These start from `alpinebase`, or `weaverimage` (Stage 4) as the base, and add what executables, scripts and configuration they need from `builder`.
 
-## Makefile
+### Makefile
 
-The [Makefile](build/Makefile) is a distilled version of the [old Makefile](../Makefile). It only builds executables. It invokes the correct C cross-compiler, and picks up the correct static `libpcap`, based on the target architecture. It is meant be used only in Stage 2 of the build process, and not directly.
+The [Makefile](build/Makefile) is a distilled version of the [old Makefile](../Makefile). It only builds executables. It invokes the correct C cross-compiler, and picks up the correct static `libpcap`, based on the target architecture. **It is meant be used only in Stage 2 of the build process, and not directly.**
 
-## build-images.sh
+## Build Tools
+
+### reweave/Makefile
+
+This makefile controls the build and scan processes. It provides the following parameters:
+
+|Parameter|Description|Default value|
+|---|---|---|
+|IMAGE_VERSION|The tag part of the name (after `:`) for all weave net images.|*version set in makefile*|
+|REGISTRY_USER|The account name (with optional registry name in front) used to tag all weave net images.|`weaveworks`|
+|ALPINE_BASEIMAGE|The qualified name for the base Alpine image used to build all weave net images.|`alpine:3.17.2`|
+
+and the following targets:
+
+|Target|Description|
+|build|Builds images matching the architecture of the local Docker engine, and loads it into the local Docker engine.|
+|scan|Scans the weave-kube and weave-npc images using the configured scanner (currently grype), and stores the results in `reweave/scans`.|
+|publish|Builds multi-architecture images for all configured architectures, and pushes them to the registry.|
+|clean|Deletes images from the local Docker engine, and deletes scan results.|
+
+### reweave/tools/build-images.sh
 
 This script invokes `docker buildx build` for each stage from stage 4 onwards. By default, it builds for all supported platforms, tags the image as `weaveworks/IMAGENAME:CURRENTVERSION`, and keeps them in the build cache. This behavior can be controlled by setting the following environment variables before invoking the script.
 
@@ -90,6 +117,18 @@ This script invokes `docker buildx build` for each stage from stage 4 onwards. B
 |---|---|---|
 |IMAGE_VERSION|The tag part of the name (after `:`) for all weave net images.|*version set in script file*|
 |REGISTRY_USER|The account name (with optional registry name in front) used to tag all weave net images.|`weaveworks`|
+|ALPINE_BASEIMAGE|The qualified name for the base Alpine image used to build all weave net images.|`alpine:3.17.2`|
 |PLATFORMS|Comma-separated list of the target platforms for which the weave net images will be built.|`linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x`|
 |POSTBUILD|Whether to push the images after build (`--push`) , or load them to the local Docker engine (`--load`). `--load` is only possible if PLATFORMS has the same value as the build platform. If left empty, the images will be built in the build cache only.||
-|ALPINE_BASEIMAGE|The qualified name for the base Alpine image used to build all weave net images.|`alpine:3.17.2`|
+
+### reweave/tools/scan-images.sh
+
+This script scans the weave-kube and weave-npc images using grype. It saves scan results in the directory `reweave/scans`.
+
+### reweave/tools/clean-images.sh
+
+This script deletes the built images from the local Docker engine.
+
+### reweave/tools/clean-scans.sh
+
+This script clears the `reweave/scans` directory.
