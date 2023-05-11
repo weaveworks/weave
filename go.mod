@@ -13,7 +13,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20180322171221-3e8f2ea4b190 // indirect
 	github.com/containernetworking/cni v0.5.2
 	github.com/coreos/go-iptables v0.3.0
-	github.com/docker/distribution v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible // indirect
+	github.com/docker/distribution v2.8.2-beta.1+incompatible // indirect
 	github.com/docker/docker v17.12.0-ce-rc1.0.20180328155642-38588656727d+incompatible
 	github.com/docker/go-connections v0.3.0 // indirect
 	github.com/docker/go-units v0.3.2 // indirect
