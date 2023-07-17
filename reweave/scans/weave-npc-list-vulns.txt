@@ -1,6 +1,2 @@
-NAME        INSTALLED  FIXED-IN  TYPE  VULNERABILITY  SEVERITY 
-libcrypto3  3.0.8-r3   3.0.8-r4  apk   CVE-2023-1255  Medium    
-libcrypto3  3.0.8-r3   3.0.9-r0  apk   CVE-2023-2650  High      
-libssl3     3.0.8-r3   3.0.8-r4  apk   CVE-2023-1255  Medium    
-libssl3     3.0.8-r3   3.0.9-r0  apk   CVE-2023-2650  High      
+No vulnerabilities found
 

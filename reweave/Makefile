@@ -1,7 +1,7 @@
-IMAGE_VERSION ?= 2.8.2-beta6
+IMAGE_VERSION ?= 2.8.2-beta7
 REGISTRY_USER ?= weaveworks
 
-ALPINE_BASEIMAGE ?= alpine:3.17.3
+ALPINE_BASEIMAGE ?= alpine:3.18.2
 
 # Targets
 .PHONY: build
