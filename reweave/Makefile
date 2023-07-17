@@ -1,4 +1,4 @@
-IMAGE_VERSION ?= 2.8.2-beta7
+IMAGE_VERSION ?= 2.8.2-beta8
 REGISTRY_USER ?= weaveworks
 
 ALPINE_BASEIMAGE ?= alpine:3.18.2

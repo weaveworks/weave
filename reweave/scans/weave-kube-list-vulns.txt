@@ -1,9 +1,2 @@
-NAME                            INSTALLED             FIXED-IN      TYPE       VULNERABILITY        SEVERITY 
-github.com/docker/distribution  v2.8.1+incompatible   2.8.2-beta.1  go-module  GHSA-hqxw-f8mx-cpmw  High      
-github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-232p-vwff-86mp  High      
-github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-33pg-m6jh-5237  Medium    
-github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-6wrf-mxfj-pf5p  Medium    
-github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-g2j6-57v7-gm8c  Medium    
-github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-m8cg-xc2p-r3fc  Low       
-github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-vpvm-3wq2-2wvm  High      
+No vulnerabilities found
 
