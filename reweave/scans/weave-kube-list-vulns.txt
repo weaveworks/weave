@@ -1,2 +1,31 @@
-NAME                            INSTALLED  FIXED-IN  TYPE       VULNERABILITY        SEVERITY 
-github.com/opencontainers/runc  v1.1.4     1.1.5     go-module  GHSA-vpvm-3wq2-2wvm  High      
+NAME                            INSTALLED             FIXED-IN      TYPE       VULNERABILITY        SEVERITY 
+bind-libs                       9.18.11-r0                          apk        CVE-2023-2828        High      
+bind-libs                       9.18.11-r0                          apk        CVE-2023-2829        High      
+bind-libs                       9.18.11-r0                          apk        CVE-2023-2911        High      
+bind-tools                      9.18.11-r0                          apk        CVE-2023-2828        High      
+bind-tools                      9.18.11-r0                          apk        CVE-2023-2829        High      
+bind-tools                      9.18.11-r0                          apk        CVE-2023-2911        High      
+curl                            7.88.1-r1             8.1.0-r0      apk        CVE-2023-28319       High      
+curl                            7.88.1-r1             8.1.0-r0      apk        CVE-2023-28320       Medium    
+curl                            7.88.1-r1             8.1.0-r0      apk        CVE-2023-28321       Medium    
+curl                            7.88.1-r1             8.1.0-r0      apk        CVE-2023-28322       Low       
+github.com/docker/distribution  v2.8.1+incompatible   2.8.2-beta.1  go-module  GHSA-hqxw-f8mx-cpmw  High      
+github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-232p-vwff-86mp  High      
+github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-33pg-m6jh-5237  Medium    
+github.com/docker/docker        v23.0.1+incompatible  23.0.3        go-module  GHSA-6wrf-mxfj-pf5p  Medium    
+github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-g2j6-57v7-gm8c  Medium    
+github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-m8cg-xc2p-r3fc  Low       
+github.com/opencontainers/runc  v1.1.4                1.1.5         go-module  GHSA-vpvm-3wq2-2wvm  High      
+libcap2                         2.66-r0               2.66-r1       apk        CVE-2023-2602        Low       
+libcap2                         2.66-r0               2.66-r1       apk        CVE-2023-2603        High      
+libcrypto3                      3.0.8-r3              3.0.8-r4      apk        CVE-2023-1255        Medium    
+libcrypto3                      3.0.8-r3              3.0.9-r0      apk        CVE-2023-2650        High      
+libcurl                         7.88.1-r1             8.1.0-r0      apk        CVE-2023-28319       High      
+libcurl                         7.88.1-r1             8.1.0-r0      apk        CVE-2023-28320       Medium    
+libcurl                         7.88.1-r1             8.1.0-r0      apk        CVE-2023-28321       Medium    
+libcurl                         7.88.1-r1             8.1.0-r0      apk        CVE-2023-28322       Low       
+libssl3                         3.0.8-r3              3.0.8-r4      apk        CVE-2023-1255        Medium    
+libssl3                         3.0.8-r3              3.0.9-r0      apk        CVE-2023-2650        High      
+libxml2                         2.10.3-r1             2.10.4-r0     apk        CVE-2023-28484       Medium    
+libxml2                         2.10.3-r1             2.10.4-r0     apk        CVE-2023-29469       Medium    
+
