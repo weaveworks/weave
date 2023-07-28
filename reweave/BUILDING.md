@@ -104,10 +104,17 @@ This makefile controls the build and scan processes. It provides the following p
 and the following targets:
 
 |Target|Description|
-|build|Builds images matching the architecture of the local Docker engine, and loads it into the local Docker engine.|
+|---|---|
+|build-images|Builds images matching the architecture of the local Docker engine, and loads it into the local Docker engine.|
+|publish-images|Builds multi-architecture images for all configured architectures, and pushes them to the registry.|
+|clean-images|Removes images from the local docker engine.|
+|build-plugin|Builds the [weave Docker Network Plugin(v2)](https://www.weave.works/docs/net/latest/install/plugin/plugin-v2/) on the local Docker engine. Requires published images.|
+|publish-plugin|Pushes the plugin to the registry.|
+|clean-plugin|Removes the plugin from the local Docker engine.|
+|publish|Combines the publish-images and publish-plugin steps, in that order.|
+|clean|Combines the clean-images and clean-plugin steps, in that order.|
 |scan|Scans the weave-kube and weave-npc images using the configured scanner (currently grype), and stores the results in `reweave/scans`.|
-|publish|Builds multi-architecture images for all configured architectures, and pushes them to the registry.|
-|clean|Deletes images from the local Docker engine, and deletes scan results.|
+|clean-scan|Deletes scan results.|
 
 ### reweave/tools/build-images.sh
 

@@ -2,12 +2,35 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
+## 2.8.2-beta9
+
+### Changed
+
+* Ran `go mod tidy` to remove unused references
+* Included tools and build steps to build the docker plugin (v2)
+
+## 2.8.2-beta8
+
+### Changed
+
+* Upgraded github.com/opencontainers/runc to v1.1.5
+* Upgraded github.com/docker/docker to v23.0.3+incompatible
+* Upgraded github.com/docker/distribution to v2.8.2-beta.1+incompatible
+
+## 2.8.2-beta7
+
+### Changed
+
+* Alpine base image was changed to `alpine:3.18.2`
+
 ## 2.8.2-beta6
 
-## Changed
+### Changed
+
 * Alpine base image was changed to `alpine:3.17.3`
 
-## Fixed
+### Fixed
+
 * Corrections were made in `reweave/build/Dockerfile` to ensure it builds everywhere, specifically on M1 Macs too
 * `ALPINE_BASEIMAGE` was added as a parameter to `reweave/Makefile`. Now all changeable parameters are in one place
 

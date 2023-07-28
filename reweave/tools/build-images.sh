@@ -17,17 +17,33 @@ fi
 : "${WEAVE_VERSION=git-$(git rev-parse --short=12 HEAD)}"
 : "${GIT_REVISION=$(git rev-parse HEAD)}"
 : "${PLATFORMS:=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x}"
-: "${POSTBUILD:=}"
+: "${PUBLISH:=}"
+
+if [ "$PUBLISH" = "true" ]; then
+    POSTBUILD="--push"
+elif [ "$PUBLISH" = "false" ]; then
+    POSTBUILD=""
+else
+    POSTBUILD="--load"
+fi
 
 # These are the names of the images
-WEAVER_IMAGE=${REGISTRY_USER}/weave:${IMAGE_VERSION}
-WEAVEEXEC_IMAGE=${REGISTRY_USER}/weaveexec:${IMAGE_VERSION}
-WEAVEKUBE_IMAGE=${REGISTRY_USER}/weave-kube:${IMAGE_VERSION}
-WEAVENPC_IMAGE=${REGISTRY_USER}/weave-npc:${IMAGE_VERSION}
-WEAVEDB_IMAGE=${REGISTRY_USER}/weavedb:${IMAGE_VERSION}
-NETWORKTESTER_IMAGE=${REGISTRY_USER}/network-tester:${IMAGE_VERSION}
+WEAVER_IMAGE=${REGISTRY_USER}/weave
+WEAVEEXEC_IMAGE=${REGISTRY_USER}/weaveexec
+WEAVEKUBE_IMAGE=${REGISTRY_USER}/weave-kube
+WEAVENPC_IMAGE=${REGISTRY_USER}/weave-npc
+WEAVEDB_IMAGE=${REGISTRY_USER}/weavedb
+NETWORKTESTER_IMAGE=${REGISTRY_USER}/network-tester
 
 build_image() {
+    IMAGENAME=$2
+    IMAGETAG=${IMAGENAME}:${IMAGE_VERSION}
+    if [ "$PUBLISH" = "true" ]; then
+        PUBLISHTAGOPT="-t ${IMAGENAME}:latest"
+    else
+        PUBLISHTAGOPT=""
+    fi
+
     # Get directory of script file
     a="/$0"; a="${a%/*}"; a="${a:-.}"; a="${a##/}/"; BINDIR=$(cd "$a"; pwd)
     
@@ -43,7 +59,8 @@ build_image() {
             --build-arg=revision=${GIT_REVISION} \
             --build-arg=imageversion=${IMAGE_VERSION} \
             -f reweave/build/Dockerfile \
-            -t "$2" \
+            -t "${IMAGETAG}" \
+            ${PUBLISHTAGOPT} \
             .
 
     cd -
