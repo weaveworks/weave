@@ -9,6 +9,7 @@ build-images: submodule
 	REGISTRY_USER=${REGISTRY_USER} IMAGE_VERSION=${IMAGE_VERSION} \
 	PLATFORMS="$$(docker version -f '{{ .Server.Arch }}')" \
 	ALPINE_BASEIMAGE=$(ALPINE_BASEIMAGE) \
+	PUBLISH=false \
 	tools/build-images.sh
 
 .PHONY: build-plugin

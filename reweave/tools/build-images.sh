@@ -13,7 +13,7 @@ fi
 
 # These variables are used to control the build process
 # Change with care.
-: "${ALPINE_BASEIMAGE:=alpine:3.17.3}"
+: "${ALPINE_BASEIMAGE:=alpine:3.18.2}"
 : "${WEAVE_VERSION=git-$(git rev-parse --short=12 HEAD)}"
 : "${GIT_REVISION=$(git rev-parse HEAD)}"
 : "${PLATFORMS:=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x}"
@@ -22,9 +22,9 @@ fi
 if [ "$PUBLISH" = "true" ]; then
     POSTBUILD="--push"
 elif [ "$PUBLISH" = "false" ]; then
-    POSTBUILD=""
-else
     POSTBUILD="--load"
+else
+    POSTBUILD=""
 fi
 
 # These are the names of the images
