@@ -1,1 +1,1 @@
-Image version: 2.8.2-beta9
+Image version: 2.8.2-beta10
