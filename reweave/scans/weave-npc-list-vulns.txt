@@ -1,2 +1,7 @@
-No vulnerabilities found
-
+NAME        INSTALLED  FIXED-IN  TYPE  VULNERABILITY  SEVERITY 
+libcrypto3  3.1.1-r1   3.1.2-r0  apk   CVE-2023-3817  Medium    
+libcrypto3  3.1.1-r1   3.1.1-r3  apk   CVE-2023-3446  Medium    
+libcrypto3  3.1.1-r1   3.1.1-r2  apk   CVE-2023-2975  Medium    
+libssl3     3.1.1-r1   3.1.2-r0  apk   CVE-2023-3817  Medium    
+libssl3     3.1.1-r1   3.1.1-r3  apk   CVE-2023-3446  Medium    
+libssl3     3.1.1-r1   3.1.1-r2  apk   CVE-2023-2975  Medium
