@@ -134,7 +134,7 @@ github.com/docker/machine/libmachine/cert
 github.com/docker/machine/libmachine/log
 github.com/docker/machine/libmachine/mcnutils
 github.com/docker/machine/version
-# github.com/evanphx/json-patch v4.2.0+incompatible
+# github.com/evanphx/json-patch v4.9.0+incompatible
 github.com/evanphx/json-patch
 # github.com/fsouza/go-dockerclient v1.2.0
 ## explicit
@@ -390,7 +390,7 @@ gopkg.in/inf.v0
 gopkg.in/yaml.v2
 # gotest.tools v2.2.0+incompatible
 ## explicit
-# k8s.io/api v0.18.6
+# k8s.io/api v0.18.14
 ## explicit
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1
@@ -432,7 +432,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apimachinery v0.18.6
+# k8s.io/apimachinery v0.18.14
 ## explicit
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -477,7 +477,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.18.6
+# k8s.io/client-go v0.18.14
 ## explicit
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/fake
