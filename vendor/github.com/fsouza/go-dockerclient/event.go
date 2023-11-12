@@ -7,16 +7,47 @@ package docker
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// EventsOptions to filter events
+// See https://docs.docker.com/engine/api/v1.41/#operation/SystemEvents for more details.
+type EventsOptions struct {
+	// Show events created since this timestamp then stream new events.
+	Since string
+
+	// Show events created until this timestamp then stop streaming.
+	Until string
+
+	// Filter for events. For example:
+	//  map[string][]string{"type": {"container"}, "event": {"start", "die"}}
+	// will return events when container was started and stopped or killed
+	//
+	// Available filters:
+	//  config=<string> config name or ID
+	//  container=<string> container name or ID
+	//  daemon=<string> daemon name or ID
+	//  event=<string> event type
+	//  image=<string> image name or ID
+	//  label=<string> image or container label
+	//  network=<string> network name or ID
+	//  node=<string> node ID
+	//  plugin= plugin name or ID
+	//  scope= local or swarm
+	//  secret=<string> secret name or ID
+	//  service=<string> service name or ID
+	//  type=<string> container, image, volume, network, daemon, plugin, node, service, secret or config
+	//  volume=<string> volume name
+	Filters map[string][]string
+}
 
 // APIEvents represents events coming from the Docker API
 // The fields in the Docker API changed in API version 1.22, and
@@ -62,6 +93,7 @@ type eventMonitoringState struct {
 	C         chan *APIEvents
 	errC      chan error
 	listeners []chan<- *APIEvents
+	closeConn func()
 }
 
 const (
@@ -93,9 +125,17 @@ var (
 //
 // The parameter is a channel through which events will be sent.
 func (c *Client) AddEventListener(listener chan<- *APIEvents) error {
+	return c.AddEventListenerWithOptions(EventsOptions{}, listener)
+}
+
+// AddEventListener adds a new listener to container events in the Docker API.
+// See https://docs.docker.com/engine/api/v1.41/#operation/SystemEvents for more details.
+//
+// The listener parameter is a channel through which events will be sent.
+func (c *Client) AddEventListenerWithOptions(options EventsOptions, listener chan<- *APIEvents) error {
 	var err error
 	if !c.eventMonitor.isEnabled() {
-		err = c.eventMonitor.enableEventMonitoring(c)
+		err = c.eventMonitor.enableEventMonitoring(c, options)
 		if err != nil {
 			return err
 		}
@@ -165,7 +205,7 @@ func listenerExists(a chan<- *APIEvents, list *[]chan<- *APIEvents) bool {
 	return false
 }
 
-func (eventState *eventMonitoringState) enableEventMonitoring(c *Client) error {
+func (eventState *eventMonitoringState) enableEventMonitoring(c *Client, opts EventsOptions) error {
 	eventState.Lock()
 	defer eventState.Unlock()
 	if !eventState.enabled {
@@ -173,12 +213,12 @@ func (eventState *eventMonitoringState) enableEventMonitoring(c *Client) error {
 		atomic.StoreInt64(&eventState.lastSeen, 0)
 		eventState.C = make(chan *APIEvents, 100)
 		eventState.errC = make(chan error, 1)
-		go eventState.monitorEvents(c)
+		go eventState.monitorEvents(c, opts)
 	}
 	return nil
 }
 
-func (eventState *eventMonitoringState) disableEventMonitoring() error {
+func (eventState *eventMonitoringState) disableEventMonitoring() {
 	eventState.Lock()
 	defer eventState.Unlock()
 
@@ -190,16 +230,35 @@ func (eventState *eventMonitoringState) disableEventMonitoring() error {
 		eventState.enabled = false
 		close(eventState.C)
 		close(eventState.errC)
+
+		if eventState.closeConn != nil {
+			eventState.closeConn()
+			eventState.closeConn = nil
+		}
 	}
-	return nil
 }
 
-func (eventState *eventMonitoringState) monitorEvents(c *Client) {
+func (eventState *eventMonitoringState) monitorEvents(c *Client, opts EventsOptions) {
+	const (
+		noListenersTimeout  = 5 * time.Second
+		noListenersInterval = 10 * time.Millisecond
+		noListenersMaxTries = noListenersTimeout / noListenersInterval
+	)
+
 	var err error
-	for eventState.noListeners() {
+	for i := time.Duration(0); i < noListenersMaxTries && eventState.noListeners(); i++ {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if err = eventState.connectWithRetry(c); err != nil {
+
+	if eventState.noListeners() {
+		// terminate if no listener is available after 5 seconds.
+		// Prevents goroutine leak when RemoveEventListener is called
+		// right after AddEventListener.
+		eventState.disableEventMonitoring()
+		return
+	}
+
+	if err = eventState.connectWithRetry(c, opts); err != nil {
 		// terminate if connect failed
 		eventState.disableEventMonitoring()
 		return
@@ -218,11 +277,11 @@ func (eventState *eventMonitoringState) monitorEvents(c *Client) {
 			eventState.updateLastSeen(ev)
 			eventState.sendEvent(ev)
 		case err = <-eventState.errC:
-			if err == ErrNoListeners {
+			if errors.Is(err, ErrNoListeners) {
 				eventState.disableEventMonitoring()
 				return
 			} else if err != nil {
-				defer func() { go eventState.monitorEvents(c) }()
+				defer func() { go eventState.monitorEvents(c, opts) }()
 				return
 			}
 		case <-timeout:
@@ -231,13 +290,13 @@ func (eventState *eventMonitoringState) monitorEvents(c *Client) {
 	}
 }
 
-func (eventState *eventMonitoringState) connectWithRetry(c *Client) error {
+func (eventState *eventMonitoringState) connectWithRetry(c *Client, opts EventsOptions) error {
 	var retries int
 	eventState.RLock()
 	eventChan := eventState.C
 	errChan := eventState.errC
 	eventState.RUnlock()
-	err := c.eventHijack(atomic.LoadInt64(&eventState.lastSeen), eventChan, errChan)
+	closeConn, err := c.eventHijack(opts, atomic.LoadInt64(&eventState.lastSeen), eventChan, errChan)
 	for ; err != nil && retries < maxMonitorConnRetries; retries++ {
 		waitTime := int64(retryInitialWaitTime * math.Pow(2, float64(retries)))
 		time.Sleep(time.Duration(waitTime) * time.Millisecond)
@@ -245,8 +304,11 @@ func (eventState *eventMonitoringState) connectWithRetry(c *Client) error {
 		eventChan = eventState.C
 		errChan = eventState.errC
 		eventState.RUnlock()
-		err = c.eventHijack(atomic.LoadInt64(&eventState.lastSeen), eventChan, errChan)
+		closeConn, err = c.eventHijack(opts, atomic.LoadInt64(&eventState.lastSeen), eventChan, errChan)
 	}
+	eventState.Lock()
+	defer eventState.Unlock()
+	eventState.closeConn = closeConn
 	return err
 }
 
@@ -290,11 +352,12 @@ func (eventState *eventMonitoringState) updateLastSeen(e *APIEvents) {
 	}
 }
 
-func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan chan error) error {
-	uri := "/events"
+func (c *Client) eventHijack(opts EventsOptions, startTime int64, eventChan chan *APIEvents, errChan chan error) (closeConn func(), err error) {
+	// on reconnect override initial Since with last event seen time
 	if startTime != 0 {
-		uri += fmt.Sprintf("?since=%d", startTime)
+		opts.Since = strconv.FormatInt(startTime, 10)
 	}
+	uri := "/events?" + queryString(opts)
 	protocol := c.endpointURL.Scheme
 	address := c.endpointURL.Path
 	if protocol != "unix" && protocol != "npipe" {
@@ -302,36 +365,39 @@ func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan
 		address = c.endpointURL.Host
 	}
 	var dial net.Conn
-	var err error
 	if c.TLSConfig == nil {
 		dial, err = c.Dialer.Dial(protocol, address)
 	} else {
 		netDialer, ok := c.Dialer.(*net.Dialer)
 		if !ok {
-			return ErrTLSNotSupported
+			return nil, ErrTLSNotSupported
 		}
 		dial, err = tlsDialWithDialer(netDialer, protocol, address, c.TLSConfig)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
+	//lint:ignore SA1019 the alternative doesn't quite work, so keep using the deprecated thing.
 	conn := httputil.NewClientConn(dial, nil)
-	req, err := http.NewRequest("GET", uri, nil)
+	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	res, err := conn.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	keepRunning := int32(1)
+	//lint:ignore SA1019 the alternative doesn't quite work, so keep using the deprecated thing.
 	go func(res *http.Response, conn *httputil.ClientConn) {
 		defer conn.Close()
 		defer res.Body.Close()
 		decoder := json.NewDecoder(res.Body)
-		for {
+		for atomic.LoadInt32(&keepRunning) == 1 {
 			var event APIEvents
-			if err = decoder.Decode(&event); err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if err := decoder.Decode(&event); err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 					c.eventMonitor.RLock()
 					if c.eventMonitor.enabled && c.eventMonitor.C == eventChan {
 						// Signal that we're exiting.
@@ -353,7 +419,9 @@ func (c *Client) eventHijack(startTime int64, eventChan chan *APIEvents, errChan
 			c.eventMonitor.RUnlock()
 		}
 	}(res, conn)
-	return nil
+	return func() {
+		atomic.StoreInt32(&keepRunning, 0)
+	}, nil
 }
 
 // transformEvent takes an event and determines what version it is from

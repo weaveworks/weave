@@ -6,6 +6,16 @@ All changes made to the weave net codebase during the reweave effort will be doc
 
 ### Changed
 
+* Alpine base image upgraded to alpine:2.18.4, and `apk upgrade` applied
+* Upgraded golang.org/x/net to v0.17.0. This upgraded some dependecies
+* Upgraded github.com/docker/docker to v24.0.7. This caused a compilation error
+* Upgraded github.com/fsouza/go-dockerclient to v1.10.0. This resolved the error 
+
+## 2.8.2-beta10 (126f3ab9)
+
+### Changed
+
+* Alpine base image upgraded to alpine:2.18.3
 * Updated documentation
 * Changed [reweave/tool/build-images.sh](reweave/tool/build-images.sh) to be consistent with documentation
 
