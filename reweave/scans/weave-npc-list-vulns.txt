@@ -1,1 +1,8 @@
-No vulnerabilities found
+NAME              INSTALLED  FIXED-IN  TYPE       VULNERABILITY        SEVERITY 
+golang.org/x/net  v0.8.0     0.17.0    go-module  GHSA-4374-p667-p6c8  High      
+golang.org/x/net  v0.8.0     0.17.0    go-module  GHSA-qppj-fm5r-hxr3  Medium    
+golang.org/x/net  v0.8.0     0.13.0    go-module  GHSA-2wrh-6pvc-2jm9  Medium    
+libcrypto3        3.1.2-r0   3.1.4-r0  apk        CVE-2023-5363        High      
+libcrypto3        3.1.2-r0   3.1.4-r1  apk        CVE-2023-5678        Unknown   
+libssl3           3.1.2-r0   3.1.4-r0  apk        CVE-2023-5363        High      
+libssl3           3.1.2-r0   3.1.4-r1  apk        CVE-2023-5678        Unknown

@@ -1,1 +1,20 @@
-No vulnerabilities found
+NAME                      INSTALLED             FIXED-IN    TYPE       VULNERABILITY        SEVERITY 
+bind-libs                 9.18.16-r0            9.18.19-r0  apk        CVE-2023-4236        High      
+bind-libs                 9.18.16-r0            9.18.19-r0  apk        CVE-2023-3341        High      
+bind-tools                9.18.16-r0            9.18.19-r0  apk        CVE-2023-4236        High      
+bind-tools                9.18.16-r0            9.18.19-r0  apk        CVE-2023-3341        High      
+curl                      8.2.1-r0              8.4.0-r0    apk        CVE-2023-38545       Critical  
+curl                      8.2.1-r0              8.3.0-r0    apk        CVE-2023-38039       High      
+curl                      8.2.1-r0              8.4.0-r0    apk        CVE-2023-38546       Low       
+github.com/docker/docker  v23.0.3+incompatible  24.0.7      go-module  GHSA-jq35-85cj-fj4p  Medium    
+golang.org/x/net          v0.8.0                0.17.0      go-module  GHSA-4374-p667-p6c8  High      
+golang.org/x/net          v0.8.0                0.17.0      go-module  GHSA-qppj-fm5r-hxr3  Medium    
+golang.org/x/net          v0.8.0                0.13.0      go-module  GHSA-2wrh-6pvc-2jm9  Medium    
+libcrypto3                3.1.2-r0              3.1.4-r0    apk        CVE-2023-5363        High      
+libcrypto3                3.1.2-r0              3.1.4-r1    apk        CVE-2023-5678        Unknown   
+libcurl                   8.2.1-r0              8.4.0-r0    apk        CVE-2023-38545       Critical  
+libcurl                   8.2.1-r0              8.3.0-r0    apk        CVE-2023-38039       High      
+libcurl                   8.2.1-r0              8.4.0-r0    apk        CVE-2023-38546       Low       
+libssl3                   3.1.2-r0              3.1.4-r0    apk        CVE-2023-5363        High      
+libssl3                   3.1.2-r0              3.1.4-r1    apk        CVE-2023-5678        Unknown   
+nghttp2-libs              1.55.1-r0             1.57.0-r0   apk        CVE-2023-44487       High
