@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG ALPINE_BASEIMAGE=alpine:3.17.2
+ARG ALPINE_BASEIMAGE=alpine:3.18.4
 
 ########
 # Stage 1: go 1.20 on debian bullseye
@@ -92,18 +92,18 @@ RUN apk update \
 FROM alpinebase AS weaverimage
 
 LABEL works.weave.role="system" \
-      maintainer="Weaveworks <help@weave.works>" \
+      maintainer="Raj Chaudhuri <raj@rajware.net>" \
       org.opencontainers.image.title="Weave Net" \
       org.opencontainers.image.description="Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery" \
-      org.opencontainers.image.url="https://weave.works" \
-      org.opencontainers.image.source="https://github.com/weaveworks/weave" \
-      org.opencontainers.image.vendor="Weaveworks" \
+      org.opencontainers.image.url="https://github.com/rajch/weave" \
+      org.opencontainers.image.source="https://github.com/rajch/weave" \
+      org.opencontainers.image.vendor="Raj Chaudhuri (forked from Weaveworks)" \
       org.label-schema.schema-version="1.0" \
       org.label-schema.name="Weave Net" \
       org.label-schema.description="Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery" \
-      org.label-schema.url="https://weave.works" \
-      org.label-schema.vcs-url="https://github.com/weaveworks/weave" \
-      org.label-schema.vendor="Weaveworks"
+      org.label-schema.url="https://github.com/rajch/weave" \
+      org.label-schema.vcs-url="https://github.com/rajch/weave" \
+      org.label-schema.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
 RUN apk add --update \
     curl \
@@ -134,10 +134,10 @@ LABEL org.opencontainers.image.revision="${revision}" \
 # This will be tagged as REGISTRY_USER/weaveexec:VERSION
 FROM weaverimage AS weavexecimage
 
-LABEL maintainer="Weaveworks <help@weave.works>" \
+LABEL maintainer="Raj Chaudhuri <raj@rajware.net>" \
       org.opencontainers.image.title="weaveexec" \
-      org.opencontainers.image.source="https://github.com/weaveworks/weave" \
-      org.opencontainers.image.vendor="Weaveworks"
+      org.opencontainers.image.source="https://github.com/rajch/weave" \
+      org.opencontainers.image.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
 
@@ -159,10 +159,10 @@ LABEL org.opencontainers.image.revision="${revision}" \
 # This will be tagged as REGISTRY_USER/weave-kube:VERSION
 FROM weaverimage AS weavekubeimage
 
-LABEL maintainer="Weaveworks <help@weave.works>" \
+LABEL maintainer="Raj Chaudhuri <raj@rajware.net>" \
       org.opencontainers.image.title="weave-kube" \
-      org.opencontainers.image.source="https://github.com/weaveworks/weave" \
-      org.opencontainers.image.vendor="Weaveworks"
+      org.opencontainers.image.source="https://github.com/rajch/weave" \
+      org.opencontainers.image.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
 COPY --from=builder /root/weave/prog/weave-kube/init.sh /root/weave/prog/weave-kube/launch.sh /root/weave/prog/kube-utils/kube-utils /home/weave/
 ENTRYPOINT ["/home/weave/launch.sh"]
@@ -180,18 +180,18 @@ LABEL org.opencontainers.image.revision="${revision}" \
 FROM alpinebase AS weavenpcimage
 
 LABEL works.weave.role="system" \
-      maintainer="Weaveworks <help@weave.works>" \
+      maintainer="Raj Chaudhuri <raj@rajware.net>" \
       org.opencontainers.image.title="Weave Net" \
       org.opencontainers.image.description="Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery" \
-      org.opencontainers.image.url="https://weave.works" \
-      org.opencontainers.image.source="https://github.com/weaveworks/weave" \
-      org.opencontainers.image.vendor="Weaveworks" \
+      org.opencontainers.image.url="https://github.com/rajch/weave" \
+      org.opencontainers.image.source="https://github.com/rajch/weave" \
+      org.opencontainers.image.vendor="Raj Chaudhuri (forked from Weaveworks)" \
       org.label-schema.schema-version="1.0" \
       org.label-schema.name="Weave Net" \
       org.label-schema.description="Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery" \
-      org.label-schema.url="https://weave.works" \
-      org.label-schema.vcs-url="https://github.com/weaveworks/weave" \
-      org.label-schema.vendor="Weaveworks"
+      org.label-schema.url="https://github.com/rajch/weave" \
+      org.label-schema.vcs-url="https://github.com/rajch/weave" \
+      org.label-schema.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
 RUN apk add --update \
     iptables \
@@ -220,10 +220,10 @@ LABEL org.opencontainers.image.revision="${revision}" \
 FROM scratch AS weavedbimage
 
 LABEL works.weave.role="system" \
-      maintainer="Weaveworks <help@weave.works>" \
+      maintainer="Raj Chaudhuri <raj@rajware.net>" \
       org.opencontainers.image.title="weavedb" \
-      org.opencontainers.image.source="https://github.com/weaveworks/weave" \
-      org.opencontainers.image.vendor="Weaveworks"
+      org.opencontainers.image.source="https://github.com/rajch/weave" \
+      org.opencontainers.image.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
 ENTRYPOINT ["data-only"]
 # Workaround for Docker refusing to save an empty image

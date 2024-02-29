@@ -75,11 +75,11 @@ It starts from `builderbase` as the base, and does the following:
 * Sets environment variables indicating the current build and target architectures
 * Copies in the source code
 * Downloads modules
-* Uses a [Makefile](build/Makefilemakefile) to build all weave net executables for the target architecture
+* Uses a [Makefile](build/Makefile) to build all weave net executables for the target architecture
 
 #### Stage 3 (alpinebase)
 
-All weave net images ultimately derive from an Alpine base image. This stage allows customization of an official Alpine image, and using the customized image as the base for the weave net images. Currently, there is no customization required.
+All weave net images ultimately derive from an Alpine base image. This stage allows customization of an official Alpine image, and using the customized image as the base for the weave net images.
 
 #### Subsequent stages
 
@@ -87,7 +87,7 @@ Each of the subsequent stages builds one image, corresponding to one component o
 
 ### Makefile
 
-The [Makefile](build/Makefile) is a distilled version of the [old Makefile](../Makefile). It only builds executables. It invokes the correct C cross-compiler, and picks up the correct static `libpcap`, based on the target architecture. **It is meant be used only in Stage 2 of the build process, and not directly.**
+The [Makefile](build/Makefile) is a distilled version of the [old Makefile](../Makefile). It only builds executables. It invokes the correct C cross-compiler, and picks up the correct static `libpcap`, based on the target architecture. **It is meant be used only in Stage 2 of the build process, and not directly on a development environment.**
 
 ## Build Tools
 

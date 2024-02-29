@@ -2,7 +2,7 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## latest
+## 2.8.2-beta11 (0d58e179) latest
 
 ### Changed
 
