@@ -1,1 +1,42 @@
-No vulnerabilities found
+NAME                              INSTALLED   FIXED-IN    TYPE       VULNERABILITY        SEVERITY 
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-6516        High      
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-5679        High      
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-5517        High      
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-50387       High      
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-4408        High      
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-5680        Medium    
+bind-libs                         9.18.19-r0  9.18.24-r0  apk        CVE-2023-50868       Unknown   
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-6516        High      
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-5679        High      
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-5517        High      
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-50387       High      
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-4408        High      
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-5680        Medium    
+bind-tools                        9.18.19-r0  9.18.24-r0  apk        CVE-2023-50868       Unknown   
+busybox                           1.36.1-r5               apk        CVE-2023-42366       Medium    
+busybox                           1.36.1-r5               apk        CVE-2023-42365       Medium    
+busybox                           1.36.1-r5               apk        CVE-2023-42364       Medium    
+busybox                           1.36.1-r5               apk        CVE-2023-42363       Medium    
+busybox-binsh                     1.36.1-r5               apk        CVE-2023-42366       Medium    
+busybox-binsh                     1.36.1-r5               apk        CVE-2023-42365       Medium    
+busybox-binsh                     1.36.1-r5               apk        CVE-2023-42364       Medium    
+busybox-binsh                     1.36.1-r5               apk        CVE-2023-42363       Medium    
+curl                              8.4.0-r0    8.5.0-r0    apk        CVE-2023-46219       Medium    
+curl                              8.4.0-r0    8.5.0-r0    apk        CVE-2023-46218       Medium    
+github.com/containerd/containerd  v1.7.0      1.7.11      go-module  GHSA-7ww5-4wqc-m92c  Medium    
+github.com/opencontainers/runc    v1.1.5      1.1.12      go-module  GHSA-xr7r-f8xq-vfvv  High      
+golang.org/x/crypto               v0.14.0     0.17.0      go-module  GHSA-45x7-px36-x8w8  Medium    
+libcrypto3                        3.1.4-r1    3.1.4-r5    apk        CVE-2024-0727        Medium    
+libcrypto3                        3.1.4-r1    3.1.4-r3    apk        CVE-2023-6129        Medium    
+libcrypto3                        3.1.4-r1    3.1.4-r4    apk        CVE-2023-6237        Unknown   
+libcurl                           8.4.0-r0    8.5.0-r0    apk        CVE-2023-46219       Medium    
+libcurl                           8.4.0-r0    8.5.0-r0    apk        CVE-2023-46218       Medium    
+libssl3                           3.1.4-r1    3.1.4-r5    apk        CVE-2024-0727        Medium    
+libssl3                           3.1.4-r1    3.1.4-r3    apk        CVE-2023-6129        Medium    
+libssl3                           3.1.4-r1    3.1.4-r4    apk        CVE-2023-6237        Unknown   
+libuv                             1.44.2-r2               apk        CVE-2024-24806       High      
+libxml2                           2.11.4-r0   2.11.7-r0   apk        CVE-2024-25062       High      
+ssl_client                        1.36.1-r5               apk        CVE-2023-42366       Medium    
+ssl_client                        1.36.1-r5               apk        CVE-2023-42365       Medium    
+ssl_client                        1.36.1-r5               apk        CVE-2023-42364       Medium    
+ssl_client                        1.36.1-r5               apk        CVE-2023-42363       Medium
