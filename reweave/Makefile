@@ -1,7 +1,7 @@
-IMAGE_VERSION ?= 2.8.2-beta11
+IMAGE_VERSION ?= 2.8.2-beta12
 REGISTRY_USER ?= rajchaudhuri
 
-ALPINE_BASEIMAGE ?= alpine:3.18.4
+ALPINE_BASEIMAGE ?= alpine:3.19.1
 
 # Targets
 .PHONY: build-images

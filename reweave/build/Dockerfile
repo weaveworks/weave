@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG ALPINE_BASEIMAGE=alpine:3.18.4
+ARG ALPINE_BASEIMAGE=alpine:3.19.1
 
 ########
 # Stage 1: go 1.20 on debian bullseye
@@ -79,7 +79,7 @@ EOMAKE
 # required in the alpine base image.
 FROM --platform=linux/${TARGETARCH} ${ALPINE_BASEIMAGE} as alpinebase
 # Any additional tweaks will appear here
-# Last update on top of alpine:3.18.4
+# Last update on top of alpine:3.19.1
 RUN apk update \
     && apk upgrade \
     && rm -rf /var/cache/apk/*

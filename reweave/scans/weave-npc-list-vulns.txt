@@ -1,20 +1,13 @@
-NAME                 INSTALLED  FIXED-IN  TYPE       VULNERABILITY        SEVERITY 
-busybox              1.36.1-r5            apk        CVE-2023-42366       Medium    
-busybox              1.36.1-r5            apk        CVE-2023-42365       Medium    
-busybox              1.36.1-r5            apk        CVE-2023-42364       Medium    
-busybox              1.36.1-r5            apk        CVE-2023-42363       Medium    
-busybox-binsh        1.36.1-r5            apk        CVE-2023-42366       Medium    
-busybox-binsh        1.36.1-r5            apk        CVE-2023-42365       Medium    
-busybox-binsh        1.36.1-r5            apk        CVE-2023-42364       Medium    
-busybox-binsh        1.36.1-r5            apk        CVE-2023-42363       Medium    
-golang.org/x/crypto  v0.14.0    0.17.0    go-module  GHSA-45x7-px36-x8w8  Medium    
-libcrypto3           3.1.4-r1   3.1.4-r5  apk        CVE-2024-0727        Medium    
-libcrypto3           3.1.4-r1   3.1.4-r3  apk        CVE-2023-6129        Medium    
-libcrypto3           3.1.4-r1   3.1.4-r4  apk        CVE-2023-6237        Unknown   
-libssl3              3.1.4-r1   3.1.4-r5  apk        CVE-2024-0727        Medium    
-libssl3              3.1.4-r1   3.1.4-r3  apk        CVE-2023-6129        Medium    
-libssl3              3.1.4-r1   3.1.4-r4  apk        CVE-2023-6237        Unknown   
-ssl_client           1.36.1-r5            apk        CVE-2023-42366       Medium    
-ssl_client           1.36.1-r5            apk        CVE-2023-42365       Medium    
-ssl_client           1.36.1-r5            apk        CVE-2023-42364       Medium    
-ssl_client           1.36.1-r5            apk        CVE-2023-42363       Medium
+NAME           INSTALLED   FIXED-IN  TYPE  VULNERABILITY   SEVERITY 
+busybox        1.36.1-r15            apk   CVE-2023-42366  Medium    
+busybox        1.36.1-r15            apk   CVE-2023-42365  Medium    
+busybox        1.36.1-r15            apk   CVE-2023-42364  Medium    
+busybox        1.36.1-r15            apk   CVE-2023-42363  Medium    
+busybox-binsh  1.36.1-r15            apk   CVE-2023-42366  Medium    
+busybox-binsh  1.36.1-r15            apk   CVE-2023-42365  Medium    
+busybox-binsh  1.36.1-r15            apk   CVE-2023-42364  Medium    
+busybox-binsh  1.36.1-r15            apk   CVE-2023-42363  Medium    
+ssl_client     1.36.1-r15            apk   CVE-2023-42366  Medium    
+ssl_client     1.36.1-r15            apk   CVE-2023-42365  Medium    
+ssl_client     1.36.1-r15            apk   CVE-2023-42364  Medium    
+ssl_client     1.36.1-r15            apk   CVE-2023-42363  Medium
