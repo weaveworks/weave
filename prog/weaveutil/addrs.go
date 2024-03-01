@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 
-	weavenet "github.com/weaveworks/weave/net"
+	weavenet "github.com/rajch/weave/net"
 )
 
 func containerAddrs(args []string) error {

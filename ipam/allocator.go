@@ -9,13 +9,13 @@ import (
 
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/db"
-	"github.com/weaveworks/weave/ipam/paxos"
-	"github.com/weaveworks/weave/ipam/ring"
-	"github.com/weaveworks/weave/ipam/space"
-	"github.com/weaveworks/weave/ipam/tracker"
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/db"
+	"github.com/rajch/weave/ipam/paxos"
+	"github.com/rajch/weave/ipam/ring"
+	"github.com/rajch/weave/ipam/space"
+	"github.com/rajch/weave/ipam/tracker"
+	"github.com/rajch/weave/net/address"
 )
 
 // Kinds of message we can unicast to other peers
@@ -541,7 +541,8 @@ func (alloc *Allocator) annotatePeernames(names []mesh.PeerName) []string {
 // in the ring. Async.
 //
 // NB: the function is invoked by the gossip library routines and should be
-//     registered manually.
+//
+//	registered manually.
 func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
 	alloc.debugf("PeerGone: peer %s", peerName)
 

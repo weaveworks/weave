@@ -6,14 +6,14 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 
+	"github.com/rajch/weave/api"
+	"github.com/rajch/weave/common"
+	weavedocker "github.com/rajch/weave/common/docker"
+	"github.com/rajch/weave/ipam"
+	"github.com/rajch/weave/nameserver"
+	weavenet "github.com/rajch/weave/net"
+	"github.com/rajch/weave/net/address"
 	"github.com/weaveworks/mesh"
-	"github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
-	weavedocker "github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/nameserver"
-	weavenet "github.com/weaveworks/weave/net"
-	"github.com/weaveworks/weave/net/address"
 )
 
 func a(cidr *net.IPNet) address.CIDR {

@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveworks/mesh"
 
+	"github.com/rajch/weave/net/address"
+	"github.com/rajch/weave/testing/gossip"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/testing/gossip"
 )
 
 type mockMessage struct {

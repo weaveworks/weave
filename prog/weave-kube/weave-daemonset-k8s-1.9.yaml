@@ -151,6 +151,8 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
+                - name: CHECKPOINT_DISABLE
+                  value: "1"
               image: 'rajchaudhuri/weave-kube:latest'
               imagePullPolicy: Always
               readinessProbe:

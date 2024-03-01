@@ -7,10 +7,10 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
-	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
-	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
-	netplugin "github.com/weaveworks/weave/plugin/net"
+	weaveapi "github.com/rajch/weave/api"
+	"github.com/rajch/weave/common"
+	ipamplugin "github.com/rajch/weave/plugin/ipam"
+	netplugin "github.com/rajch/weave/plugin/net"
 )
 
 func cniNet(args []string) error {

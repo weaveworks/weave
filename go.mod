@@ -1,4 +1,4 @@
-module github.com/weaveworks/weave
+module github.com/rajch/weave
 
 go 1.20
 

@@ -1,7 +1,7 @@
 package tracker
 
 import (
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/net/address"
 )
 
 // LocalRangeTracker is an interface for tracking changes in the IPAM ring.

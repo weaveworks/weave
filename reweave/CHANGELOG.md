@@ -2,7 +2,23 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## 2.8.2-beta11 (0d58e179) latest
+## latest
+
+### Changed
+
+* Module name changed to `github.com/rajch/weave`
+* Added environment variable `CHECKPOINT_DISABLE=1` to default manifests, to bypass weaveworks telemetry
+
+## 2.8.2-beta12 (962bb57b)
+
+### Changed
+
+* Alpine base image upgraded to alpine:3.19.1
+* Upgraded github.com/containerd/containerd to v1.7.11
+* Upgraded github.com/opencontainers/runc to v1.1.12
+* Upgraded golang.org/x/crypto to v0.17.0
+
+## 2.8.2-beta11 (0d58e179)
 
 ### Changed
 

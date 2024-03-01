@@ -13,7 +13,7 @@ type Gossip interface {
 	// Unicast takes []byte instead of GossipData because "to date there has
 	// been no compelling reason [in practice] to do merging on unicast."
 	// But there may be some motivation to have unicast Mergeable; see
-	// https://github.com/weaveworks/weave/issues/1764
+	// https://github.com/rajch/weave/issues/1764
 	//
 	// TODO(pb): for uniformity of interface, rather take GossipData?
 	GossipUnicast(dst PeerName, msg []byte) error

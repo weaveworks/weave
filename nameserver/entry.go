@@ -10,7 +10,7 @@ import (
 
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/net/address"
 )
 
 var now = func() int64 { return time.Now().Unix() }

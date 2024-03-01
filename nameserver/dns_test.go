@@ -11,8 +11,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rajch/weave/net/address"
 	"github.com/weaveworks/mesh"
-	"github.com/weaveworks/weave/net/address"
 )
 
 type mockUpstream struct {

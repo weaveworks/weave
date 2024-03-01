@@ -8,8 +8,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/net/address"
 )
 
 const (

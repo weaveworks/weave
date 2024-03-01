@@ -13,7 +13,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/net/address"
 )
 
 const (
