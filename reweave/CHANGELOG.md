@@ -6,6 +6,13 @@ All changes made to the weave net codebase during the reweave effort will be doc
 
 ### Changed
 
+* Vulnerability scanning output changed to a consolidated report
+* Documentation changed to reflect new fork status
+
+## 2.8.2-beta13 (c1d31074)
+
+### Changed
+
 * Module name changed to `github.com/rajch/weave`
 * Added environment variable `CHECKPOINT_DISABLE=1` to default manifests, to bypass weaveworks telemetry
 

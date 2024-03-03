@@ -1,36 +1,30 @@
 # ReWeave - an effort to keep Weave Net alive
 
-This repository contains a fork of Weave Net, the first product developed by Weaveworks.
+This repository contains a fork of Weave Net, the first product developed by Weaveworks. Since Weaveworks has shut down, this repo aims to continue maintaining Weave Net, and to publish releases regularly.
 
-## About Weaveworks
+[![Go Report Card](https://goreportcard.com/badge/github.com/rajch/weave)](https://goreportcard.com/report/github.com/rajch/weave)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rajchaudhuri/weave-kube)](https://hub.docker.com/r/rajchaudhuri/weave-kube)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/rajch/ttws?include_prereleases)
+[![Unique vulnerability count in all images](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frajch%2Fweave%2Fmaster%2Freweave%2Fscans%2Fbadge.json&label=Vulnerabilty%20count)](reweave/scans/report.md)
 
-Weaveworks created many innovative products and services around containers, Kubernetes and the cloud. They were pioneers in CNI networking and GitOps.
+The history of the ReWeave effort can be found in [HISTORY.md](HISTORY.md).
 
-## Weave Net
+## Using Weave on Kubernetes
 
-Weave Net creates a virtual network that connects containers across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, ambassadors or links. Weave Net is also available as a CNI plugin, which allows it to provide container networking on Kubernetes clusters.
+On a newly created Kubernetes cluster, the Weave Net CNI pluging can be installed by running the following command:
 
-## History of the ReWeave project
+```
+kubectl apply -f https://reweave.azurewebsites.net/k8s/v1.28/net.yaml
+```
 
-In June 2022, Weave Net had not been updated for a year. Problems were starting to appear in the field. In particular, the last published images on the Docker Hub had issues supporting multiple processor architectures, and security scanners showed multiple vulnerabilities. 
+Replace `v1.28` with the version on Kubernetes on your cluster.
 
-A call went out from Weaveworks to get the community more involved in maintaining it. After some discussion on GitHub issues and e-mail, and even a few online meetings, things were not moving forward. Finally, in March 2023, this fork was created, with the following goals in mind:
+That endpoint is provided by the companion project [weave-endpoint](https://github.com/rajch/weave-endpoint).
 
-* Update dependencies, especially ones with security vulnerabilities
-* Make minimal code changes _only_ when required by updating dependencies
-* Create true multi-arch images using modern tools
-* Create a new build process to automate all this
+## Building Weave
 
-These goals were achieved. Details can be found in the [reweave](reweave/README.md) directory. A pull request was submitted on the weaveworks repo, with the aim of getting a new official release out.
+Details can be found [here](reweave/BUILDING.md). 
 
-On February 5th, 2024, Weaveworks CEO Alexis Richardson announced via [LinkedIn](https://www.linkedin.com/posts/richardsonalexis_hi-everyone-i-am-very-sad-to-announce-activity-7160295096825860096-ZS67/) and [Twitter](https://twitter.com/monadic/status/1754530336120140116) that Weaveworks is winding down. 
+## Documentation status
 
-So, this fork will now be maintained independently. 
-
-## New Goals
-
-The old goals, listed above, remain the priority. In addition, this project aims to:
-
-* Remove dependencies on Weaveworks infrastructure, starting with telemetry
-* Publish new releases regularly
-* Provide supporting infrastructure, such as weave's famous one-line installation, where possible
+At this point, any information found in directories other than `reweave`, such as `docs` or `site`, should be considered obsolete. In time, those will be updated.

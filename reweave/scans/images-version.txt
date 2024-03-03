@@ -1,1 +1,0 @@
-Image version: 2.8.2-beta12
