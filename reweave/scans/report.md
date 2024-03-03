@@ -1,11 +1,14 @@
 # Vulnerability Report
 
+```
 Report date: 2024-03-03
 Unique vulnerability count: 14
 Images version: 2.8.2
+```
 
 ## Scanner Details
 
+```
 Application:         grype
 Version:             0.74.7
 BuildDate:           2024-02-26T18:24:14Z
@@ -16,11 +19,13 @@ GoVersion:           go1.21.7
 Compiler:            gc
 Syft Version:        v0.105.1
 Supported DB Schema: 5
+```
 
 ## Vulnerabilities
 
 weave-kube: (14) 
 
+```
 NAME           INSTALLED   FIXED-IN  TYPE  VULNERABILITY   SEVERITY 
 busybox        1.36.1-r15            apk   CVE-2023-42366  Medium    
 busybox        1.36.1-r15            apk   CVE-2023-42365  Medium    
@@ -36,9 +41,11 @@ ssl_client     1.36.1-r15            apk   CVE-2023-42366  Medium
 ssl_client     1.36.1-r15            apk   CVE-2023-42365  Medium    
 ssl_client     1.36.1-r15            apk   CVE-2023-42364  Medium    
 ssl_client     1.36.1-r15            apk   CVE-2023-42363  Medium
+```
 
 weave-npc: (12)
 
+```
 NAME           INSTALLED   FIXED-IN  TYPE  VULNERABILITY   SEVERITY 
 busybox        1.36.1-r15            apk   CVE-2023-42366  Medium    
 busybox        1.36.1-r15            apk   CVE-2023-42365  Medium    
@@ -52,3 +59,4 @@ ssl_client     1.36.1-r15            apk   CVE-2023-42366  Medium
 ssl_client     1.36.1-r15            apk   CVE-2023-42365  Medium    
 ssl_client     1.36.1-r15            apk   CVE-2023-42364  Medium    
 ssl_client     1.36.1-r15            apk   CVE-2023-42363  Medium
+```

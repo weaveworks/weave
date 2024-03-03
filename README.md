@@ -4,7 +4,7 @@ This repository contains a fork of Weave Net, the first product developed by Wea
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/rajch/weave)](https://goreportcard.com/report/github.com/rajch/weave)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rajchaudhuri/weave-kube)](https://hub.docker.com/r/rajchaudhuri/weave-kube)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/rajch/ttws?include_prereleases)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/rajch/weave?include_prereleases)
 [![Unique vulnerability count in all images](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frajch%2Fweave%2Fmaster%2Freweave%2Fscans%2Fbadge.json&label=Vulnerabilty%20count)](reweave/scans/report.md)
 
 The history of the ReWeave effort can be found in [HISTORY.md](HISTORY.md).

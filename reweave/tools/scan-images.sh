@@ -39,16 +39,23 @@ fi
 # Produce report
 printf "# Vulnerability Report\n\n" >  "${SCANDIR}/report.md"
 {
+    printf "\`\`\`\n"
     printf "Report date: %s\n" "$(date +'%Y-%m-%d')"
     printf "Unique vulnerability count: %s\n" "${UNIQUECOUNT}" 
-    #tail -n +2 -q "${SCANDIR}/weave-npc-list-vulns.txt" "${SCANDIR}/weave-kube-list-vulns.txt" | sort -u | wc -l
     printf "Images version: %s\n" "${IMAGE_VERSION}"
+    printf "\`\`\`\n"
     printf "\n## Scanner Details\n\n"
+    printf "\`\`\`\n"
     grype version
+    printf "\`\`\`\n"
     printf "\n## Vulnerabilities\n\nweave-kube: (%s) \n\n" "$(tail +2 "${SCANDIR}/weave-kube-list-vulns.txt" | wc -l)"
+    printf "\`\`\`\n"
     cat "${SCANDIR}/weave-kube-list-vulns.txt"
+    printf "\`\`\`\n"
     printf "\nweave-npc: (%s)\n\n" "$(tail +2 "${SCANDIR}/weave-npc-list-vulns.txt" | wc -l)"
+    printf "\`\`\`\n"
     cat "${SCANDIR}/weave-npc-list-vulns.txt"
+    printf "\`\`\`\n"
 } >> "${SCANDIR}/report.md"
 
 # Produce Vulnerability Count badge json for README
