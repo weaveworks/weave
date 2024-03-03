@@ -1,3 +1,13 @@
+## Release 2.8.2
+
+This is the first release since forking from weaveworks/weave. While no new functionality has been added, there have been many changes.
+
+* Build with Go version 1.21.6
+* Dependencies, especially ones with associated CVEs, have been updated
+* libCNI has been upgraded to v1.1.2
+* A new, Docker-only build process has been created, which produces proper multi-arch images
+* A vulnerability scanning process has been created using [grype](https://github.com/anchore/grype)
+
 ## Release 2.8.1
 
 Fixes a problem introduced in 2.8.0 for machines whose ID is in /etc/machine-id #3886
