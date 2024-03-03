@@ -1,4 +1,4 @@
-IMAGE_VERSION ?= 2.8.2-beta14
+IMAGE_VERSION ?= 2.8.2-beta15
 REGISTRY_USER ?= rajchaudhuri
 
 ALPINE_BASEIMAGE ?= alpine:3.19.1
@@ -47,7 +47,7 @@ clean-plugin:
 	tools/clean-plugin.sh
 
 .PHONY: clean
-clean: clean-plugin clean-images
+clean: clean-images clean-plugin
 
 .PHONY: submodule
 submodule: ../tools/.git

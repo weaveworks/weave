@@ -1,6 +1,6 @@
 module github.com/rajch/weave
 
-go 1.20
+go 1.21
 
 require (
 	github.com/andybalholm/go-bit v1.0.1

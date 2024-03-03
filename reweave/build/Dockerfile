@@ -7,7 +7,7 @@ ARG ALPINE_BASEIMAGE=alpine:3.19.1
 # It will be built only once for a given build platform. Subsequent
 # stages will start from this and cross-compile for each target
 # architecture.
-FROM --platform=${BUILDPLATFORM} golang:1.20.2-bullseye AS builderbase
+FROM --platform=${BUILDPLATFORM} golang:1.21.6-bullseye AS builderbase
 
 # Support Raspberry Pi 2 and newer
 ENV GOARM 7

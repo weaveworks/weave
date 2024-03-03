@@ -6,6 +6,13 @@ All changes made to the weave net codebase during the reweave effort will be doc
 
 ### Changed
 
+* Bumped go version in `go.mod` to `1.21`.
+* Changed go base image in `reweave/build/Dockerfile` to `golang:1.21.6-bullseye`.
+
+## 2.8.2-beta14 (0e7b15b3)
+
+### Changed
+
 * Vulnerability scanning output changed to a consolidated report
 * Documentation changed to reflect new fork status
 
