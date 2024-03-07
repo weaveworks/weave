@@ -5,6 +5,7 @@ set -e
 # required.
 : "${IMAGE_VERSION:=}"
 : "${REGISTRY_USER:=}"
+: "${IMAGE_LIST:=weave-kube weave-npc weave weaveexec weavedb network-tester}"
 
 if [ -z "${IMAGE_VERSION}" ] || [ -z "${REGISTRY_USER}" ] ; then
     >&2 echo "Please provide valid values for IMAGE_VERSION and REGISTRY_USER." 
@@ -12,11 +13,6 @@ if [ -z "${IMAGE_VERSION}" ] || [ -z "${REGISTRY_USER}" ] ; then
 fi
 
 echo "Scanning images and collecting data..."
-
-# Currently, we are interested only in the weave-kube and weave-npc
-# images. 
-WEAVE_KUBE_IMAGE="${REGISTRY_USER}/weave-kube:${IMAGE_VERSION}"
-WEAVE_NPC_IMAGE="${REGISTRY_USER}/weave-npc:${IMAGE_VERSION}"
 
 # Get directory of script file
 a="/$0"; a="${a%/*}"; a="${a:-.}"; a="${a##/}/"; BINDIR=$(cd "$a"; pwd)
@@ -26,15 +22,19 @@ SCANDIR="${BINDIR}/../scans"
 mkdir -p "${SCANDIR}"
 
 # Scan images
-grype "${WEAVE_KUBE_IMAGE}" --add-cpes-if-none >"${SCANDIR}/weave-kube-list-vulns.txt"
-grype "${WEAVE_NPC_IMAGE}" --add-cpes-if-none >"${SCANDIR}/weave-npc-list-vulns.txt"
+for im in ${IMAGE_LIST};do
+    grype "${REGISTRY_USER}/${im}:${IMAGE_VERSION}" --add-cpes-if-none >"${SCANDIR}/${im}-list-vulns.txt"
+done
 
-UNIQUECOUNT=$(tail -n +2 -q "${SCANDIR}/weave-npc-list-vulns.txt" "${SCANDIR}/weave-kube-list-vulns.txt" | sort -u | wc -l)
+#UNIQUECOUNT=$(tail -n +2 -q "${SCANDIR}/weave-npc-list-vulns.txt" "${SCANDIR}/weave-kube-list-vulns.txt" | sort -u | wc -l)
+UNIQUECOUNT=$(tail -n +2 -q "${SCANDIR}"/*-list-vulns.txt  | sort -u | wc -l)
 BADGECOLOR="blue"
 
 if [ "$UNIQUECOUNT" -gt "0" ]; then
     BADGECOLOR="orange"
 fi
+
+echo "Generating report..."
 
 # Produce report
 printf "# Vulnerability Report\n\n" >  "${SCANDIR}/report.md"
@@ -48,17 +48,23 @@ printf "# Vulnerability Report\n\n" >  "${SCANDIR}/report.md"
     printf "\`\`\`\n"
     grype version
     printf "\`\`\`\n"
-    printf "\n## Vulnerabilities\n\nweave-kube: (%s) \n\n" "$(tail +2 "${SCANDIR}/weave-kube-list-vulns.txt" | wc -l)"
-    printf "\`\`\`\n"
-    cat "${SCANDIR}/weave-kube-list-vulns.txt"
-    printf "\`\`\`\n"
-    printf "\nweave-npc: (%s)\n\n" "$(tail +2 "${SCANDIR}/weave-npc-list-vulns.txt" | wc -l)"
-    printf "\`\`\`\n"
-    cat "${SCANDIR}/weave-npc-list-vulns.txt"
-    printf "\`\`\`\n"
+    printf "\n## Vulnerabilities\n\n"
+    for im in ${IMAGE_LIST};do
+        printf "### ${im}: (%s) \n\n" "$(tail +2 "${SCANDIR}/${im}-list-vulns.txt" | wc -l)"
+        printf "\`\`\`\n"
+        cat "${SCANDIR}/${im}-list-vulns.txt"
+        printf "\`\`\`\n\n"
+    done
+
 } >> "${SCANDIR}/report.md"
+
+rm -f "${SCANDIR}"/*-list-vulns.txt
+
+echo "Generating badge..."
 
 # Produce Vulnerability Count badge json for README
 cat <<EOBADGE > "${SCANDIR}/badge.json"
 {"schemaVersion": 1, "label": "Vulnerabilty count", "message": "${UNIQUECOUNT}", "color": "${BADGECOLOR}"}
 EOBADGE
+
+echo "Done."
