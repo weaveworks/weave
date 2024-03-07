@@ -75,9 +75,9 @@ func isDockerPluginEnabled(args []string) error {
 }
 
 func newDockerClient() (*docker.Client, error) {
-	// API 1.21 is the first version that supports docker network
-	// commands
-	c, err := docker.NewVersionedClientFromEnv("1.21")
+	// API 1.21 was the first version that supports docker network
+	// commands. In March 2024, the minimum suupported API is 1.24
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to docker: %s", err)
 	}

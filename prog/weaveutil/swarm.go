@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/pkg/errors"
 )
-
-const DOCKER_API_VERSION = "1.26"
 
 func swarmManagerPeers(args []string) error {
 	info, err := dockerInfo()
@@ -32,7 +30,7 @@ func swarmManagerPeers(args []string) error {
 }
 
 func dockerInfo() (*docker.DockerInfo, error) {
-	client, err := docker.NewVersionedClientFromEnv(DOCKER_API_VERSION)
+	client, err := newVersionedDockerClientFromEnv(swarmDockerAPIVersion)
 	if err != nil {
 		return nil, errors.Wrap(err, "docker.NewVersionedClientFromEnv")
 	}

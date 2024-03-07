@@ -2,7 +2,22 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## 2.8.2 latest
+## latest
+
+### Changed
+
+* The docker API client version, used by the proxy package and the weaveutil command, was bumped from 1.18 to 1.24. As of March 2024, Docker API versions below 1.24 are deprecated. This means that the minimum supported Docker version is now 1.12.0
+
+### Added
+
+* Provision was made in weaveutil program and the weave script to override the API version used, via the environment variable `DOCKER_API_VERSION`. The same variable is used by standard docker clients
+
+### Fixed
+
+* Fixed `proxy.go` in the proxy package to handle changes in the Docker API. In the 1.24 API, container objects expose a `.Mounts` property rather than a `.Volumes` property.
+* The `weave` script was modified to add a `-t` switch when invoking functionality inside a container. This ensures that output is visible even when using the Weave docker proxy
+
+## 2.8.2 (7b087168)
 
 ### Changed
 

@@ -14,7 +14,7 @@ func containerAddrs(args []string) error {
 	}
 	bridgeName := args[0]
 
-	client, err := docker.NewVersionedClientFromEnv("1.18")
+	client, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return err
 	}
