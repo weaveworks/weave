@@ -3,6 +3,7 @@ set -e
 
 [ -n "$WEAVE_DEBUG" ] && set -x
 
+# Release Version
 SCRIPT_VERSION="unreleased"
 IMAGE_VERSION=latest
 [ "$SCRIPT_VERSION" = "unreleased" ] || IMAGE_VERSION=$SCRIPT_VERSION

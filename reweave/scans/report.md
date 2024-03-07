@@ -1,9 +1,9 @@
 # Vulnerability Report
 
 ```
-Report date: 2024-03-07
+Report date: 2024-03-08
 Unique vulnerability count: 14
-Images version: 2.8.3-beta1
+Images version: 2.8.3
 ```
 
 ## Scanner Details

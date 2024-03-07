@@ -2,11 +2,20 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## latest
+## 2.8.3
+
+### Changed
+
+* Changed version in `reweave/Makefile` to 2.8.3
+* Modified reweave and main CHANGELOG.md
+* Modified the `weave` script
+
+## 2.8.3-beta1 (a752f656)
 
 ### Changed
 
 * The docker API client version, used by the proxy package and the weaveutil command, was bumped from 1.18 to 1.24. As of March 2024, Docker API versions below 1.24 are deprecated. This means that the minimum supported Docker version is now 1.12.0
+* The scan report now scans all images other than the V2 Docker plugin
 
 ### Added
 

@@ -1,3 +1,9 @@
+## Release 2.8.3
+
+The docker API client version, used by the proxy package and the weaveutil command, was bumped from 1.18 to 1.24. As of March 2024, Docker API versions below 1.24 are deprecated. This means that the minimum supported Docker version is now 1.12.0.
+
+Provision was made in weaveutil program and the weave script to override the API version used, via the environment variable `DOCKER_API_VERSION`. The same variable is used by standard docker clients.
+
 ## Release 2.8.2
 
 This is the first release since forking from weaveworks/weave. While no new functionality has been added, there have been many changes.
