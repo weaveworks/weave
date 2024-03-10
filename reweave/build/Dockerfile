@@ -105,15 +105,23 @@ LABEL works.weave.role="system" \
       org.label-schema.vcs-url="https://github.com/rajch/weave" \
       org.label-schema.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
-RUN apk add --update \
-    curl \
-    iptables \
-    ipset \
-    iproute2 \
-    conntrack-tools \
-    bind-tools \
-    ca-certificates \
-    && rm -rf /var/cache/apk/*
+RUN <<EOWEAVER
+      apk add --update \
+                  curl \
+                  iptables \
+                  ipset \
+                  iproute2 \
+                  conntrack-tools \
+                  bind-tools \
+                  ca-certificates
+      # Alpine 3.19 made nftables the default backend for iptables
+      # For backward compatibility, the following is required:
+      apk add iptables-legacy
+      ln -sf /sbin/iptables-legacy /sbin/iptables
+      ln -sf /sbin/iptables-legacy-save /sbin/iptables-save
+      ln -sf /sbin/iptables-legacy-restore /sbin/iptables-restore
+      rm -rf /var/cache/apk/*
+EOWEAVER
 
 COPY --from=builder /root/weave/weave /root/weave/prog/weaver/weaver /home/weave/
 COPY --from=builder /root/weave/prog/weaveutil/weaveutil /usr/bin/
@@ -193,12 +201,22 @@ LABEL works.weave.role="system" \
       org.label-schema.vcs-url="https://github.com/rajch/weave" \
       org.label-schema.vendor="Raj Chaudhuri (forked from Weaveworks)"
 
-RUN apk add --update \
-    iptables \
-    ipset \
-    ulogd \
-    && rm -rf /var/cache/apk/* \
-    && mknod /var/log/ulogd.pcap p
+RUN <<EONPC
+      apk add --update \
+                  iptables \
+                  ipset \
+                  ulogd
+      mknod /var/log/ulogd.pcap p
+      
+      # Alpine 3.19 made nftables the default backend for iptables
+      # For backward compatibility, the following is required:
+      apk add iptables-legacy
+      ln -sf /sbin/iptables-legacy /sbin/iptables
+      ln -sf /sbin/iptables-legacy-save /sbin/iptables-save
+      ln -sf /sbin/iptables-legacy-restore /sbin/iptables-restore
+
+      rm -rf /var/cache/apk/*
+EONPC
 COPY --from=builder /root/weave/prog/weave-npc/weave-npc /usr/bin/weave-npc
 COPY --from=builder /root/weave/prog/weave-npc/ulogd.conf /etc/ulogd.conf
 COPY --from=builder /root/weave/prog/weave-npc/launch.sh /usr/bin/
