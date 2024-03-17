@@ -39,7 +39,14 @@ build_image() {
     IMAGENAME=$2
     IMAGETAG=${IMAGENAME}:${IMAGE_VERSION}
     if [ "$PUBLISH" = "true" ]; then
-        PUBLISHTAGOPT="-t ${IMAGENAME}:latest"
+        # When an image is published to a registry, also tag it
+        # with ':latest', unless the image version string 
+        # contains '-beta'
+        case "$IMAGE_VERSION" in
+            *-beta*) IS_BETA=1 ;;
+            *) IS_BETA= ;;
+        esac
+        [ -z "${IS_BETA}" ] && PUBLISHTAGOPT="-t ${IMAGENAME}:latest"
     else
         PUBLISHTAGOPT=""
     fi
