@@ -2,7 +2,24 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## 2.8.3
+## latest
+
+### Changed
+
+* Changed the CNI version configured in the `weave` script to `1.0.0`, as per [this](https://www.cni.dev/docs/spec/#configuration-format)
+* Ensured that the weave version gets added to `weaveutil` via linker flag
+
+## 2.8.4-beta1 (bcab10a4)
+
+### Changed
+* Added tracing The `launch.sh` and `init.sh` scripts if the WEAVE_DEBUG environment variable is set.
+* When publishing images, the `:latest` tag is also applied. It will not be applied any more if the tag includes "-beta" anywhere.
+
+### Fixed
+
+* The Alpine Linux base image had been upgraded to 3.19.1. In this version, the default iptables backend is nftables, and the legacy backend is not included by default. Our scripts and programs assume legacy as the default backend, and change to nft if autodetected, or if we ask for it. So, changed our build script to install the Alpine `iptables-legacy` package, and changed the symbolic links to point to the legacy backend by default.
+
+## 2.8.3 (d0878790)
 
 ### Changed
 

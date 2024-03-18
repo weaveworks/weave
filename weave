@@ -735,7 +735,7 @@ upgrade_cni_plugin() {
 create_cni_config() {
     cat >"$1" <<EOF
 {
-    "cniVersion": "0.3.0",
+    "cniVersion": "1.0.0",
     "name": "weave",
     "disableCheck": true,
     "plugins": [

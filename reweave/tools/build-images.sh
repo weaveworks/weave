@@ -14,7 +14,7 @@ fi
 # These variables are used to control the build process
 # Change with care.
 : "${ALPINE_BASEIMAGE:=alpine:3.19.1}"
-: "${WEAVE_VERSION=git-$(git rev-parse --short=12 HEAD)}"
+: "${WEAVE_VERSION=${IMAGE_VERSION}}"
 : "${GIT_REVISION=$(git rev-parse HEAD)}"
 : "${PLATFORMS:=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x}"
 : "${PUBLISH:=}"
@@ -59,6 +59,7 @@ build_image() {
     # shellcheck disable=SC2086
     docker buildx build \
             ${POSTBUILD} \
+            --progress=plain \
             --platform=${PLATFORMS} \
             --target="$1" \
             --build-arg=ALPINE_BASEIMAGE=${ALPINE_BASEIMAGE} \

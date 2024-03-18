@@ -68,6 +68,13 @@ EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(WEAVEWAIT_
 # -tags "osusergo netgo" to use native Go UID and DNS implementations
 BUILD_FLAGS=-ldflags "-extldflags -static -X main.version=$(WEAVE_VERSION) -s -w" -tags "osusergo netgo"
 
+# This allows adding up to three extra switches to the -ldflags value inside
+# the same string returned by BUILD_FLAGS. Needed because the go # tool does
+# not combine multiple -ldflags 
+define extraldflags
+-ldflags "-extldflags -static -X main.version=$(WEAVE_VERSION) $(strip $(1) $(2) $(3)) -s -w" -tags "osusergo netgo"
+endef
+
 # Targets
 all: showbuild exes
 
@@ -97,7 +104,10 @@ exes: $(EXES)
 $(WEAVER_EXE):
 	CC=$(CC) GOOS=linux GOARCH=$(ARCH) go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
-$(WEAVEUTIL_EXE) $(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
+$(WEAVEUTIL_EXE):
+	CC=$(CC) GOOS=linux GOARCH=$(ARCH) go build $(call extraldflags,-X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=$(WEAVE_VERSION)) -o $@ ./$(@D)
+
+$(KUBEUTILS_EXE) $(WEAVENPC_EXE) $(NETWORKTESTER_EXE):
 	CC=$(CC) GOOS=linux GOARCH=$(ARCH) go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVEWAIT_EXE):
