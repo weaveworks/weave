@@ -6,6 +6,13 @@ All changes made to the weave net codebase during the reweave effort will be doc
 
 ### Changed
 
+* Upgraded google.golang.org/protobuf to v1.33.0
+* Changed the scan process to exclude weavedb and network-tester images. Weavedb is data-only, and network-tester does not get used outside of testing
+
+## 2.8.4-beta2 (c1993b9d)
+
+### Changed
+
 * Changed the CNI version configured in the `weave` script to `1.0.0`, as per [this](https://www.cni.dev/docs/spec/#configuration-format)
 * Ensured that the weave version gets added to `weaveutil` via linker flag
 * Moved old, not-in-use artifacts to a directory called original
