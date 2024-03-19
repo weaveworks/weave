@@ -8,6 +8,9 @@ All changes made to the weave net codebase during the reweave effort will be doc
 
 * Changed the CNI version configured in the `weave` script to `1.0.0`, as per [this](https://www.cni.dev/docs/spec/#configuration-format)
 * Ensured that the weave version gets added to `weaveutil` via linker flag
+* Moved old, not-in-use artifacts to a directory called original
+* Copied contents of old site directory into a directory called website. Rearranged and modified them for use with the Jekyll static site generator, for deployment on GitHub pages
+* Added a GitHub actions workflow to build and publish the contents of the website directory
 
 ## 2.8.4-beta1 (bcab10a4)
 
