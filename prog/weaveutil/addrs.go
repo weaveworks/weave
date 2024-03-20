@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 
-	weavenet "github.com/weaveworks/weave/net"
+	weavenet "github.com/rajch/weave/net"
 )
 
 func containerAddrs(args []string) error {
@@ -14,7 +14,7 @@ func containerAddrs(args []string) error {
 	}
 	bridgeName := args[0]
 
-	client, err := docker.NewVersionedClientFromEnv("1.18")
+	client, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return err
 	}

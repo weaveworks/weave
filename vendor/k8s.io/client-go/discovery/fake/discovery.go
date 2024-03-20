@@ -18,12 +18,16 @@ package fake
 
 import (
 	"fmt"
+	"net/http"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
 	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
@@ -49,14 +53,13 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 			return resourceList, nil
 		}
 	}
-	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
-}
-
-// ServerResources returns the supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := c.ServerGroupsAndResources()
-	return rs, err
+	return nil, &errors.StatusError{
+		ErrStatus: metav1.Status{
+			Status:  metav1.StatusFailure,
+			Code:    http.StatusNotFound,
+			Reason:  metav1.StatusReasonNotFound,
+			Message: fmt.Sprintf("the server could not find the requested resource, GroupVersion %q not found", groupVersion),
+		}}
 }
 
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
@@ -153,8 +156,16 @@ func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
 }
 
+func (c *FakeDiscovery) OpenAPIV3() openapi.Client {
+	panic("unimplemented")
+}
+
 // RESTClient returns a RESTClient that is used to communicate with API server
 // by this client implementation.
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
+}
+
+func (c *FakeDiscovery) WithLegacy() discovery.DiscoveryInterface {
+	panic("unimplemented")
 }

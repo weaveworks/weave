@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -63,12 +62,16 @@ func (c changesByPath) Less(i, j int) bool { return c[i].Path < c[j].Path }
 func (c changesByPath) Len() int           { return len(c) }
 func (c changesByPath) Swap(i, j int)      { c[j], c[i] = c[i], c[j] }
 
-// Gnu tar and the go tar writer don't have sub-second mtime
-// precision, which is problematic when we apply changes via tar
-// files, we handle this by comparing for exact times, *or* same
+// Gnu tar doesn't have sub-second mtime precision. The go tar
+// writer (1.10+) does when using PAX format, but we round times to seconds
+// to ensure archives have the same hashes for backwards compatibility.
+// See https://github.com/moby/moby/pull/35739/commits/fb170206ba12752214630b269a40ac7be6115ed4.
+//
+// Non-sub-second is problematic when we apply changes via tar
+// files. We handle this by comparing for exact times, *or* same
 // second count and either a or b having exactly 0 nanoseconds
 func sameFsTime(a, b time.Time) bool {
-	return a == b ||
+	return a.Equal(b) ||
 		(a.Unix() == b.Unix() &&
 			(a.Nanosecond() == 0 || b.Nanosecond() == 0))
 }
@@ -243,7 +246,6 @@ func (info *FileInfo) path() string {
 }
 
 func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
-
 	sizeAtEntry := len(*changes)
 
 	if oldInfo == nil {
@@ -316,7 +318,6 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 		copy((*changes)[sizeAtEntry+1:], (*changes)[sizeAtEntry:])
 		(*changes)[sizeAtEntry] = change
 	}
-
 }
 
 // Changes add changes to file information.
@@ -344,7 +345,7 @@ func ChangesDirs(newDir, oldDir string) ([]Change, error) {
 		oldRoot, newRoot *FileInfo
 	)
 	if oldDir == "" {
-		emptyDir, err := ioutil.TempDir("", "empty")
+		emptyDir, err := os.MkdirTemp("", "empty")
 		if err != nil {
 			return nil, err
 		}
@@ -391,10 +392,10 @@ func ChangesSize(newDir string, changes []Change) int64 {
 }
 
 // ExportChanges produces an Archive from the provided changes, relative to dir.
-func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMap) (io.ReadCloser, error) {
+func ExportChanges(dir string, changes []Change, idMap idtools.IdentityMapping) (io.ReadCloser, error) {
 	reader, writer := io.Pipe()
 	go func() {
-		ta := newTarAppender(idtools.NewIDMappingsFromMaps(uidMaps, gidMaps), writer, nil)
+		ta := newTarAppender(idMap, writer, nil)
 
 		// this buffer is needed for the duration of this piped stream
 		defer pools.BufioWriter32KPool.Put(ta.Buffer)

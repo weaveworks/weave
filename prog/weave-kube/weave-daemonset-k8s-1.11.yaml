@@ -120,7 +120,7 @@ items:
         spec:
           initContainers:
             - name: weave-init
-              image: 'weaveworks/weave-kube:latest'
+              image: 'rajchaudhuri/weave-kube:latest'
               imagePullPolicy: Always
               command:
                 - /home/weave/init.sh
@@ -151,7 +151,9 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
-              image: 'weaveworks/weave-kube:latest'
+                - name: CHECKPOINT_DISABLE
+                  value: "1"
+              image: 'rajchaudhuri/weave-kube:latest'
               imagePullPolicy: Always
               readinessProbe:
                 httpGet:
@@ -182,7 +184,7 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
-              image: 'weaveworks/weave-npc:latest'
+              image: 'rajchaudhuri/weave-npc:latest'
               imagePullPolicy: Always
 #npc-args
               resources:

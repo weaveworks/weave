@@ -6,8 +6,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/rajch/weave/db"
 	"github.com/weaveworks/mesh"
-	"github.com/weaveworks/weave/db"
 )
 
 func getOldStyleSystemUUID() ([]byte, error) {

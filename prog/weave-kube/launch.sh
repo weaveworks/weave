@@ -3,6 +3,8 @@
 
 set -e
 
+[ -n "$WEAVE_DEBUG" ] && set -x
+
 # If this is run from an older manifest, run the init script here
 [ "${INIT_CONTAINER}" = "true" ] || "$(dirname "$0")/init.sh"
 
@@ -24,7 +26,9 @@ setup_iptables_backend() {
         fi
       fi
     fi
-    if [ $mode = "nft" ]; then
+    printf "iptables backend mode: %s\n" "$mode"
+    if [ "$mode" = "nft" ]; then
+      [ -n "$WEAVE_DEBUG" ] && echo "Changing iptables symlinks..."
       rm /sbin/iptables
       rm /sbin/iptables-save
       rm /sbin/iptables-restore

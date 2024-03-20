@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/net/address"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/address"
 )
 
 func HTTPPost(t *testing.T, url string) string {

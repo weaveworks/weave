@@ -1,0 +1,31 @@
+---
+---
+@import "{{ site.theme }}";
+
+header {
+    display: flex;
+    flex-flow: row;
+    align-items: baseline;
+}
+
+header span.sitetitle {
+    flex-grow: 1;
+    font-size: 2rem;
+    font-weight: bolder;
+}
+
+header span.sitetitle a:hover {
+    text-decoration: none;
+}
+
+nav {
+    display: inline-block;
+}
+nav a {
+    padding-right: 0.5rem;
+}
+
+.container-lg {
+    max-width: 75%;
+    margin: 0 auto;
+}

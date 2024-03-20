@@ -111,7 +111,7 @@ func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
 
 	// A state with spi 0 can't be deleted so don't allow it to be set
 	if state.Spi == 0 {
-		return fmt.Errorf("Spi must be set when adding xfrm state.")
+		return fmt.Errorf("Spi must be set when adding xfrm state")
 	}
 	req := h.newNetlinkRequest(nlProto, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 
@@ -158,6 +158,19 @@ func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
 		out := nl.NewRtAttr(nl.XFRMA_REPLAY_ESN_VAL, writeReplayEsn(state.ReplayWindow))
 		req.AddData(out)
 	}
+	if state.OutputMark != nil {
+		out := nl.NewRtAttr(nl.XFRMA_SET_MARK, nl.Uint32Attr(state.OutputMark.Value))
+		req.AddData(out)
+		if state.OutputMark.Mask != 0 {
+			out = nl.NewRtAttr(nl.XFRMA_SET_MARK_MASK, nl.Uint32Attr(state.OutputMark.Mask))
+			req.AddData(out)
+		}
+	}
+
+	if state.Ifid != 0 {
+		ifId := nl.NewRtAttr(nl.XFRMA_IF_ID, nl.Uint32Attr(uint32(state.Ifid)))
+		req.AddData(ifId)
+	}
 
 	_, err := req.Execute(unix.NETLINK_XFRM, 0)
 	return err
@@ -184,12 +197,7 @@ func (h *Handle) xfrmStateAllocSpi(state *XfrmState) (*XfrmState, error) {
 		return nil, err
 	}
 
-	s, err := parseXfrmState(msgs[0], FAMILY_ALL)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, err
+	return parseXfrmState(msgs[0], FAMILY_ALL)
 }
 
 // XfrmStateDel will delete an xfrm state from the system. Note that
@@ -273,6 +281,11 @@ func (h *Handle) xfrmStateGetOrDelete(state *XfrmState, nlProto int) (*XfrmState
 	if state.Src != nil {
 		out := nl.NewRtAttr(nl.XFRMA_SRCADDR, state.Src.To16())
 		req.AddData(out)
+	}
+
+	if state.Ifid != 0 {
+		ifId := nl.NewRtAttr(nl.XFRMA_IF_ID, nl.Uint32Attr(uint32(state.Ifid)))
+		req.AddData(ifId)
 	}
 
 	resType := nl.XFRM_MSG_NEWSA
@@ -372,6 +385,21 @@ func parseXfrmState(m []byte, family int) (*XfrmState, error) {
 			state.Mark = new(XfrmMark)
 			state.Mark.Value = mark.Value
 			state.Mark.Mask = mark.Mask
+		case nl.XFRMA_SET_MARK:
+			if state.OutputMark == nil {
+				state.OutputMark = new(XfrmMark)
+			}
+			state.OutputMark.Value = native.Uint32(attr.Value)
+		case nl.XFRMA_SET_MARK_MASK:
+			if state.OutputMark == nil {
+				state.OutputMark = new(XfrmMark)
+			}
+			state.OutputMark.Mask = native.Uint32(attr.Value)
+			if state.OutputMark.Mask == 0xffffffff {
+				state.OutputMark.Mask = 0
+			}
+		case nl.XFRMA_IF_ID:
+			state.Ifid = int(native.Uint32(attr.Value))
 		}
 	}
 
@@ -394,11 +422,7 @@ func (h *Handle) XfrmStateFlush(proto Proto) error {
 	req.AddData(&nl.XfrmUsersaFlush{Proto: uint8(proto)})
 
 	_, err := req.Execute(unix.NETLINK_XFRM, 0)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func limitsToLft(lmts XfrmStateLimits, lft *nl.XfrmLifetimeCfg) {

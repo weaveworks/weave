@@ -7,7 +7,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/weaveworks/weave/net/ipset"
+	"github.com/rajch/weave/net/ipset"
 )
 
 func (ns *ns) analysePolicy(policy *networkingv1.NetworkPolicy) (

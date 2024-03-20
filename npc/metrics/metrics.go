@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/weaveworks/weave/common"
+	"github.com/rajch/weave/common"
 )
 
 var (

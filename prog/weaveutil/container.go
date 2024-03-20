@@ -9,7 +9,7 @@ import (
 )
 
 func inspectContainer(containerNameOrID string) (*docker.Container, error) {
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to docker: %s", err)
 	}
@@ -174,7 +174,7 @@ func parseContainerArgs(args []string) docker.CreateContainerOptions {
 func runContainer(args []string) error {
 	containerOptions := parseContainerArgs(args)
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
@@ -206,7 +206,7 @@ func listContainers(args []string) error {
 		cmdUsage("list-containers", "[<label>]")
 	}
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
@@ -233,7 +233,7 @@ func stopContainer(args []string) error {
 		cmdUsage("stop-container", "<container-id> [<container-id2> ...]")
 	}
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
@@ -252,7 +252,7 @@ func killContainer(args []string) error {
 		cmdUsage("kill-container", "<container-id> [<container-id2> ...]")
 	}
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}
@@ -288,7 +288,7 @@ func removeContainer(args []string) error {
 		}
 	}
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}

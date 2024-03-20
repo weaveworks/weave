@@ -1,3 +1,25 @@
+## Release 2.8.4
+
+The alpine base image used by `weave-kube` and `weave-npc` was upgraded to version 3.19.1 in the previous release. In this version, the default iptables backend is nftables, and the legacy backend is not included. Our scripts and programs assume legacy as the default backend, and change to nft if autodetected, or if we ask for it. So, the build Dockerfile (reweave/build/Dockerfile) was changed to also install the Alpine `iptables-legacy` package , and change the `iptables-{save,restore}` symbolic links to point to the legacy backend by default.
+
+The `weave-kube` and `weave-npc` images can now log traces if the environment WEAVE_DEBUG is set in the manifest.
+
+## Release 2.8.3
+
+The docker API client version, used by the proxy package and the weaveutil command, was bumped from 1.18 to 1.24. As of March 2024, Docker API versions below 1.24 are deprecated. This means that the minimum supported Docker version is now 1.12.0.
+
+Provision was made in weaveutil program and the weave script to override the API version used, via the environment variable `DOCKER_API_VERSION`. The same variable is used by standard docker clients.
+
+## Release 2.8.2
+
+This is the first release since forking from weaveworks/weave. While no new functionality has been added, there have been many changes.
+
+* Build with Go version 1.21.6
+* Dependencies, especially ones with associated CVEs, have been updated
+* libCNI has been upgraded to v1.1.2
+* A new, Docker-only build process has been created, which produces proper multi-arch images
+* A vulnerability scanning process has been created using [grype](https://github.com/anchore/grype)
+
 ## Release 2.8.1
 
 Fixes a problem introduced in 2.8.0 for machines whose ID is in /etc/machine-id #3886

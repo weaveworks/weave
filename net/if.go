@@ -21,7 +21,7 @@ func ensureInterface(ifaceName string) (*net.Interface, error) {
 	ch := make(chan netlink.LinkUpdate)
 	// NB: We do not supply (and eventually close) a 'done' channel
 	// here since that can cause incorrect file descriptor
-	// re-usage. See https://github.com/weaveworks/weave/issues/2120
+	// re-usage. See https://github.com/rajch/weave/issues/2120
 	if err := netlink.LinkSubscribe(ch, nil); err != nil {
 		return nil, err
 	}

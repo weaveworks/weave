@@ -13,7 +13,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/net/address"
 )
 
 const (
@@ -273,7 +273,7 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 		reqCopy := req.Copy()
 		reqCopy.Id = dns.Id()
 		response, _, err := h.client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, upstreamConfig.Port))
-		if (err != nil && err != dns.ErrTruncated) || response == nil {
+		if (err != nil) || response == nil {
 			h.ns.debugf("error trying %s: %v", server, err)
 			continue
 		}

@@ -3,6 +3,8 @@
 
 set -e
 
+[ -n "$WEAVE_DEBUG" ] && set -x
+
 modprobe_safe() {
     modprobe $1 || echo "Ignore the error if \"$1\" is built-in in the kernel" >&2
 }

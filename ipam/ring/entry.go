@@ -6,8 +6,8 @@ import (
 
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/net/address"
 )
 
 // Entry represents entries around the ring
@@ -74,8 +74,9 @@ func (es entries) get(token address.Address) (*entry, bool) {
 // Is token between entries at i and j?
 // NB i and j can overflow and will wrap
 // NBB this function does not work very well if there is only one
-//     token on the ring; luckily an accurate answer is not needed
-//     by the call sites in this case.
+//
+//	token on the ring; luckily an accurate answer is not needed
+//	by the call sites in this case.
 func (es entries) between(token address.Address, i, j int) bool {
 	common.Assert(i < j)
 

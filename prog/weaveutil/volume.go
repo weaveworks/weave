@@ -15,7 +15,7 @@ func createVolumeContainer(args []string) error {
 	label := args[2]
 	bindMounts := args[3:]
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	c, err := newVersionedDockerClientFromEnv(defaulDockerAPIVersion)
 	if err != nil {
 		return fmt.Errorf("unable to connect to docker: %s", err)
 	}

@@ -6,10 +6,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/nameserver"
-	"github.com/weaveworks/weave/net/address"
-	weave "github.com/weaveworks/weave/router"
+	"github.com/rajch/weave/ipam"
+	"github.com/rajch/weave/nameserver"
+	"github.com/rajch/weave/net/address"
+	weave "github.com/rajch/weave/router"
 )
 
 func metricsHandler(router *weave.NetworkRouter, allocator *ipam.Allocator, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) http.Handler {

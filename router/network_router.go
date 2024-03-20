@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/db"
-	weavenet "github.com/weaveworks/weave/net"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/db"
+	weavenet "github.com/rajch/weave/net"
 )
 
 const (
