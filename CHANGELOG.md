@@ -1,3 +1,9 @@
+## Release 2.8.4
+
+The alpine base image used by `weave-kube` and `weave-npc` was upgraded to version 3.19.1 in the previous release. In this version, the default iptables backend is nftables, and the legacy backend is not included. Our scripts and programs assume legacy as the default backend, and change to nft if autodetected, or if we ask for it. So, the build Dockerfile (reweave/build/Dockerfile) was changed to also install the Alpine `iptables-legacy` package , and change the `iptables-{save,restore}` symbolic links to point to the legacy backend by default.
+
+The `weave-kube` and `weave-npc` images can now log traces if the environment WEAVE_DEBUG is set in the manifest.
+
 ## Release 2.8.3
 
 The docker API client version, used by the proxy package and the weaveutil command, was bumped from 1.18 to 1.24. As of March 2024, Docker API versions below 1.24 are deprecated. This means that the minimum supported Docker version is now 1.12.0.

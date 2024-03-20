@@ -2,7 +2,15 @@
 
 All changes made to the weave net codebase during the reweave effort will be documented in this file.
 
-## latest
+## 2.8.4
+
+### Changed
+
+* Changed version in `reweave/Makefile` to 2.8.4
+* Modified reweave and main CHANGELOG.md
+* Modified README.md
+
+## 2.8.4-beta3 (8c148120)
 
 ### Changed
 
@@ -22,8 +30,8 @@ All changes made to the weave net codebase during the reweave effort will be doc
 ## 2.8.4-beta1 (bcab10a4)
 
 ### Changed
-* Added tracing The `launch.sh` and `init.sh` scripts if the WEAVE_DEBUG environment variable is set.
-* When publishing images, the `:latest` tag is also applied. It will not be applied any more if the tag includes "-beta" anywhere.
+* Added tracing to `launch.sh` and `init.sh` scripts if the WEAVE_DEBUG environment variable is set.
+* When publishing images, the `:latest` tag is also applied. It will not be applied any more if the published tag includes "-beta" anywhere.
 
 ### Fixed
 

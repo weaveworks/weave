@@ -1,4 +1,4 @@
-IMAGE_VERSION ?= 2.8.4-beta3
+IMAGE_VERSION ?= 2.8.4
 REGISTRY_USER ?= rajchaudhuri
 
 ALPINE_BASEIMAGE ?= alpine:3.19.1
