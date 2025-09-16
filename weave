@@ -3,16 +3,20 @@ set -e
 
 [ -n "$WEAVE_DEBUG" ] && set -x
 
+# There is no longer a checkpoint service
+export CHECKPOINT_DISABLE=1
+
+# Release Version
 SCRIPT_VERSION="unreleased"
 IMAGE_VERSION=latest
 [ "$SCRIPT_VERSION" = "unreleased" ] || IMAGE_VERSION=$SCRIPT_VERSION
 IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
 # Minimum tested version of Docker + Weave Net
-MIN_DOCKER_VERSION=1.10.0
+MIN_DOCKER_VERSION=1.12.0
 
 # These are needed for remote execs, hence we introduce them here
-DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
+DOCKERHUB_USER=${DOCKERHUB_USER:-rajchaudhuri}
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 WEAVEDB_IMAGE=$DOCKERHUB_USER/weavedb:latest
@@ -21,6 +25,12 @@ IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
 PROXY_HOST=${PROXY_HOST:-127.0.0.1}
 DOCKER_CLIENT_HOST=${DOCKER_CLIENT_HOST:-$DOCKER_HOST}
+
+# From weave 2.9.0 onwards, the weave image sets up
+# the iptables-nft backend as default. To use the
+# iptables-legacy backend, the environment variable
+# IPTABLES_BACKEND needs to be set to "legacy"
+IPTABLES_BACKEND=${IPTABLES_BACKEND:-nft}
 
 # Define some regular expressions for matching addresses.
 # The regexp here is far from precise, but good enough.
@@ -95,8 +105,8 @@ where <peer>     = <ip_address_or_fqdn>[:<port>]
       <peer_id>  = <nickname> | <weave internal peer ID>
       <mode>     = consensus[=<count>] | seed=<mac>,... | observer
 
-To troubleshoot and visualize Weave networks, try Weave Cloud: http://www.weave.works/product/cloud/
 EOF
+# To troubleshoot and visualize Weave networks, try Weave : http://www.weave.works/product/cloud/
 }
 
 usage() {
@@ -155,6 +165,9 @@ exec_remote() {
         -e COVERAGE \
         -e CHECKPOINT_DISABLE \
         -e AWSVPC   \
+        -e DOCKER_API_VERSION \
+        -e IPTABLES_BACKEND \
+        -t \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -316,7 +329,17 @@ run_iptables() {
         CHECKED_IPTABLES_W=1
     fi
 
-    iptables $IPTABLES_W "$@"
+    # From weave 2.9.0 onwards, the weave image sets up
+    # the iptables-nft backend as default. To use the
+    # iptables-legacy backend, the environment variable
+    # IPTABLES_BACKEND needs to be set to "legacy"
+    if [ "$IPTABLES_BACKEND" = "legacy" ];then
+        iptables-legacy "$IPTABLES_W" "$@"
+    else
+        iptables "$IPTABLES_W" "$@"
+    fi
+
+    
 }
 
 # Insert a rule in iptables, if it doesn't exist already
@@ -366,6 +389,7 @@ util_op() {
         weaveutil "$@"
     else
         docker run --rm --pid host $(docker_run_options) \
+            -e IPTABLES_BACKEND \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
@@ -732,8 +756,9 @@ upgrade_cni_plugin() {
 create_cni_config() {
     cat >"$1" <<EOF
 {
-    "cniVersion": "0.3.0",
+    "cniVersion": "1.0.0",
     "name": "weave",
+    "disableCheck": true,
     "plugins": [
         {
             "name": "weave",
@@ -1216,6 +1241,7 @@ launch() {
         -e WEAVE_PASSWORD \
         -e EXEC_IMAGE=$EXEC_IMAGE \
         -e CHECKPOINT_DISABLE \
+        -e IPTABLES_BACKEND \
         $WEAVE_DOCKER_ARGS \
         $IMAGE \
         $COVERAGE_ARGS \

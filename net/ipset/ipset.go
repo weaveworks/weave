@@ -53,7 +53,7 @@ type ipset struct {
 	// List of users per ipset entry. User is either a namespace or a pod.
 	// There might be multiple users for the same ipset & entry pair because
 	// events from k8s API server might be out of order causing duplicate IPs:
-	// https://github.com/weaveworks/weave/issues/2792.
+	// https://github.com/rajch/weave/issues/2792.
 	users map[entryKey]map[UID]struct{}
 }
 

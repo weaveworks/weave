@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
 
-	weavetracker "github.com/weaveworks/weave/testing/kubernetes/testing"
+	weavetracker "github.com/rajch/weave/testing/kubernetes/testing"
 )
 
 var scheme = runtime.NewScheme()

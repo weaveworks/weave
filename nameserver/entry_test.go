@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/net/address"
+	"github.com/rajch/weave/net/address"
 )
 
 func l(es Entries) Entries {

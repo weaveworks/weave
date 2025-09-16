@@ -2,35 +2,18 @@ package client // import "github.com/docker/docker/client"
 
 import (
 	"bufio"
-	"crypto/tls"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/go-connections/sockets"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
-
-// tlsClientCon holds tls information and a dialed connection.
-type tlsClientCon struct {
-	*tls.Conn
-	rawConn net.Conn
-}
-
-func (c *tlsClientCon) CloseWrite() error {
-	// Go standard tls.Conn doesn't provide the CloseWrite() method so we do it
-	// on its underlying connection.
-	if conn, ok := c.rawConn.(types.CloseWriter); ok {
-		return conn.CloseWrite()
-	}
-	return nil
-}
 
 // postHijacked sends a POST request and hijacks the connection.
 func (cli *Client) postHijacked(ctx context.Context, path string, query url.Values, body interface{}, headers map[string][]string) (types.HijackedResponse, error) {
@@ -38,128 +21,45 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	if err != nil {
 		return types.HijackedResponse{}, err
 	}
-
-	apiPath := cli.getAPIPath(path, query)
-	req, err := http.NewRequest("POST", apiPath, bodyEncoded)
+	req, err := cli.buildRequest(ctx, http.MethodPost, cli.getAPIPath(ctx, path, query), bodyEncoded, headers)
 	if err != nil {
 		return types.HijackedResponse{}, err
 	}
-	req = cli.addHeaders(req, headers)
-
-	conn, err := cli.setupHijackConn(req, "tcp")
+	conn, mediaType, err := cli.setupHijackConn(req, "tcp")
 	if err != nil {
 		return types.HijackedResponse{}, err
 	}
 
-	return types.HijackedResponse{Conn: conn, Reader: bufio.NewReader(conn)}, err
+	return types.NewHijackedResponse(conn, mediaType), err
 }
 
-func tlsDial(network, addr string, config *tls.Config) (net.Conn, error) {
-	return tlsDialWithDialer(new(net.Dialer), network, addr, config)
-}
-
-// We need to copy Go's implementation of tls.Dial (pkg/cryptor/tls/tls.go) in
-// order to return our custom tlsClientCon struct which holds both the tls.Conn
-// object _and_ its underlying raw connection. The rationale for this is that
-// we need to be able to close the write end of the connection when attaching,
-// which tls.Conn does not provide.
-func tlsDialWithDialer(dialer *net.Dialer, network, addr string, config *tls.Config) (net.Conn, error) {
-	// We want the Timeout and Deadline values from dialer to cover the
-	// whole process: TCP connection and TLS handshake. This means that we
-	// also need to start our own timers now.
-	timeout := dialer.Timeout
-
-	if !dialer.Deadline.IsZero() {
-		deadlineTimeout := time.Until(dialer.Deadline)
-		if timeout == 0 || deadlineTimeout < timeout {
-			timeout = deadlineTimeout
-		}
-	}
-
-	var errChannel chan error
-
-	if timeout != 0 {
-		errChannel = make(chan error, 2)
-		time.AfterFunc(timeout, func() {
-			errChannel <- errors.New("")
-		})
-	}
-
-	proxyDialer, err := sockets.DialerFromEnvironment(dialer)
+// DialHijack returns a hijacked connection with negotiated protocol proto.
+func (cli *Client) DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	req = cli.addHeaders(req, meta)
 
-	rawConn, err := proxyDialer.Dial(network, addr)
-	if err != nil {
-		return nil, err
-	}
-	// When we set up a TCP connection for hijack, there could be long periods
-	// of inactivity (a long running command with no output) that in certain
-	// network setups may cause ECONNTIMEOUT, leaving the client in an unknown
-	// state. Setting TCP KeepAlive on the socket connection will prohibit
-	// ECONNTIMEOUT unless the socket connection truly is broken
-	if tcpConn, ok := rawConn.(*net.TCPConn); ok {
-		tcpConn.SetKeepAlive(true)
-		tcpConn.SetKeepAlivePeriod(30 * time.Second)
-	}
-
-	colonPos := strings.LastIndex(addr, ":")
-	if colonPos == -1 {
-		colonPos = len(addr)
-	}
-	hostname := addr[:colonPos]
-
-	// If no ServerName is set, infer the ServerName
-	// from the hostname we're connecting to.
-	if config.ServerName == "" {
-		// Make a copy to avoid polluting argument or default.
-		config = tlsConfigClone(config)
-		config.ServerName = hostname
-	}
-
-	conn := tls.Client(rawConn, config)
-
-	if timeout == 0 {
-		err = conn.Handshake()
-	} else {
-		go func() {
-			errChannel <- conn.Handshake()
-		}()
-
-		err = <-errChannel
-	}
-
-	if err != nil {
-		rawConn.Close()
-		return nil, err
-	}
-
-	// This is Docker difference with standard's crypto/tls package: returned a
-	// wrapper which holds both the TLS and raw connections.
-	return &tlsClientCon{conn, rawConn}, nil
+	conn, _, err := cli.setupHijackConn(req, proto)
+	return conn, err
 }
 
-func dial(proto, addr string, tlsConfig *tls.Config) (net.Conn, error) {
-	if tlsConfig != nil && proto != "unix" && proto != "npipe" {
-		// Notice this isn't Go standard's tls.Dial function
-		return tlsDial(proto, addr, tlsConfig)
-	}
-	if proto == "npipe" {
-		return sockets.DialPipe(addr, 32*time.Second)
-	}
-	return net.Dial(proto, addr)
-}
-
-func (cli *Client) setupHijackConn(req *http.Request, proto string) (net.Conn, error) {
-	req.Host = cli.addr
+func (cli *Client) setupHijackConn(req *http.Request, proto string) (_ net.Conn, _ string, retErr error) {
+	ctx := req.Context()
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", proto)
 
-	conn, err := dial(cli.proto, cli.addr, resolveTLSConfig(cli.client.Transport))
+	dialer := cli.Dialer()
+	conn, err := dialer(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot connect to the Docker daemon. Is 'docker daemon' running on this host?")
+		return nil, "", errors.Wrap(err, "cannot connect to the Docker daemon. Is 'docker daemon' running on this host?")
 	}
+	defer func() {
+		if retErr != nil {
+			conn.Close()
+		}
+	}()
 
 	// When we set up a TCP connection for hijack, there could be long periods
 	// of inactivity (a long running command with no output) that in certain
@@ -167,40 +67,42 @@ func (cli *Client) setupHijackConn(req *http.Request, proto string) (net.Conn, e
 	// state. Setting TCP KeepAlive on the socket connection will prohibit
 	// ECONNTIMEOUT unless the socket connection truly is broken
 	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		tcpConn.SetKeepAlive(true)
-		tcpConn.SetKeepAlivePeriod(30 * time.Second)
+		_ = tcpConn.SetKeepAlive(true)
+		_ = tcpConn.SetKeepAlivePeriod(30 * time.Second)
 	}
 
-	clientconn := httputil.NewClientConn(conn, nil)
-	defer clientconn.Close()
+	hc := &hijackedConn{conn, bufio.NewReader(conn)}
 
 	// Server hijacks the connection, error 'connection closed' expected
-	resp, err := clientconn.Do(req)
-	if err != httputil.ErrPersistEOF {
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode != http.StatusSwitchingProtocols {
-			resp.Body.Close()
-			return nil, fmt.Errorf("unable to upgrade to %s, received %d", proto, resp.StatusCode)
-		}
+	resp, err := otelhttp.NewTransport(hc).RoundTrip(req)
+	if err != nil {
+		return nil, "", err
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		_ = resp.Body.Close()
+		return nil, "", fmt.Errorf("unable to upgrade to %s, received %d", proto, resp.StatusCode)
 	}
 
-	c, br := clientconn.Hijack()
-	if br.Buffered() > 0 {
+	if hc.r.Buffered() > 0 {
 		// If there is buffered content, wrap the connection.  We return an
-		// object that implements CloseWrite iff the underlying connection
+		// object that implements CloseWrite if the underlying connection
 		// implements it.
-		if _, ok := c.(types.CloseWriter); ok {
-			c = &hijackedConnCloseWriter{&hijackedConn{c, br}}
+		if _, ok := hc.Conn.(types.CloseWriter); ok {
+			conn = &hijackedConnCloseWriter{hc}
 		} else {
-			c = &hijackedConn{c, br}
+			conn = hc
 		}
 	} else {
-		br.Reset(nil)
+		hc.r.Reset(nil)
 	}
 
-	return c, nil
+	var mediaType string
+	if versions.GreaterThanOrEqualTo(cli.ClientVersion(), "1.42") {
+		// Prior to 1.42, Content-Type is always set to raw-stream and not relevant
+		mediaType = resp.Header.Get("Content-Type")
+	}
+
+	return conn, mediaType, nil
 }
 
 // hijackedConn wraps a net.Conn and is returned by setupHijackConn in the case
@@ -210,6 +112,13 @@ func (cli *Client) setupHijackConn(req *http.Request, proto string) (net.Conn, e
 type hijackedConn struct {
 	net.Conn
 	r *bufio.Reader
+}
+
+func (c *hijackedConn) RoundTrip(req *http.Request) (*http.Response, error) {
+	if err := req.Write(c.Conn); err != nil {
+		return nil, err
+	}
+	return http.ReadResponse(c.r, req)
 }
 
 func (c *hijackedConn) Read(b []byte) (int, error) {

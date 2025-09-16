@@ -1,13 +1,14 @@
 package npc
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegressionHandleNil3095(t *testing.T) {
 	// Test for handling nil values
-	// https://github.com/weaveworks/weave/issues/3095
+	// https://github.com/rajch/weave/issues/3095
 
 	rs := newRuleSpec(policyTypeIngress, nil, nil, nil, nil)
 

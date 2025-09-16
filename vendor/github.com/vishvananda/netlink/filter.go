@@ -2,6 +2,7 @@ package netlink
 
 import (
 	"fmt"
+	"net"
 )
 
 type Filter interface {
@@ -135,6 +136,60 @@ func (action *BpfAction) Attrs() *ActionAttrs {
 	return &action.ActionAttrs
 }
 
+type ConnmarkAction struct {
+	ActionAttrs
+	Zone uint16
+}
+
+func (action *ConnmarkAction) Type() string {
+	return "connmark"
+}
+
+func (action *ConnmarkAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewConnmarkAction() *ConnmarkAction {
+	return &ConnmarkAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
+type CsumUpdateFlags uint32
+
+const (
+	TCA_CSUM_UPDATE_FLAG_IPV4HDR CsumUpdateFlags = 1
+	TCA_CSUM_UPDATE_FLAG_ICMP    CsumUpdateFlags = 2
+	TCA_CSUM_UPDATE_FLAG_IGMP    CsumUpdateFlags = 4
+	TCA_CSUM_UPDATE_FLAG_TCP     CsumUpdateFlags = 8
+	TCA_CSUM_UPDATE_FLAG_UDP     CsumUpdateFlags = 16
+	TCA_CSUM_UPDATE_FLAG_UDPLITE CsumUpdateFlags = 32
+	TCA_CSUM_UPDATE_FLAG_SCTP    CsumUpdateFlags = 64
+)
+
+type CsumAction struct {
+	ActionAttrs
+	UpdateFlags CsumUpdateFlags
+}
+
+func (action *CsumAction) Type() string {
+	return "csum"
+}
+
+func (action *CsumAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewCsumAction() *CsumAction {
+	return &CsumAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 type MirredAct uint8
 
 func (a MirredAct) String() string {
@@ -182,47 +237,94 @@ func NewMirredAction(redirIndex int) *MirredAction {
 	}
 }
 
-// Sel of the U32 filters that contains multiple TcU32Key. This is the copy
-// and the frontend representation of nl.TcU32Sel. It is serialized into canonical
-// nl.TcU32Sel with the appropriate endianness.
-type TcU32Sel struct {
-	Flags    uint8
-	Offshift uint8
-	Nkeys    uint8
-	Pad      uint8
-	Offmask  uint16
-	Off      uint16
-	Offoff   int16
-	Hoff     int16
-	Hmask    uint32
-	Keys     []TcU32Key
+type TunnelKeyAct int8
+
+const (
+	TCA_TUNNEL_KEY_SET   TunnelKeyAct = 1 // set tunnel key
+	TCA_TUNNEL_KEY_UNSET TunnelKeyAct = 2 // unset tunnel key
+)
+
+type TunnelKeyAction struct {
+	ActionAttrs
+	Action   TunnelKeyAct
+	SrcAddr  net.IP
+	DstAddr  net.IP
+	KeyID    uint32
+	DestPort uint16
 }
 
-// TcU32Key contained of Sel in the U32 filters. This is the copy and the frontend
-// representation of nl.TcU32Key. It is serialized into chanonical nl.TcU32Sel
-// with the appropriate endianness.
-type TcU32Key struct {
-	Mask    uint32
-	Val     uint32
-	Off     int32
-	OffMask int32
+func (action *TunnelKeyAction) Type() string {
+	return "tunnel_key"
 }
 
-// U32 filters on many packet related properties
-type U32 struct {
-	FilterAttrs
-	ClassId    uint32
-	RedirIndex int
-	Sel        *TcU32Sel
-	Actions    []Action
+func (action *TunnelKeyAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
 }
 
-func (filter *U32) Attrs() *FilterAttrs {
-	return &filter.FilterAttrs
+func NewTunnelKeyAction() *TunnelKeyAction {
+	return &TunnelKeyAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
 }
 
-func (filter *U32) Type() string {
-	return "u32"
+type SkbEditAction struct {
+	ActionAttrs
+	QueueMapping *uint16
+	PType        *uint16
+	Priority     *uint32
+	Mark         *uint32
+}
+
+func (action *SkbEditAction) Type() string {
+	return "skbedit"
+}
+
+func (action *SkbEditAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewSkbEditAction() *SkbEditAction {
+	return &SkbEditAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
+type PoliceAction struct {
+	ActionAttrs
+	Rate            uint32 // in byte per second
+	Burst           uint32 // in byte
+	RCellLog        int
+	Mtu             uint32
+	Mpu             uint16 // in byte
+	PeakRate        uint32 // in byte per second
+	PCellLog        int
+	AvRate          uint32 // in byte per second
+	Overhead        uint16
+	LinkLayer       int
+	ExceedAction    TcPolAct
+	NotExceedAction TcPolAct
+}
+
+func (action *PoliceAction) Type() string {
+	return "police"
+}
+
+func (action *PoliceAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewPoliceAction() *PoliceAction {
+	return &PoliceAction{
+		RCellLog:        -1,
+		PCellLog:        -1,
+		LinkLayer:       1, // ETHERNET
+		ExceedAction:    TC_POLICE_RECLASSIFY,
+		NotExceedAction: TC_POLICE_OK,
+	}
 }
 
 // MatchAll filters match all packets
@@ -240,20 +342,20 @@ func (filter *MatchAll) Type() string {
 	return "matchall"
 }
 
-type FilterFwAttrs struct {
-	ClassId   uint32
-	InDev     string
-	Mask      uint32
-	Index     uint32
-	Buffer    uint32
-	Mtu       uint32
-	Mpu       uint16
-	Rate      uint32
-	AvRate    uint32
-	PeakRate  uint32
-	Action    TcPolAct
-	Overhead  uint16
-	LinkLayer int
+type FwFilter struct {
+	FilterAttrs
+	ClassId uint32
+	InDev   string
+	Mask    uint32
+	Police  *PoliceAction
+}
+
+func (filter *FwFilter) Attrs() *FilterAttrs {
+	return &filter.FilterAttrs
+}
+
+func (filter *FwFilter) Type() string {
+	return "fw"
 }
 
 type BpfFilter struct {
@@ -262,6 +364,8 @@ type BpfFilter struct {
 	Fd           int
 	Name         string
 	DirectAction bool
+	Id           int
+	Tag          string
 }
 
 func (filter *BpfFilter) Type() string {

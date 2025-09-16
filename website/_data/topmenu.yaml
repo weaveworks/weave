@@ -1,0 +1,15 @@
+menuitems:
+  - title: Home
+    url: /
+  - title: Overview
+    url: /overview
+  - title: Concepts
+    url: /concepts
+  - title: Install
+    url: /install
+  - title: Kubernetes
+    url: /kubernetes
+  - title: Operational Guide
+    url: /operational-guide
+  - title: Tasks
+    url: /tasks

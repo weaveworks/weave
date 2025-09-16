@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/rajch/weave/common/chains"
+	"github.com/rajch/weave/net/ipset"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/common/chains"
-	"github.com/weaveworks/weave/net/ipset"
 	coreapi "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,7 +156,7 @@ func (ipt *mockIPTables) Insert(table, chain string, pos int, rulespec ...string
 
 func TestRegressionPolicyNamespaceOrdering3059(t *testing.T) {
 	// Test for race condition between namespace and networkpolicy events
-	// https://github.com/weaveworks/weave/issues/3059
+	// https://github.com/rajch/weave/issues/3059
 
 	sourceNamespace := &coreapi.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -456,7 +456,7 @@ func TestOutOfOrderPodEvents(t *testing.T) {
 	require.False(t, m.entriesExist(runBarIPSetName, podIP))
 }
 
-// Test case for https://github.com/weaveworks/weave/issues/3222
+// Test case for https://github.com/rajch/weave/issues/3222
 func TestNewTargetSelector(t *testing.T) {
 	const (
 		ingressDefaultAllowIPSetName = "weave-;rGqyMIl1HN^cfDki~Z$3]6!N"
@@ -633,7 +633,7 @@ func TestEgressPolicyWithIPBlock(t *testing.T) {
 	require.Equal(t, 2, len(m.sets[exceptIPSetNameInNonDefault].subSets))
 }
 
-// Test case for https://github.com/weaveworks/weave/issues/3653
+// Test case for https://github.com/rajch/weave/issues/3653
 func TestIngressPolicyWithIPBlockAndPortSpecified(t *testing.T) {
 	const (
 		barPodIP        = "10.32.0.11"

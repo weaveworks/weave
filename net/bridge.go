@@ -12,11 +12,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/chains"
-	"github.com/weaveworks/weave/common/odp"
-	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/net/ipset"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/common/chains"
+	"github.com/rajch/weave/common/odp"
+	"github.com/rajch/weave/net/address"
+	"github.com/rajch/weave/net/ipset"
 )
 
 /* This code implements three possible configurations to connect
@@ -48,7 +48,7 @@ the "datapath" device, via "router/fastdp.go:fastDatapathBridge"
 
 "weave" is an Open vSwitch datapath, and capture/injection are as in
 BridgedFastdp. Not used by default due to missing conntrack support in
-datapath of old kernel versions (https://github.com/weaveworks/weave/issues/1577).
+datapath of old kernel versions (https://github.com/rajch/weave/issues/1577).
 */
 
 const (

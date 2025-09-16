@@ -3,9 +3,9 @@ package archive // import "github.com/docker/docker/pkg/archive"
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/log"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/pools"
 	"github.com/docker/docker/pkg/system"
-	"github.com/sirupsen/logrus"
 )
 
 // ChangeType represents the change type.
@@ -63,12 +63,16 @@ func (c changesByPath) Less(i, j int) bool { return c[i].Path < c[j].Path }
 func (c changesByPath) Len() int           { return len(c) }
 func (c changesByPath) Swap(i, j int)      { c[j], c[i] = c[i], c[j] }
 
-// Gnu tar and the go tar writer don't have sub-second mtime
-// precision, which is problematic when we apply changes via tar
-// files, we handle this by comparing for exact times, *or* same
+// Gnu tar doesn't have sub-second mtime precision. The go tar
+// writer (1.10+) does when using PAX format, but we round times to seconds
+// to ensure archives have the same hashes for backwards compatibility.
+// See https://github.com/moby/moby/pull/35739/commits/fb170206ba12752214630b269a40ac7be6115ed4.
+//
+// Non-sub-second is problematic when we apply changes via tar
+// files. We handle this by comparing for exact times, *or* same
 // second count and either a or b having exactly 0 nanoseconds
 func sameFsTime(a, b time.Time) bool {
-	return a == b ||
+	return a.Equal(b) ||
 		(a.Unix() == b.Unix() &&
 			(a.Nanosecond() == 0 || b.Nanosecond() == 0))
 }
@@ -104,8 +108,10 @@ func aufsDeletedFile(root, path string, fi os.FileInfo) (string, error) {
 	return "", nil
 }
 
-type skipChange func(string) (bool, error)
-type deleteChange func(string, string, os.FileInfo) (string, error)
+type (
+	skipChange   func(string) (bool, error)
+	deleteChange func(string, string, os.FileInfo) (string, error)
+)
 
 func changes(layers []string, rw string, dc deleteChange, sc skipChange) ([]Change, error) {
 	var (
@@ -243,7 +249,6 @@ func (info *FileInfo) path() string {
 }
 
 func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
-
 	sizeAtEntry := len(*changes)
 
 	if oldInfo == nil {
@@ -316,7 +321,6 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 		copy((*changes)[sizeAtEntry+1:], (*changes)[sizeAtEntry:])
 		(*changes)[sizeAtEntry] = change
 	}
-
 }
 
 // Changes add changes to file information.
@@ -340,11 +344,9 @@ func newRootFileInfo() *FileInfo {
 // ChangesDirs compares two directories and generates an array of Change objects describing the changes.
 // If oldDir is "", then all files in newDir will be Add-Changes.
 func ChangesDirs(newDir, oldDir string) ([]Change, error) {
-	var (
-		oldRoot, newRoot *FileInfo
-	)
+	var oldRoot, newRoot *FileInfo
 	if oldDir == "" {
-		emptyDir, err := ioutil.TempDir("", "empty")
+		emptyDir, err := os.MkdirTemp("", "empty")
 		if err != nil {
 			return nil, err
 		}
@@ -370,7 +372,7 @@ func ChangesSize(newDir string, changes []Change) int64 {
 			file := filepath.Join(newDir, change.Path)
 			fileInfo, err := os.Lstat(file)
 			if err != nil {
-				logrus.Errorf("Can not stat %q: %s", file, err)
+				log.G(context.TODO()).Errorf("Can not stat %q: %s", file, err)
 				continue
 			}
 
@@ -391,10 +393,10 @@ func ChangesSize(newDir string, changes []Change) int64 {
 }
 
 // ExportChanges produces an Archive from the provided changes, relative to dir.
-func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMap) (io.ReadCloser, error) {
+func ExportChanges(dir string, changes []Change, idMap idtools.IdentityMapping) (io.ReadCloser, error) {
 	reader, writer := io.Pipe()
 	go func() {
-		ta := newTarAppender(idtools.NewIDMappingsFromMaps(uidMaps, gidMaps), writer, nil)
+		ta := newTarAppender(idMap, writer, nil)
 
 		// this buffer is needed for the duration of this piped stream
 		defer pools.BufioWriter32KPool.Put(ta.Buffer)
@@ -419,22 +421,22 @@ func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMa
 					ChangeTime: timestamp,
 				}
 				if err := ta.TarWriter.WriteHeader(hdr); err != nil {
-					logrus.Debugf("Can't write whiteout header: %s", err)
+					log.G(context.TODO()).Debugf("Can't write whiteout header: %s", err)
 				}
 			} else {
 				path := filepath.Join(dir, change.Path)
 				if err := ta.addTarFile(path, change.Path[1:]); err != nil {
-					logrus.Debugf("Can't add file %s to tar: %s", path, err)
+					log.G(context.TODO()).Debugf("Can't add file %s to tar: %s", path, err)
 				}
 			}
 		}
 
 		// Make sure to check the error on Close.
 		if err := ta.TarWriter.Close(); err != nil {
-			logrus.Debugf("Can't close layer: %s", err)
+			log.G(context.TODO()).Debugf("Can't close layer: %s", err)
 		}
 		if err := writer.Close(); err != nil {
-			logrus.Debugf("failed close Changes writer: %s", err)
+			log.G(context.TODO()).Debugf("failed close Changes writer: %s", err)
 		}
 	}()
 	return reader, nil

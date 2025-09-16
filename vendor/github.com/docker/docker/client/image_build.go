@@ -1,6 +1,7 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -9,34 +10,26 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/context"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 )
 
-// ImageBuild sends request to the daemon to build images.
-// The Body in the response implement an io.ReadCloser and it's up to the caller to
+// ImageBuild sends a request to the daemon to build images.
+// The Body in the response implements an io.ReadCloser and it's up to the caller to
 // close it.
 func (cli *Client) ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error) {
-	query, err := cli.imageBuildOptionsToQuery(options)
+	query, err := cli.imageBuildOptionsToQuery(ctx, options)
 	if err != nil {
 		return types.ImageBuildResponse{}, err
 	}
 
-	headers := http.Header(make(map[string][]string))
 	buf, err := json.Marshal(options.AuthConfigs)
 	if err != nil {
 		return types.ImageBuildResponse{}, err
 	}
-	headers.Add("X-Registry-Config", base64.URLEncoding.EncodeToString(buf))
 
-	if options.Platform != "" {
-		if err := cli.NewVersionError("1.32", "platform"); err != nil {
-			return types.ImageBuildResponse{}, err
-		}
-		query.Set("platform", options.Platform)
-	}
+	headers := http.Header{}
+	headers.Add("X-Registry-Config", base64.URLEncoding.EncodeToString(buf))
 	headers.Set("Content-Type", "application/x-tar")
 
 	serverResp, err := cli.postRaw(ctx, "/build", query, buildContext, headers)
@@ -44,15 +37,13 @@ func (cli *Client) ImageBuild(ctx context.Context, buildContext io.Reader, optio
 		return types.ImageBuildResponse{}, err
 	}
 
-	osType := getDockerOS(serverResp.header.Get("Server"))
-
 	return types.ImageBuildResponse{
 		Body:   serverResp.body,
-		OSType: osType,
+		OSType: getDockerOS(serverResp.header.Get("Server")),
 	}, nil
 }
 
-func (cli *Client) imageBuildOptionsToQuery(options types.ImageBuildOptions) (url.Values, error) {
+func (cli *Client) imageBuildOptionsToQuery(ctx context.Context, options types.ImageBuildOptions) (url.Values, error) {
 	query := url.Values{
 		"t":           options.Tags,
 		"securityopt": options.SecurityOpt,
@@ -82,7 +73,7 @@ func (cli *Client) imageBuildOptionsToQuery(options types.ImageBuildOptions) (ur
 	}
 
 	if options.Squash {
-		if err := cli.NewVersionError("1.25", "squash"); err != nil {
+		if err := cli.NewVersionError(ctx, "1.25", "squash"); err != nil {
 			return query, err
 		}
 		query.Set("squash", "1")
@@ -132,7 +123,22 @@ func (cli *Client) imageBuildOptionsToQuery(options types.ImageBuildOptions) (ur
 		query.Set("session", options.SessionID)
 	}
 	if options.Platform != "" {
+		if err := cli.NewVersionError(ctx, "1.32", "platform"); err != nil {
+			return query, err
+		}
 		query.Set("platform", strings.ToLower(options.Platform))
+	}
+	if options.BuildID != "" {
+		query.Set("buildid", options.BuildID)
+	}
+	query.Set("version", string(options.Version))
+
+	if options.Outputs != nil {
+		outputsJSON, err := json.Marshal(options.Outputs)
+		if err != nil {
+			return query, err
+		}
+		query.Set("outputs", string(outputsJSON))
 	}
 	return query, nil
 }

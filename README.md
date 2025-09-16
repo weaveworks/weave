@@ -1,37 +1,36 @@
-# Weave Net - Weaving Containers into Applications
-
-[![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield)](https://circleci.com/gh/weaveworks/weave)
-[![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
-[![Go Report Card](https://goreportcard.com/badge/github.com/weaveworks/weave)](https://goreportcard.com/report/github.com/weaveworks/weave)
-[![Docker Pulls](https://img.shields.io/docker/pulls/weaveworks/weave.svg?maxAge=604800)](https://hub.docker.com/r/weaveworks/weave/)
-
-# About Weaveworks
-
-[Weaveworks](https://www.weave.works) is the company that delivers the most productive way for developers to connect, observe and control Docker containers.
-
-This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, with over 8 million downloads to date. Weave Net enables you to get started with Docker clusters and portable apps in a fraction of the time required by other solutions.
-
 # Weave Net
 
-Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, ambassadors or links.
+This repository contains a fork of Weave Net, the first product developed by Weaveworks. Since Weaveworks has shut down, this repo aims to continue maintaining Weave Net, and to publish releases regularly.
 
-Services provided by application containers on the Weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
+[![Go Report Card](https://goreportcard.com/badge/github.com/rajch/weave)](https://goreportcard.com/report/github.com/rajch/weave)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rajchaudhuri/weave-kube "Number of times the weave-kube image was pulled from the Docker Hub")](https://hub.docker.com/r/rajchaudhuri/weave-kube)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/rajch/weave?include_prereleases)](https://github.com/rajch/weave/releases)
+[![Unique CVE count in all images](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frajch%2Fweave%2Fmaster%2Freweave%2Fscans%2Fbadge.json&label=CVE%20count "The number of unique CVEs reported by scanning all images")](reweave/scans/report.md)
 
-## <a name="help"></a>Getting help
+The history of the fork can be found in [HISTORY.md](HISTORY.md).
 
-If you have any questions about, feedback for or a problem with Weave Net:
+## Using Weave Net on Kubernetes
 
-- Read [the Weave Net docs](https://www.weave.works/docs/net/latest/overview).
-- Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-  - The channel for contributors and developers of Weave Net is [#net-dev](https://weave-community.slack.com/messages/net-dev/).
-- Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area.
-- [File an issue](https://github.com/weaveworks/weave/issues/new).
+On a newly created Kubernetes cluster, the Weave Net CNI pluging can be installed by running the following command:
 
-We follow the [CNCF Code of Conduct](code-of-conduct.md).
+```
+kubectl apply -f https://reweave.azurewebsites.net/k8s/v1.29/net.yaml
+```
 
-Your feedback is always welcome!
+Replace `v1.29` with the version on Kubernetes on your cluster.
 
-## Further Information
+That endpoint is provided by the companion project [weave-endpoint](https://github.com/rajch/weave-endpoint).
 
-* [Installing Weave Net](https://www.weave.works/docs/net/latest/install/installing-weave)
-* [Weave Net Product Overview](https://www.weave.works/products/weave-net)
+## Using Weave Net in other ways
+
+Please refer to the [documentation](https://rajch.github.io/weave).
+
+## Building Weave Net
+
+Details can be found [here](reweave/BUILDING.md). 
+
+## Documentation status
+
+The public documentation that used to exist in the `site` directory has been moved to the `original/site` directory. A new `website` directory has been created, and populated with the content of the `original/site` directory, rearranged and reformatted for being built with Jekyll and published to the GitHub pages site [https://rajch.github.io/weave](https://rajch.github.io/weave).
+
+The documentation will now be maintained and published from the `website` directory exclusively.

@@ -3,15 +3,14 @@ package dns
 import (
 	"bytes"
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
-	_ "crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
-	_ "crypto/sha1"
-	_ "crypto/sha256"
-	_ "crypto/sha512"
+	_ "crypto/sha1"   // need its init function
+	_ "crypto/sha256" // need its init function
+	_ "crypto/sha512" // need its init function
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
@@ -19,8 +18,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"golang.org/x/crypto/ed25519"
 )
 
 // DNSSEC encryption algorithm codes.
@@ -67,19 +64,20 @@ var AlgorithmToString = map[uint8]string{
 	PRIVATEOID:       "PRIVATEOID",
 }
 
-// StringToAlgorithm is the reverse of AlgorithmToString.
-var StringToAlgorithm = reverseInt8(AlgorithmToString)
-
 // AlgorithmToHash is a map of algorithm crypto hash IDs to crypto.Hash's.
+// For newer algorithm that do their own hashing (i.e. ED25519) the returned value
+// is 0, implying no (external) hashing should occur. The non-exported identityHash is then
+// used.
 var AlgorithmToHash = map[uint8]crypto.Hash{
 	RSAMD5:           crypto.MD5, // Deprecated in RFC 6725
+	DSA:              crypto.SHA1,
 	RSASHA1:          crypto.SHA1,
 	RSASHA1NSEC3SHA1: crypto.SHA1,
 	RSASHA256:        crypto.SHA256,
 	ECDSAP256SHA256:  crypto.SHA256,
 	ECDSAP384SHA384:  crypto.SHA384,
 	RSASHA512:        crypto.SHA512,
-	ED25519:          crypto.Hash(0),
+	ED25519:          0,
 }
 
 // DNSSEC hashing algorithm codes.
@@ -100,9 +98,6 @@ var HashToString = map[uint8]string{
 	SHA384: "SHA384",
 	SHA512: "SHA512",
 }
-
-// StringToHash is a map of names to hash IDs.
-var StringToHash = reverseInt8(HashToString)
 
 // DNSKEY flag values.
 const (
@@ -145,12 +140,12 @@ func (k *DNSKEY) KeyTag() uint16 {
 	var keytag int
 	switch k.Algorithm {
 	case RSAMD5:
-		// Look at the bottom two bytes of the modules, which the last
-		// item in the pubkey. We could do this faster by looking directly
-		// at the base64 values. But I'm lazy.
+		// This algorithm has been deprecated, but keep this key-tag calculation.
+		// Look at the bottom two bytes of the modules, which the last item in the pubkey.
+		// See https://www.rfc-editor.org/errata/eid193 .
 		modulus, _ := fromBase64([]byte(k.PublicKey))
 		if len(modulus) > 1 {
-			x := binary.BigEndian.Uint16(modulus[len(modulus)-2:])
+			x := binary.BigEndian.Uint16(modulus[len(modulus)-3:])
 			keytag = int(x)
 		}
 	default:
@@ -172,7 +167,7 @@ func (k *DNSKEY) KeyTag() uint16 {
 				keytag += int(v) << 8
 			}
 		}
-		keytag += (keytag >> 16) & 0xFFFF
+		keytag += keytag >> 16 & 0xFFFF
 		keytag &= 0xFFFF
 	}
 	return uint16(keytag)
@@ -205,7 +200,7 @@ func (k *DNSKEY) ToDS(h uint8) *DS {
 	wire = wire[:n]
 
 	owner := make([]byte, 255)
-	off, err1 := PackDomainName(strings.ToLower(k.Hdr.Name), owner, 0, nil, false)
+	off, err1 := PackDomainName(CanonicalName(k.Hdr.Name), owner, 0, nil, false)
 	if err1 != nil {
 		return nil
 	}
@@ -239,7 +234,7 @@ func (k *DNSKEY) ToDS(h uint8) *DS {
 // ToCDNSKEY converts a DNSKEY record to a CDNSKEY record.
 func (k *DNSKEY) ToCDNSKEY() *CDNSKEY {
 	c := &CDNSKEY{DNSKEY: *k}
-	c.Hdr = *k.Hdr.copyHeader()
+	c.Hdr = k.Hdr
 	c.Hdr.Rrtype = TypeCDNSKEY
 	return c
 }
@@ -247,7 +242,7 @@ func (k *DNSKEY) ToCDNSKEY() *CDNSKEY {
 // ToCDS converts a DS record to a CDS record.
 func (d *DS) ToCDS() *CDS {
 	c := &CDS{DS: *d}
-	c.Hdr = *d.Hdr.copyHeader()
+	c.Hdr = d.Hdr
 	c.Hdr.Rrtype = TypeCDS
 	return c
 }
@@ -267,16 +262,17 @@ func (rr *RRSIG) Sign(k crypto.Signer, rrset []RR) error {
 		return ErrKey
 	}
 
+	h0 := rrset[0].Header()
 	rr.Hdr.Rrtype = TypeRRSIG
-	rr.Hdr.Name = rrset[0].Header().Name
-	rr.Hdr.Class = rrset[0].Header().Class
+	rr.Hdr.Name = h0.Name
+	rr.Hdr.Class = h0.Class
 	if rr.OrigTtl == 0 { // If set don't override
-		rr.OrigTtl = rrset[0].Header().Ttl
+		rr.OrigTtl = h0.Ttl
 	}
-	rr.TypeCovered = rrset[0].Header().Rrtype
-	rr.Labels = uint8(CountLabel(rrset[0].Header().Name))
+	rr.TypeCovered = h0.Rrtype
+	rr.Labels = uint8(CountLabel(h0.Name))
 
-	if strings.HasPrefix(rrset[0].Header().Name, "*") {
+	if strings.HasPrefix(h0.Name, "*") {
 		rr.Labels-- // wildcard, remove from label count
 	}
 
@@ -289,7 +285,7 @@ func (rr *RRSIG) Sign(k crypto.Signer, rrset []RR) error {
 	sigwire.Inception = rr.Inception
 	sigwire.KeyTag = rr.KeyTag
 	// For signing, lowercase this name
-	sigwire.SignerName = strings.ToLower(rr.SignerName)
+	sigwire.SignerName = CanonicalName(rr.SignerName)
 
 	// Create the desired binary blob
 	signdata := make([]byte, DefaultMsgSize)
@@ -303,39 +299,27 @@ func (rr *RRSIG) Sign(k crypto.Signer, rrset []RR) error {
 		return err
 	}
 
-	hash, ok := AlgorithmToHash[rr.Algorithm]
-	if !ok {
-		return ErrAlg
+	h, cryptohash, err := hashFromAlgorithm(rr.Algorithm)
+	if err != nil {
+		return err
 	}
 
 	switch rr.Algorithm {
-	case ED25519:
-		// ed25519 signs the raw message and performs hashing internally.
-		// All other supported signature schemes operate over the pre-hashed
-		// message, and thus ed25519 must be handled separately here.
-		//
-		// The raw message is passed directly into sign and crypto.Hash(0) is
-		// used to signal to the crypto.Signer that the data has not been hashed.
-		signature, err := sign(k, append(signdata, wire...), crypto.Hash(0), rr.Algorithm)
-		if err != nil {
-			return err
-		}
-
-		rr.Signature = toBase64(signature)
+	case RSAMD5, DSA, DSANSEC3SHA1:
+		// See RFC 6944.
+		return ErrAlg
 	default:
-		h := hash.New()
 		h.Write(signdata)
 		h.Write(wire)
 
-		signature, err := sign(k, h.Sum(nil), hash, rr.Algorithm)
+		signature, err := sign(k, h.Sum(nil), cryptohash, rr.Algorithm)
 		if err != nil {
 			return err
 		}
 
 		rr.Signature = toBase64(signature)
+		return nil
 	}
-
-	return nil
 }
 
 func sign(k crypto.Signer, hashed []byte, hash crypto.Hash, alg uint8) ([]byte, error) {
@@ -345,9 +329,8 @@ func sign(k crypto.Signer, hashed []byte, hash crypto.Hash, alg uint8) ([]byte, 
 	}
 
 	switch alg {
-	case RSASHA1, RSASHA1NSEC3SHA1, RSASHA256, RSASHA512:
+	case RSASHA1, RSASHA1NSEC3SHA1, RSASHA256, RSASHA512, ED25519:
 		return signature, nil
-
 	case ECDSAP256SHA256, ECDSAP384SHA384:
 		ecdsaSignature := &struct {
 			R, S *big.Int
@@ -367,25 +350,16 @@ func sign(k crypto.Signer, hashed []byte, hash crypto.Hash, alg uint8) ([]byte, 
 		signature := intToBytes(ecdsaSignature.R, intlen)
 		signature = append(signature, intToBytes(ecdsaSignature.S, intlen)...)
 		return signature, nil
-
-	// There is no defined interface for what a DSA backed crypto.Signer returns
-	case DSA, DSANSEC3SHA1:
-		// 	t := divRoundUp(divRoundUp(p.PublicKey.Y.BitLen(), 8)-64, 8)
-		// 	signature := []byte{byte(t)}
-		// 	signature = append(signature, intToBytes(r1, 20)...)
-		// 	signature = append(signature, intToBytes(s1, 20)...)
-		// 	rr.Signature = signature
-
-	case ED25519:
-		return signature, nil
+	default:
+		return nil, ErrAlg
 	}
-
-	return nil, ErrAlg
 }
 
 // Verify validates an RRSet with the signature and key. This is only the
 // cryptographic test, the signature validity period must be checked separately.
 // This function copies the rdata of some RRs (to lowercase domain names) for the validation to work.
+// It also checks that the Zone Key bit (RFC 4034 2.1.1) is set on the DNSKEY
+// and that the Protocol field is set to 3 (RFC 4034 2.1.2).
 func (rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error {
 	// First the easy checks
 	if !IsRRset(rrset) {
@@ -400,20 +374,23 @@ func (rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error {
 	if rr.Algorithm != k.Algorithm {
 		return ErrKey
 	}
-	if strings.ToLower(rr.SignerName) != strings.ToLower(k.Hdr.Name) {
+	if !strings.EqualFold(rr.SignerName, k.Hdr.Name) {
 		return ErrKey
 	}
 	if k.Protocol != 3 {
+		return ErrKey
+	}
+	// RFC 4034 2.1.1 If bit 7 has value 0, then the DNSKEY record holds some
+	// other type of DNS public key and MUST NOT be used to verify RRSIGs that
+	// cover RRsets.
+	if k.Flags&ZONE == 0 {
 		return ErrKey
 	}
 
 	// IsRRset checked that we have at least one RR and that the RRs in
 	// the set have consistent type, class, and name. Also check that type and
 	// class matches the RRSIG record.
-	if rrset[0].Header().Class != rr.Hdr.Class {
-		return ErrRRset
-	}
-	if rrset[0].Header().Rrtype != rr.TypeCovered {
+	if h0 := rrset[0].Header(); h0.Class != rr.Hdr.Class || h0.Rrtype != rr.TypeCovered {
 		return ErrRRset
 	}
 
@@ -427,7 +404,7 @@ func (rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error {
 	sigwire.Expiration = rr.Expiration
 	sigwire.Inception = rr.Inception
 	sigwire.KeyTag = rr.KeyTag
-	sigwire.SignerName = strings.ToLower(rr.SignerName)
+	sigwire.SignerName = CanonicalName(rr.SignerName)
 	// Create the desired binary blob
 	signeddata := make([]byte, DefaultMsgSize)
 	n, err := packSigWire(sigwire, signeddata)
@@ -446,23 +423,22 @@ func (rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error {
 		// remove the domain name and assume its ours?
 	}
 
-	hash, ok := AlgorithmToHash[rr.Algorithm]
-	if !ok {
-		return ErrAlg
+	h, cryptohash, err := hashFromAlgorithm(rr.Algorithm)
+	if err != nil {
+		return err
 	}
 
 	switch rr.Algorithm {
-	case RSASHA1, RSASHA1NSEC3SHA1, RSASHA256, RSASHA512, RSAMD5:
+	case RSASHA1, RSASHA1NSEC3SHA1, RSASHA256, RSASHA512:
 		// TODO(mg): this can be done quicker, ie. cache the pubkey data somewhere??
 		pubkey := k.publicKeyRSA() // Get the key
 		if pubkey == nil {
 			return ErrKey
 		}
 
-		h := hash.New()
 		h.Write(signeddata)
 		h.Write(wire)
-		return rsa.VerifyPKCS1v15(pubkey, hash, h.Sum(nil), sigbuf)
+		return rsa.VerifyPKCS1v15(pubkey, cryptohash, h.Sum(nil), sigbuf)
 
 	case ECDSAP256SHA256, ECDSAP384SHA384:
 		pubkey := k.publicKeyECDSA()
@@ -474,7 +450,6 @@ func (rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error {
 		r := new(big.Int).SetBytes(sigbuf[:len(sigbuf)/2])
 		s := new(big.Int).SetBytes(sigbuf[len(sigbuf)/2:])
 
-		h := hash.New()
 		h.Write(signeddata)
 		h.Write(wire)
 		if ecdsa.Verify(pubkey, h.Sum(nil), r, s) {
@@ -511,12 +486,12 @@ func (rr *RRSIG) ValidityPeriod(t time.Time) bool {
 	}
 	modi := (int64(rr.Inception) - utc) / year68
 	mode := (int64(rr.Expiration) - utc) / year68
-	ti := int64(rr.Inception) + (modi * year68)
-	te := int64(rr.Expiration) + (mode * year68)
+	ti := int64(rr.Inception) + modi*year68
+	te := int64(rr.Expiration) + mode*year68
 	return ti <= utc && utc <= te
 }
 
-// Return the signatures base64 encodedig sigdata as a byte slice.
+// Return the signatures base64 encoding sigdata as a byte slice.
 func (rr *RRSIG) sigBuf() []byte {
 	sigbuf, err := fromBase64([]byte(rr.Signature))
 	if err != nil {
@@ -532,6 +507,11 @@ func (k *DNSKEY) publicKeyRSA() *rsa.PublicKey {
 		return nil
 	}
 
+	if len(keybuf) < 1+1+64 {
+		// Exponent must be at least 1 byte and modulus at least 64
+		return nil
+	}
+
 	// RFC 2537/3110, section 2. RSA Public KEY Resource Records
 	// Length is in the 0th byte, unless its zero, then it
 	// it in bytes 1 and 2 and its a 16 bit number
@@ -541,25 +521,35 @@ func (k *DNSKEY) publicKeyRSA() *rsa.PublicKey {
 		explen = uint16(keybuf[1])<<8 | uint16(keybuf[2])
 		keyoff = 3
 	}
-	pubkey := new(rsa.PublicKey)
 
-	pubkey.N = big.NewInt(0)
-	shift := uint64((explen - 1) * 8)
-	expo := uint64(0)
-	for i := int(explen - 1); i > 0; i-- {
-		expo += uint64(keybuf[keyoff+i]) << shift
-		shift -= 8
-	}
-	// Remainder
-	expo += uint64(keybuf[keyoff])
-	if expo > (2<<31)+1 {
-		// Larger expo than supported.
-		// println("dns: F5 primes (or larger) are not supported")
+	if explen > 4 || explen == 0 || keybuf[keyoff] == 0 {
+		// Exponent larger than supported by the crypto package,
+		// empty, or contains prohibited leading zero.
 		return nil
 	}
-	pubkey.E = int(expo)
 
-	pubkey.N.SetBytes(keybuf[keyoff+int(explen):])
+	modoff := keyoff + int(explen)
+	modlen := len(keybuf) - modoff
+	if modlen < 64 || modlen > 512 || keybuf[modoff] == 0 {
+		// Modulus is too small, large, or contains prohibited leading zero.
+		return nil
+	}
+
+	pubkey := new(rsa.PublicKey)
+
+	var expo uint64
+	// The exponent of length explen is between keyoff and modoff.
+	for _, v := range keybuf[keyoff:modoff] {
+		expo <<= 8
+		expo |= uint64(v)
+	}
+	if expo > 1<<31-1 {
+		// Larger exponent than supported by the crypto package.
+		return nil
+	}
+
+	pubkey.E = int(expo)
+	pubkey.N = new(big.Int).SetBytes(keybuf[modoff:])
 	return pubkey
 }
 
@@ -584,34 +574,8 @@ func (k *DNSKEY) publicKeyECDSA() *ecdsa.PublicKey {
 			return nil
 		}
 	}
-	pubkey.X = big.NewInt(0)
-	pubkey.X.SetBytes(keybuf[:len(keybuf)/2])
-	pubkey.Y = big.NewInt(0)
-	pubkey.Y.SetBytes(keybuf[len(keybuf)/2:])
-	return pubkey
-}
-
-func (k *DNSKEY) publicKeyDSA() *dsa.PublicKey {
-	keybuf, err := fromBase64([]byte(k.PublicKey))
-	if err != nil {
-		return nil
-	}
-	if len(keybuf) < 22 {
-		return nil
-	}
-	t, keybuf := int(keybuf[0]), keybuf[1:]
-	size := 64 + t*8
-	q, keybuf := keybuf[:20], keybuf[20:]
-	if len(keybuf) != 3*size {
-		return nil
-	}
-	p, keybuf := keybuf[:size], keybuf[size:]
-	g, y := keybuf[:size], keybuf[size:]
-	pubkey := new(dsa.PublicKey)
-	pubkey.Parameters.Q = big.NewInt(0).SetBytes(q)
-	pubkey.Parameters.P = big.NewInt(0).SetBytes(p)
-	pubkey.Parameters.G = big.NewInt(0).SetBytes(g)
-	pubkey.Y = big.NewInt(0).SetBytes(y)
+	pubkey.X = new(big.Int).SetBytes(keybuf[:len(keybuf)/2])
+	pubkey.Y = new(big.Int).SetBytes(keybuf[len(keybuf)/2:])
 	return pubkey
 }
 
@@ -641,15 +605,16 @@ func rawSignatureData(rrset []RR, s *RRSIG) (buf []byte, err error) {
 	wires := make(wireSlice, len(rrset))
 	for i, r := range rrset {
 		r1 := r.copy()
-		r1.Header().Ttl = s.OrigTtl
-		labels := SplitDomainName(r1.Header().Name)
+		h := r1.Header()
+		h.Ttl = s.OrigTtl
+		labels := SplitDomainName(h.Name)
 		// 6.2. Canonical RR Form. (4) - wildcards
 		if len(labels) > int(s.Labels) {
 			// Wildcard
-			r1.Header().Name = "*." + strings.Join(labels[len(labels)-int(s.Labels):], ".") + "."
+			h.Name = "*." + strings.Join(labels[len(labels)-int(s.Labels):], ".") + "."
 		}
 		// RFC 4034: 6.2.  Canonical RR Form. (2) - domain name to lowercase
-		r1.Header().Name = strings.ToLower(r1.Header().Name)
+		h.Name = CanonicalName(h.Name)
 		// 6.2. Canonical RR Form. (3) - domain rdata to lowercase.
 		//   NS, MD, MF, CNAME, SOA, MB, MG, MR, PTR,
 		//   HINFO, MINFO, MX, RP, AFSDB, RT, SIG, PX, NXT, NAPTR, KX,
@@ -662,52 +627,52 @@ func rawSignatureData(rrset []RR, s *RRSIG) (buf []byte, err error) {
 		//	conversion.
 		switch x := r1.(type) {
 		case *NS:
-			x.Ns = strings.ToLower(x.Ns)
+			x.Ns = CanonicalName(x.Ns)
 		case *MD:
-			x.Md = strings.ToLower(x.Md)
+			x.Md = CanonicalName(x.Md)
 		case *MF:
-			x.Mf = strings.ToLower(x.Mf)
+			x.Mf = CanonicalName(x.Mf)
 		case *CNAME:
-			x.Target = strings.ToLower(x.Target)
+			x.Target = CanonicalName(x.Target)
 		case *SOA:
-			x.Ns = strings.ToLower(x.Ns)
-			x.Mbox = strings.ToLower(x.Mbox)
+			x.Ns = CanonicalName(x.Ns)
+			x.Mbox = CanonicalName(x.Mbox)
 		case *MB:
-			x.Mb = strings.ToLower(x.Mb)
+			x.Mb = CanonicalName(x.Mb)
 		case *MG:
-			x.Mg = strings.ToLower(x.Mg)
+			x.Mg = CanonicalName(x.Mg)
 		case *MR:
-			x.Mr = strings.ToLower(x.Mr)
+			x.Mr = CanonicalName(x.Mr)
 		case *PTR:
-			x.Ptr = strings.ToLower(x.Ptr)
+			x.Ptr = CanonicalName(x.Ptr)
 		case *MINFO:
-			x.Rmail = strings.ToLower(x.Rmail)
-			x.Email = strings.ToLower(x.Email)
+			x.Rmail = CanonicalName(x.Rmail)
+			x.Email = CanonicalName(x.Email)
 		case *MX:
-			x.Mx = strings.ToLower(x.Mx)
+			x.Mx = CanonicalName(x.Mx)
 		case *RP:
-			x.Mbox = strings.ToLower(x.Mbox)
-			x.Txt = strings.ToLower(x.Txt)
+			x.Mbox = CanonicalName(x.Mbox)
+			x.Txt = CanonicalName(x.Txt)
 		case *AFSDB:
-			x.Hostname = strings.ToLower(x.Hostname)
+			x.Hostname = CanonicalName(x.Hostname)
 		case *RT:
-			x.Host = strings.ToLower(x.Host)
+			x.Host = CanonicalName(x.Host)
 		case *SIG:
-			x.SignerName = strings.ToLower(x.SignerName)
+			x.SignerName = CanonicalName(x.SignerName)
 		case *PX:
-			x.Map822 = strings.ToLower(x.Map822)
-			x.Mapx400 = strings.ToLower(x.Mapx400)
+			x.Map822 = CanonicalName(x.Map822)
+			x.Mapx400 = CanonicalName(x.Mapx400)
 		case *NAPTR:
-			x.Replacement = strings.ToLower(x.Replacement)
+			x.Replacement = CanonicalName(x.Replacement)
 		case *KX:
-			x.Exchanger = strings.ToLower(x.Exchanger)
+			x.Exchanger = CanonicalName(x.Exchanger)
 		case *SRV:
-			x.Target = strings.ToLower(x.Target)
+			x.Target = CanonicalName(x.Target)
 		case *DNAME:
-			x.Target = strings.ToLower(x.Target)
+			x.Target = CanonicalName(x.Target)
 		}
 		// 6.2. Canonical RR Form. (5) - origTTL
-		wire := make([]byte, r1.len()+1) // +1 to be safe(r)
+		wire := make([]byte, Len(r1)+1) // +1 to be safe(r)
 		off, err1 := PackRR(r1, wire, 0, nil, false)
 		if err1 != nil {
 			return nil, err1

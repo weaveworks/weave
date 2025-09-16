@@ -3,20 +3,21 @@ package plugin
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
-	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
+	"github.com/containernetworking/plugins/pkg/ipam"
+	weaveapi "github.com/rajch/weave/api"
+	weavenet "github.com/rajch/weave/net"
+	ipamplugin "github.com/rajch/weave/plugin/ipam"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
-	weaveapi "github.com/weaveworks/weave/api"
-	weavenet "github.com/weaveworks/weave/net"
-	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 )
 
 var (
@@ -176,8 +177,17 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 	return nil
 }
 
+func (c *CNIPlugin) CmdCheck(args *skel.CmdArgs) error {
+	// TODO: Figure out how to do a proper CNI check here
+	// For now, return not implemented error
+
+	return errors.New("CNI plugin check not implemented")
+}
+
 // As of CNI 0.5 spec:
-//   "Plugins should generally complete a DEL action without error even if some resources are missing"
+//
+//	"Plugins should generally complete a DEL action without error even if some resources are missing"
+//
 // this method should therefore return nil in most, if not all, cases.
 func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 	conf, err := loadNetConf(args.StdinData)

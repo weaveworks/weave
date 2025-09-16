@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	weavenet "github.com/weaveworks/weave/net"
+	weavenet "github.com/rajch/weave/net"
 )
 
 func detectBridgeType(args []string) error {

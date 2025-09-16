@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/docker/libnetwork/ipamapi"
-	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/docker"
-	weavenet "github.com/weaveworks/weave/net"
-	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
-	netplugin "github.com/weaveworks/weave/plugin/net"
-	"github.com/weaveworks/weave/plugin/skel"
+	weaveapi "github.com/rajch/weave/api"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/common/docker"
+	weavenet "github.com/rajch/weave/net"
+	ipamplugin "github.com/rajch/weave/plugin/ipam"
+	netplugin "github.com/rajch/weave/plugin/net"
+	"github.com/rajch/weave/plugin/skel"
 )
 
 const (

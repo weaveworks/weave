@@ -10,13 +10,13 @@ package docker
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -30,12 +30,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/docker/docker/opts"
 	"github.com/docker/docker/pkg/homedir"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
-	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 const (
@@ -56,9 +53,12 @@ var (
 	ErrInactivityTimeout = errors.New("inactivity time exceeded timeout")
 
 	apiVersion112, _ = NewAPIVersion("1.12")
+	apiVersion118, _ = NewAPIVersion("1.18")
 	apiVersion119, _ = NewAPIVersion("1.19")
+	apiVersion121, _ = NewAPIVersion("1.21")
 	apiVersion124, _ = NewAPIVersion("1.24")
 	apiVersion125, _ = NewAPIVersion("1.25")
+	apiVersion135, _ = NewAPIVersion("1.35")
 )
 
 // APIVersion is an internal representation of a version of the Remote API.
@@ -70,7 +70,7 @@ type APIVersion []int
 // <minor> and <patch> are integer numbers.
 func NewAPIVersion(input string) (APIVersion, error) {
 	if !strings.Contains(input, ".") {
-		return nil, fmt.Errorf("Unable to parse version %q", input)
+		return nil, fmt.Errorf("unable to parse version %q", input)
 	}
 	raw := strings.Split(input, "-")
 	arr := strings.Split(raw[0], ".")
@@ -79,39 +79,36 @@ func NewAPIVersion(input string) (APIVersion, error) {
 	for i, val := range arr {
 		ret[i], err = strconv.Atoi(val)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse version %q: %q is not an integer", input, val)
+			return nil, fmt.Errorf("unable to parse version %q: %q is not an integer", input, val)
 		}
 	}
 	return ret, nil
 }
 
 func (version APIVersion) String() string {
-	var str string
+	parts := make([]string, len(version))
 	for i, val := range version {
-		str += strconv.Itoa(val)
-		if i < len(version)-1 {
-			str += "."
-		}
+		parts[i] = strconv.Itoa(val)
 	}
-	return str
+	return strings.Join(parts, ".")
 }
 
-// LessThan is a function for comparing APIVersion structs
+// LessThan is a function for comparing APIVersion structs.
 func (version APIVersion) LessThan(other APIVersion) bool {
 	return version.compare(other) < 0
 }
 
-// LessThanOrEqualTo is a function for comparing APIVersion structs
+// LessThanOrEqualTo is a function for comparing APIVersion structs.
 func (version APIVersion) LessThanOrEqualTo(other APIVersion) bool {
 	return version.compare(other) <= 0
 }
 
-// GreaterThan is a function for comparing APIVersion structs
+// GreaterThan is a function for comparing APIVersion structs.
 func (version APIVersion) GreaterThan(other APIVersion) bool {
 	return version.compare(other) > 0
 }
 
-// GreaterThanOrEqualTo is a function for comparing APIVersion structs
+// GreaterThanOrEqualTo is a function for comparing APIVersion structs.
 func (version APIVersion) GreaterThanOrEqualTo(other APIVersion) bool {
 	return version.compare(other) >= 0
 }
@@ -224,11 +221,13 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 
 // WithTransport replaces underlying HTTP client of Docker Client by accepting
 // a function that returns pointer to a transport object.
-func (c *Client) WithTransport(trFunc func () *http.Transport) {
+func (c *Client) WithTransport(trFunc func() *http.Transport) {
 	c.initializeNativeClient(trFunc)
 }
 
-// NewVersionnedTLSClient has been DEPRECATED, please use NewVersionedTLSClient.
+// NewVersionnedTLSClient is like NewVersionedClient, but with ann extra n.
+//
+// Deprecated: Use NewVersionedTLSClient instead.
 func NewVersionnedTLSClient(endpoint string, cert, key, ca, apiVersionString string) (*Client, error) {
 	return NewVersionedTLSClient(endpoint, cert, key, ca, apiVersionString)
 }
@@ -240,19 +239,19 @@ func NewVersionedTLSClient(endpoint string, cert, key, ca, apiVersionString stri
 	var keyPEMBlock []byte
 	var caPEMCert []byte
 	if _, err := os.Stat(cert); !os.IsNotExist(err) {
-		certPEMBlock, err = ioutil.ReadFile(cert)
+		certPEMBlock, err = os.ReadFile(cert)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if _, err := os.Stat(key); !os.IsNotExist(err) {
-		keyPEMBlock, err = ioutil.ReadFile(key)
+		keyPEMBlock, err = os.ReadFile(key)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if _, err := os.Stat(ca); !os.IsNotExist(err) {
-		caPEMCert, err = ioutil.ReadFile(ca)
+		caPEMCert, err = os.ReadFile(ca)
 		if err != nil {
 			return nil, err
 		}
@@ -261,16 +260,19 @@ func NewVersionedTLSClient(endpoint string, cert, key, ca, apiVersionString stri
 }
 
 // NewClientFromEnv returns a Client instance ready for communication created from
-// Docker's default logic for the environment variables DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT_PATH.
+// Docker's default logic for the environment variables DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH,
+// and DOCKER_API_VERSION.
 //
 // See https://github.com/docker/docker/blob/1f963af697e8df3a78217f6fdbf67b8123a7db94/docker/docker.go#L68.
 // See https://github.com/docker/compose/blob/81707ef1ad94403789166d2fe042c8a718a4c748/compose/cli/docker_client.py#L7.
+// See https://github.com/moby/moby/blob/28d7dba41d0c0d9c7f0dafcc79d3c59f2b3f5dc3/client/options.go#L51
 func NewClientFromEnv() (*Client, error) {
-	client, err := NewVersionedClientFromEnv("")
+	apiVersionString := os.Getenv("DOCKER_API_VERSION")
+	client, err := NewVersionedClientFromEnv(apiVersionString)
 	if err != nil {
 		return nil, err
 	}
-	client.SkipServerVersionCheck = true
+	client.SkipServerVersionCheck = apiVersionString == ""
 	return client, nil
 }
 
@@ -314,7 +316,7 @@ func NewVersionedTLSClientFromBytes(endpoint string, certPEMBlock, keyPEMBlock, 
 			return nil, err
 		}
 	}
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
 	if certPEMBlock != nil && keyPEMBlock != nil {
 		tlsCert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 		if err != nil {
@@ -327,7 +329,7 @@ func NewVersionedTLSClientFromBytes(endpoint string, certPEMBlock, keyPEMBlock, 
 	} else {
 		caPool := x509.NewCertPool()
 		if !caPool.AppendCertsFromPEM(caPEMCert) {
-			return nil, errors.New("Could not add RootCA pem")
+			return nil, errors.New("could not add RootCA pem")
 		}
 		tlsConfig.RootCAs = caPool
 	}
@@ -385,7 +387,7 @@ func (c *Client) Endpoint() string {
 //
 // See https://goo.gl/wYfgY1 for more details.
 func (c *Client) Ping() error {
-	return c.PingWithContext(nil)
+	return c.PingWithContext(context.TODO())
 }
 
 // PingWithContext pings the docker server
@@ -394,7 +396,7 @@ func (c *Client) Ping() error {
 // See https://goo.gl/wYfgY1 for more details.
 func (c *Client) PingWithContext(ctx context.Context) error {
 	path := "/_ping"
-	resp, err := c.do("GET", path, doOptions{context: ctx})
+	resp, err := c.do(http.MethodGet, path, doOptions{context: ctx})
 	if err != nil {
 		return err
 	}
@@ -406,15 +408,15 @@ func (c *Client) PingWithContext(ctx context.Context) error {
 }
 
 func (c *Client) getServerAPIVersionString() (version string, err error) {
-	resp, err := c.do("GET", "/version", doOptions{})
+	resp, err := c.do(http.MethodGet, "/version", doOptions{})
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Received unexpected status %d while trying to retrieve the server version", resp.StatusCode)
+		return "", fmt.Errorf("received unexpected status %d while trying to retrieve the server version", resp.StatusCode)
 	}
-	var versionResponse map[string]interface{}
+	var versionResponse map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&versionResponse); err != nil {
 		return "", err
 	}
@@ -425,7 +427,7 @@ func (c *Client) getServerAPIVersionString() (version string, err error) {
 }
 
 type doOptions struct {
-	data      interface{}
+	data      any
 	forceJSON bool
 	headers   map[string]string
 	context   context.Context
@@ -462,7 +464,7 @@ func (c *Client) do(method, path string, doOptions doOptions) (*http.Response, e
 	req.Header.Set("User-Agent", userAgent)
 	if doOptions.data != nil {
 		req.Header.Set("Content-Type", "application/json")
-	} else if method == "POST" {
+	} else if method == http.MethodPost {
 		req.Header.Set("Content-Type", "plain/text")
 	}
 
@@ -475,7 +477,7 @@ func (c *Client) do(method, path string, doOptions doOptions) (*http.Response, e
 		ctx = context.Background()
 	}
 
-	resp, err := ctxhttp.Do(ctx, c.HTTPClient, req)
+	resp, err := c.HTTPClient.Do(req.WithContext(ctx))
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil, ErrConnectionRefused
@@ -483,7 +485,7 @@ func (c *Client) do(method, path string, doOptions doOptions) (*http.Response, e
 
 		return nil, chooseError(ctx, err)
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		return nil, newError(resp)
 	}
 	return resp, nil
@@ -506,18 +508,17 @@ type streamOptions struct {
 	context           context.Context
 }
 
-// if error in context, return that instead of generic http error
 func chooseError(ctx context.Context, err error) error {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return context.Cause(ctx)
 	default:
 		return err
 	}
 }
 
 func (c *Client) stream(method, path string, streamOptions streamOptions) error {
-	if (method == "POST" || method == "PUT") && streamOptions.in == nil {
+	if (method == http.MethodPost || method == http.MethodPut) && streamOptions.in == nil {
 		streamOptions.in = bytes.NewReader(nil)
 	}
 	if path != "/version" && !c.SkipServerVersionCheck && c.expectedAPIVersion == nil {
@@ -526,25 +527,18 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 			return err
 		}
 	}
-	req, err := http.NewRequest(method, c.getURL(path), streamOptions.in)
-	if err != nil {
-		return err
+	return c.streamURL(method, c.getURL(path), streamOptions)
+}
+
+func (c *Client) streamURL(method, url string, streamOptions streamOptions) error {
+	if (method == http.MethodPost || method == http.MethodPut) && streamOptions.in == nil {
+		streamOptions.in = bytes.NewReader(nil)
 	}
-	req.Header.Set("User-Agent", userAgent)
-	if method == "POST" {
-		req.Header.Set("Content-Type", "plain/text")
-	}
-	for key, val := range streamOptions.headers {
-		req.Header.Set(key, val)
-	}
-	var resp *http.Response
-	protocol := c.endpointURL.Scheme
-	address := c.endpointURL.Path
-	if streamOptions.stdout == nil {
-		streamOptions.stdout = ioutil.Discard
-	}
-	if streamOptions.stderr == nil {
-		streamOptions.stderr = ioutil.Discard
+	if !c.SkipServerVersionCheck && c.expectedAPIVersion == nil {
+		err := c.checkAPIVersion()
+		if err != nil {
+			return err
+		}
 	}
 
 	// make a sub-context so that our active cancellation does not affect parent
@@ -554,6 +548,27 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 	}
 	subCtx, cancelRequest := context.WithCancel(ctx)
 	defer cancelRequest()
+
+	req, err := http.NewRequestWithContext(ctx, method, url, streamOptions.in)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	if method == http.MethodPost {
+		req.Header.Set("Content-Type", "plain/text")
+	}
+	for key, val := range streamOptions.headers {
+		req.Header.Set(key, val)
+	}
+	var resp *http.Response
+	protocol := c.endpointURL.Scheme
+	address := c.endpointURL.Path
+	if streamOptions.stdout == nil {
+		streamOptions.stdout = io.Discard
+	}
+	if streamOptions.stderr == nil {
+		streamOptions.stderr = io.Discard
+	}
 
 	if protocol == unixProtocol || protocol == namedPipeProtocol {
 		var dial net.Conn
@@ -590,18 +605,19 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 
 			return chooseError(subCtx, err)
 		}
+		defer resp.Body.Close()
 	} else {
-		if resp, err = ctxhttp.Do(subCtx, c.HTTPClient, req); err != nil {
+		if resp, err = c.HTTPClient.Do(req.WithContext(subCtx)); err != nil {
 			if strings.Contains(err.Error(), "connection refused") {
 				return ErrConnectionRefused
 			}
 			return chooseError(subCtx, err)
 		}
+		defer resp.Body.Close()
 		if streamOptions.reqSent != nil {
 			close(streamOptions.reqSent)
 		}
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return newError(resp)
 	}
@@ -637,16 +653,18 @@ func handleStreamResponse(resp *http.Response, streamOptions *streamOptions) err
 		_, err = io.Copy(streamOptions.stdout, resp.Body)
 		return err
 	}
-	if st, ok := streamOptions.stdout.(interface {
-		io.Writer
-		FD() uintptr
-		IsTerminal() bool
-	}); ok {
+	if st, ok := streamOptions.stdout.(stream); ok {
 		err = jsonmessage.DisplayJSONMessagesToStream(resp.Body, st, nil)
 	} else {
 		err = jsonmessage.DisplayJSONMessagesStream(resp.Body, streamOptions.stdout, 0, false, nil)
 	}
 	return err
+}
+
+type stream interface {
+	io.Writer
+	FD() uintptr
+	IsTerminal() bool
 }
 
 type proxyReader struct {
@@ -692,7 +710,7 @@ type hijackOptions struct {
 	in             io.Reader
 	stdout         io.Writer
 	stderr         io.Writer
-	data           interface{}
+	data           any
 }
 
 // CloseWaiter is an interface with methods for closing the underlying resource
@@ -758,6 +776,7 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) (Close
 	errs := make(chan error, 1)
 	quit := make(chan struct{})
 	go func() {
+		//lint:ignore SA1019 the alternative doesn't quite work, so keep using the deprecated thing.
 		clientconn := httputil.NewClientConn(dial, nil)
 		defer clientconn.Close()
 		clientconn.Do(req)
@@ -778,10 +797,10 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) (Close
 			// will "hang" until the container terminates, even though you're not reading
 			// stdout/stderr
 			if hijackOptions.stdout == nil {
-				hijackOptions.stdout = ioutil.Discard
+				hijackOptions.stdout = io.Discard
 			}
 			if hijackOptions.stderr == nil {
-				hijackOptions.stderr = ioutil.Discard
+				hijackOptions.stderr = io.Discard
 			}
 
 			go func() {
@@ -854,6 +873,29 @@ func (c *Client) getURL(path string) string {
 	return fmt.Sprintf("%s%s", urlStr, path)
 }
 
+func (c *Client) getPath(basepath string, opts any) (string, error) {
+	queryStr, requiredAPIVersion := queryStringVersion(opts)
+	return c.pathVersionCheck(basepath, queryStr, requiredAPIVersion)
+}
+
+func (c *Client) pathVersionCheck(basepath, queryStr string, requiredAPIVersion APIVersion) (string, error) {
+	urlStr := strings.TrimRight(c.endpointURL.String(), "/")
+	if c.endpointURL.Scheme == unixProtocol || c.endpointURL.Scheme == namedPipeProtocol {
+		urlStr = ""
+	}
+	if c.requestedAPIVersion != nil {
+		if c.requestedAPIVersion.GreaterThanOrEqualTo(requiredAPIVersion) {
+			return fmt.Sprintf("%s/v%s%s?%s", urlStr, c.requestedAPIVersion, basepath, queryStr), nil
+		}
+		return "", fmt.Errorf("API %s requires version %s, requested version %s is insufficient",
+			basepath, requiredAPIVersion, c.requestedAPIVersion)
+	}
+	if requiredAPIVersion != nil {
+		return fmt.Sprintf("%s/v%s%s?%s", urlStr, requiredAPIVersion, basepath, queryStr), nil
+	}
+	return fmt.Sprintf("%s%s?%s", urlStr, basepath, queryStr), nil
+}
+
 // getFakeNativeURL returns the URL needed to make an HTTP request over a UNIX
 // domain socket to the given path.
 func (c *Client) getFakeNativeURL(path string) string {
@@ -870,24 +912,18 @@ func (c *Client) getFakeNativeURL(path string) string {
 	return fmt.Sprintf("%s%s", urlStr, path)
 }
 
-type jsonMessage struct {
-	Status   string `json:"status,omitempty"`
-	Progress string `json:"progress,omitempty"`
-	Error    string `json:"error,omitempty"`
-	Stream   string `json:"stream,omitempty"`
-}
-
-func queryString(opts interface{}) string {
+func queryStringVersion(opts any) (string, APIVersion) {
 	if opts == nil {
-		return ""
+		return "", nil
 	}
 	value := reflect.ValueOf(opts)
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
 	}
 	if value.Kind() != reflect.Struct {
-		return ""
+		return "", nil
 	}
+	var apiVersion APIVersion
 	items := url.Values(map[string][]string{})
 	for i := 0; i < value.NumField(); i++ {
 		field := value.Type().Field(i)
@@ -900,49 +936,80 @@ func queryString(opts interface{}) string {
 		} else if key == "-" {
 			continue
 		}
-		addQueryStringValue(items, key, value.Field(i))
+		if addQueryStringValue(items, key, value.Field(i)) {
+			verstr := field.Tag.Get("ver")
+			if verstr != "" {
+				ver, _ := NewAPIVersion(verstr)
+				if apiVersion == nil {
+					apiVersion = ver
+				} else if ver.GreaterThan(apiVersion) {
+					apiVersion = ver
+				}
+			}
+		}
 	}
-	return items.Encode()
+	return items.Encode(), apiVersion
 }
 
-func addQueryStringValue(items url.Values, key string, v reflect.Value) {
+func queryString(opts any) string {
+	s, _ := queryStringVersion(opts)
+	return s
+}
+
+func addQueryStringValue(items url.Values, key string, v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Bool:
 		if v.Bool() {
 			items.Add(key, "1")
+			return true
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if v.Int() > 0 {
 			items.Add(key, strconv.FormatInt(v.Int(), 10))
+			return true
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if v.Uint() > 0 {
+			items.Add(key, strconv.FormatUint(v.Uint(), 10))
+			return true
 		}
 	case reflect.Float32, reflect.Float64:
 		if v.Float() > 0 {
 			items.Add(key, strconv.FormatFloat(v.Float(), 'f', -1, 64))
+			return true
 		}
 	case reflect.String:
 		if v.String() != "" {
 			items.Add(key, v.String())
+			return true
 		}
 	case reflect.Ptr:
 		if !v.IsNil() {
 			if b, err := json.Marshal(v.Interface()); err == nil {
 				items.Add(key, string(b))
+				return true
 			}
 		}
 	case reflect.Map:
 		if len(v.MapKeys()) > 0 {
 			if b, err := json.Marshal(v.Interface()); err == nil {
 				items.Add(key, string(b))
+				return true
 			}
 		}
 	case reflect.Array, reflect.Slice:
 		vLen := v.Len()
+		var valuesAdded int
 		if vLen > 0 {
 			for i := 0; i < vLen; i++ {
-				addQueryStringValue(items, key, v.Index(i))
+				if addQueryStringValue(items, key, v.Index(i)) {
+					valuesAdded++
+				}
 			}
 		}
+		return valuesAdded > 0
 	}
+	return false
 }
 
 // Error represents failures in the API. It represents a failure from the API.
@@ -956,7 +1023,7 @@ func newError(resp *http.Response) *Error {
 		Message string `json:"message"`
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return &Error{Status: resp.StatusCode, Message: fmt.Sprintf("cannot read body, err: %v", err)}
 	}
@@ -989,7 +1056,8 @@ func parseEndpoint(endpoint string, tls bool) (*url.URL, error) {
 	case "http", "https", "tcp":
 		_, port, err := net.SplitHostPort(u.Host)
 		if err != nil {
-			if e, ok := err.(*net.AddrError); ok {
+			var e *net.AddrError
+			if errors.As(err, &e) {
 				if e.Err == "missing port in address" {
 					return u, nil
 				}
@@ -1023,7 +1091,7 @@ func getDockerEnv() (*dockerEnv, error) {
 	dockerHost := os.Getenv("DOCKER_HOST")
 	var err error
 	if dockerHost == "" {
-		dockerHost = opts.DefaultHost
+		dockerHost = defaultHost
 	}
 	dockerTLSVerify := os.Getenv("DOCKER_TLS_VERIFY") != ""
 	var dockerCertPath string

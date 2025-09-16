@@ -267,7 +267,7 @@ func parseDirent(buf []byte, names []nameIno) (consumed int, newnames []nameIno)
 			continue
 		}
 		bytes := (*[10000]byte)(unsafe.Pointer(&dirent.Name[0]))
-		var name = string(bytes[0:clen(bytes[:])])
+		name := string(bytes[0:clen(bytes[:])])
 		if name == "." || name == ".." { // Useless names
 			continue
 		}
@@ -283,31 +283,4 @@ func clen(n []byte) int {
 		}
 	}
 	return len(n)
-}
-
-// OverlayChanges walks the path rw and determines changes for the files in the path,
-// with respect to the parent layers
-func OverlayChanges(layers []string, rw string) ([]Change, error) {
-	return changes(layers, rw, overlayDeletedFile, nil)
-}
-
-func overlayDeletedFile(root, path string, fi os.FileInfo) (string, error) {
-	if fi.Mode()&os.ModeCharDevice != 0 {
-		s := fi.Sys().(*syscall.Stat_t)
-		if unix.Major(uint64(s.Rdev)) == 0 && unix.Minor(uint64(s.Rdev)) == 0 { // nolint: unconvert
-			return path, nil
-		}
-	}
-	if fi.Mode()&os.ModeDir != 0 {
-		opaque, err := system.Lgetxattr(filepath.Join(root, path), "trusted.overlay.opaque")
-		if err != nil {
-			return "", err
-		}
-		if len(opaque) == 1 && opaque[0] == 'y' {
-			return path, nil
-		}
-	}
-
-	return "", nil
-
 }

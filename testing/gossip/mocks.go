@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/common"
+	"github.com/rajch/weave/common"
 )
 
 // Router to convey gossip from one gossiper to another, for testing

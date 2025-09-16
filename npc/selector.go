@@ -6,8 +6,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/net/ipset"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/net/ipset"
 )
 
 type selectorSpec struct {
@@ -121,9 +121,9 @@ func newSelectorSet(ips ipset.Interface, onNewSelector selectorFn, onNewTargetSe
 		onNewSelector:           onNewSelector,
 		onNewTargetSelector:     onNewTargetSelector,
 		onDestroyTargetSelector: onDestroyTargetSelector,
-		users:                make(map[string]map[ipset.UID]struct{}),
-		entries:              make(map[string]*selector),
-		targetSelectorsCount: make(map[string]map[policyType]int)}
+		users:                   make(map[string]map[ipset.UID]struct{}),
+		entries:                 make(map[string]*selector),
+		targetSelectorsCount:    make(map[string]map[policyType]int)}
 }
 
 func (ss *selectorSet) addToMatchingPodSelector(user ipset.UID, podLabelsMap map[string]string, entry string, comment string) (bool, bool, error) {

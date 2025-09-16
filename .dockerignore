@@ -1,0 +1,13 @@
+# Git status should be ignored
+.git
+
+# .dockerignore should be ignored
+.dockerignore
+
+# Almost all of the reweave directory 
+# should be ignored
+reweave/build/Dockerfile
+reweave/tools/
+reweave/scans/
+reweave/Makefile
+reweave/*.md

@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/chains"
-	"github.com/weaveworks/weave/net/ipset"
-	"github.com/weaveworks/weave/npc/iptables"
+	"github.com/rajch/weave/common"
+	"github.com/rajch/weave/common/chains"
+	"github.com/rajch/weave/net/ipset"
+	"github.com/rajch/weave/npc/iptables"
 )
 
 type ruleHost interface {

@@ -97,6 +97,14 @@
           "value"
       ],
       "value": ""
+    },
+    {
+      "description": "Whether to use the version check feature of Weave Net",
+      "name": "CHECKPOINT_DISABLE",
+      "settable": [
+          "value"
+      ],
+      "value": "1"
     }
   ],
   "network": {

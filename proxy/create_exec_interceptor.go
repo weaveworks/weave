@@ -2,7 +2,10 @@ package proxy
 
 import (
 	"net/http"
+	"slices"
 	"strings"
+
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type createExecInterceptor struct{ proxy *Proxy }
@@ -18,7 +21,19 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if _, hasWeaveWait := container.Volumes["/w"]; !hasWeaveWait {
+	// The .Volumes property seems to have been replaced with .Mounts in Docker
+	// API 1.20.
+	// .Volumes was a list, where the key was the mount path or destination
+	// .Mounts is an array of objects, where the .Destination property
+	//  corresponds to the old .Volumes list key.
+	//
+	// if _, hasWeaveWait := container.Volumes["/w"]; !hasWeaveWait {
+	// 	return nil
+	// }
+	mountIndex := slices.IndexFunc(container.Mounts, func(m docker.Mount) bool {
+		return m.Destination == "/w"
+	})
+	if mountIndex == -1 {
 		return nil
 	}
 

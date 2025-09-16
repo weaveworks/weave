@@ -14,7 +14,7 @@ import (
 	"github.com/weaveworks/go-odp/odp"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/net/ipsec"
+	"github.com/rajch/weave/net/ipsec"
 )
 
 // The virtual bridge accepts packets from ODP vports and the router
@@ -1322,9 +1322,9 @@ func (fastdp *FastDatapath) takeDecoder(lock *fastDatapathLock) *EthernetDecoder
 // mode on the weave bridge port which attaches the datapath. Such flow is
 // identified by either:
 //
-// * in_port == out_port, where in_port is non-vxlan vport;
-// * a packet is sent back to a vxlan tunnel it has been received from and
-//   the tunnel id is either the same or dstPeer and srcPeer are reversed.
+//   - in_port == out_port, where in_port is non-vxlan vport;
+//   - a packet is sent back to a vxlan tunnel it has been received from and
+//     the tunnel id is either the same or dstPeer and srcPeer are reversed.
 func (fastdp *FastDatapath) isHairpinFlow(flow *odp.FlowSpec) bool {
 	var (
 		vxlanKey odp.TunnelAttrs

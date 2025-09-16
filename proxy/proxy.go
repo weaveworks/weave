@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,9 +18,9 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/pkg/errors"
 
-	weaveapi "github.com/weaveworks/weave/api"
-	weavedocker "github.com/weaveworks/weave/common/docker"
-	weavenet "github.com/weaveworks/weave/net"
+	weaveapi "github.com/rajch/weave/api"
+	weavedocker "github.com/rajch/weave/common/docker"
+	weavenet "github.com/rajch/weave/net"
 )
 
 const (
@@ -125,6 +126,16 @@ func (j attachJob) Stop() {
 	j.timer.Stop()
 }
 
+const defaulDockerAPIVersion = "1.24"
+
+func dockerAPIVersion() string {
+	overridenAPIVersion, ok := os.LookupEnv("DOCKER_API_VERSION")
+	if ok && overridenAPIVersion != "" {
+		return overridenAPIVersion
+	}
+	return defaulDockerAPIVersion
+}
+
 func StubProxy(c Config) (*Proxy, error) {
 	p := &Proxy{
 		Config:     c,
@@ -139,7 +150,14 @@ func StubProxy(c Config) (*Proxy, error) {
 	// to insulate ourselves from breaking changes to the API, as
 	// happened in 1.20 (Docker 1.8.0) when the presentation of
 	// volumes changed in `inspect`.
-	client, err := weavedocker.NewVersionedClient(c.DockerHost, "1.18")
+	// Updated in March 2024: We can't do that any more. Protocol
+	// version has to be updated to minimum 1.24.
+	// The presentation of volumes aspect has been handled later in
+	// this file. There may be other breaking changes if we change
+	// the protocol again, so will wait and watch.
+	// The default, 1.24, can be overridden using an environment
+	// variable called DOCKER_API_VERSION.
+	client, err := weavedocker.NewVersionedClient(c.DockerHost, dockerAPIVersion())
 	if err != nil {
 		return nil, err
 	}
@@ -212,15 +230,33 @@ func (proxy *Proxy) findVolume(v string) (string, error) {
 		return "", fmt.Errorf("Could not find the weavewait volume: %s", err)
 	}
 
-	if container.Volumes == nil {
-		return "", fmt.Errorf("Could not find the weavewait volume")
+	// The .Volumes property seems to have been replaced with .Mounts in Docker
+	// API 1.20.
+	// .Volumes was a list, where the key was the mount path or destination
+	// .Mounts is an array of objects, where the .Destination property
+	//  corresponds to the old .Volumes list key.
+	//
+	// if container.Volumes == nil {
+	// 	return "", fmt.Errorf("Could not find the weavewait volume - no volumes : %+v", container)
+	// }
+	//
+	// volume, ok := container.Volumes[v]
+	// if !ok {
+	// 	return "", fmt.Errorf("Could not find the weavewait volume named '%v' : %+v", v, container)
+	// }
+	mounts := container.Mounts
+	if mounts == nil {
+		return "", fmt.Errorf("Could not find the weavewait volume - no volumes : %+v", container)
 	}
 
-	volume, ok := container.Volumes[v]
-	if !ok {
-		return "", fmt.Errorf("Could not find the weavewait volume")
+	mountIndex := slices.IndexFunc(mounts, func(m docker.Mount) bool {
+		return m.Destination == v
+	})
+	if mountIndex < 0 {
+		return "", fmt.Errorf("Could not find the weavewait volume named '%v' : %+v", v, container)
 	}
 
+	volume := container.Mounts[mountIndex].Name
 	return volume, nil
 }
 

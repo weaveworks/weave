@@ -1,19 +1,19 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/net/context"
 )
 
 // ContainersPrune requests the daemon to delete unused data
 func (cli *Client) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (types.ContainersPruneReport, error) {
 	var report types.ContainersPruneReport
 
-	if err := cli.NewVersionError("1.25", "container prune"); err != nil {
+	if err := cli.NewVersionError(ctx, "1.25", "container prune"); err != nil {
 		return report, err
 	}
 
@@ -23,10 +23,10 @@ func (cli *Client) ContainersPrune(ctx context.Context, pruneFilters filters.Arg
 	}
 
 	serverResp, err := cli.post(ctx, "/containers/prune", query, nil, nil)
+	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return report, err
 	}
-	defer ensureReaderClosed(serverResp)
 
 	if err := json.NewDecoder(serverResp.body).Decode(&report); err != nil {
 		return report, fmt.Errorf("Error retrieving disk usage: %v", err)

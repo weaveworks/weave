@@ -1,4 +1,4 @@
-// +build !linux
+//go:build !linux
 
 package system // import "github.com/docker/docker/pkg/system"
 

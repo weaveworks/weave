@@ -1,15 +1,17 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 // PluginInstall installs a plugin
@@ -67,18 +69,20 @@ func (cli *Client) PluginInstall(ctx context.Context, name string, options types
 }
 
 func (cli *Client) tryPluginPrivileges(ctx context.Context, query url.Values, registryAuth string) (serverResponse, error) {
-	headers := map[string][]string{"X-Registry-Auth": {registryAuth}}
-	return cli.get(ctx, "/plugins/privileges", query, headers)
+	return cli.get(ctx, "/plugins/privileges", query, http.Header{
+		registry.AuthHeader: {registryAuth},
+	})
 }
 
 func (cli *Client) tryPluginPull(ctx context.Context, query url.Values, privileges types.PluginPrivileges, registryAuth string) (serverResponse, error) {
-	headers := map[string][]string{"X-Registry-Auth": {registryAuth}}
-	return cli.post(ctx, "/plugins/pull", query, privileges, headers)
+	return cli.post(ctx, "/plugins/pull", query, privileges, http.Header{
+		registry.AuthHeader: {registryAuth},
+	})
 }
 
 func (cli *Client) checkPluginPermissions(ctx context.Context, query url.Values, options types.PluginInstallOptions) (types.PluginPrivileges, error) {
 	resp, err := cli.tryPluginPrivileges(ctx, query, options.RegistryAuth)
-	if resp.statusCode == http.StatusUnauthorized && options.PrivilegeFunc != nil {
+	if errdefs.IsUnauthorized(err) && options.PrivilegeFunc != nil {
 		// todo: do inspect before to check existing name before checking privileges
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
@@ -106,7 +110,7 @@ func (cli *Client) checkPluginPermissions(ctx context.Context, query url.Values,
 			return nil, err
 		}
 		if !accept {
-			return nil, pluginPermissionDenied{options.RemoteRef}
+			return nil, errors.Errorf("permission denied while installing plugin %s", options.RemoteRef)
 		}
 	}
 	return privileges, nil

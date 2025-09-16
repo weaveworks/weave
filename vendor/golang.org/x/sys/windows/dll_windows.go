@@ -32,6 +32,8 @@ type DLLError struct {
 
 func (e *DLLError) Error() string { return e.Msg }
 
+func (e *DLLError) Unwrap() error { return e.Err }
+
 // A DLL implements access to a single DLL.
 type DLL struct {
 	Name   string
@@ -63,7 +65,7 @@ func LoadDLL(name string) (dll *DLL, err error) {
 	return d, nil
 }
 
-// MustLoadDLL is like LoadDLL but panics if load operation failes.
+// MustLoadDLL is like LoadDLL but panics if load operation fails.
 func MustLoadDLL(name string) *DLL {
 	d, e := LoadDLL(name)
 	if e != nil {
@@ -389,7 +391,6 @@ func loadLibraryEx(name string, system bool) (*DLL, error) {
 	var flags uintptr
 	if system {
 		if canDoSearchSystem32() {
-			const LOAD_LIBRARY_SEARCH_SYSTEM32 = 0x00000800
 			flags = LOAD_LIBRARY_SEARCH_SYSTEM32
 		} else if isBaseName(name) {
 			// WindowsXP or unpatched Windows machine

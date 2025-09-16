@@ -1,24 +1,25 @@
 package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/net/context"
 )
 
 // ContainerList returns the list of containers in the docker host.
-func (cli *Client) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+func (cli *Client) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
 	query := url.Values{}
 
 	if options.All {
 		query.Set("all", "1")
 	}
 
-	if options.Limit != -1 {
+	if options.Limit > 0 {
 		query.Set("limit", strconv.Itoa(options.Limit))
 	}
 
@@ -35,8 +36,8 @@ func (cli *Client) ContainerList(ctx context.Context, options types.ContainerLis
 	}
 
 	if options.Filters.Len() > 0 {
+		//nolint:staticcheck // ignore SA1019 for old code
 		filterJSON, err := filters.ToParamWithVersion(cli.version, options.Filters)
-
 		if err != nil {
 			return nil, err
 		}
@@ -45,12 +46,12 @@ func (cli *Client) ContainerList(ctx context.Context, options types.ContainerLis
 	}
 
 	resp, err := cli.get(ctx, "/containers/json", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var containers []types.Container
 	err = json.NewDecoder(resp.body).Decode(&containers)
-	ensureReaderClosed(resp)
 	return containers, err
 }

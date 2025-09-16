@@ -15,57 +15,132 @@
 package invoke
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/create"
 	"github.com/containernetworking/cni/pkg/version"
 )
 
-func ExecPluginWithResult(pluginPath string, netconf []byte, args CNIArgs) (types.Result, error) {
-	return defaultPluginExec.WithResult(pluginPath, netconf, args)
+// Exec is an interface encapsulates all operations that deal with finding
+// and executing a CNI plugin. Tests may provide a fake implementation
+// to avoid writing fake plugins to temporary directories during the test.
+type Exec interface {
+	ExecPlugin(ctx context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error)
+	FindInPath(plugin string, paths []string) (string, error)
+	Decode(jsonBytes []byte) (version.PluginInfo, error)
 }
 
-func ExecPluginWithoutResult(pluginPath string, netconf []byte, args CNIArgs) error {
-	return defaultPluginExec.WithoutResult(pluginPath, netconf, args)
-}
-
-func GetVersionInfo(pluginPath string) (version.PluginInfo, error) {
-	return defaultPluginExec.GetVersionInfo(pluginPath)
-}
-
-var defaultPluginExec = &PluginExec{
-	RawExec:        &RawExec{Stderr: os.Stderr},
-	VersionDecoder: &version.PluginDecoder{},
-}
-
-type PluginExec struct {
-	RawExec interface {
-		ExecPlugin(pluginPath string, stdinData []byte, environ []string) ([]byte, error)
-	}
-	VersionDecoder interface {
-		Decode(jsonBytes []byte) (version.PluginInfo, error)
-	}
-}
-
-func (e *PluginExec) WithResult(pluginPath string, netconf []byte, args CNIArgs) (types.Result, error) {
-	stdoutBytes, err := e.RawExec.ExecPlugin(pluginPath, netconf, args.AsEnv())
-	if err != nil {
-		return nil, err
-	}
-
-	// Plugin must return result in same version as specified in netconf
+// Plugin must return result in same version as specified in netconf; but
+// for backwards compatibility reasons if the result version is empty use
+// config version (rather than technically correct 0.1.0).
+// https://github.com/containernetworking/cni/issues/895
+func fixupResultVersion(netconf, result []byte) (string, []byte, error) {
 	versionDecoder := &version.ConfigDecoder{}
 	confVersion, err := versionDecoder.Decode(netconf)
 	if err != nil {
+		return "", nil, err
+	}
+
+	var rawResult map[string]interface{}
+	if err := json.Unmarshal(result, &rawResult); err != nil {
+		return "", nil, fmt.Errorf("failed to unmarshal raw result: %w", err)
+	}
+
+	// plugin output of "null" is successfully unmarshalled, but results in a nil
+	// map which causes a panic when the confVersion is assigned below.
+	if rawResult == nil {
+		rawResult = make(map[string]interface{})
+	}
+
+	// Manually decode Result version; we need to know whether its cniVersion
+	// is empty, while built-in decoders (correctly) substitute 0.1.0 for an
+	// empty version per the CNI spec.
+	if resultVerRaw, ok := rawResult["cniVersion"]; ok {
+		resultVer, ok := resultVerRaw.(string)
+		if ok && resultVer != "" {
+			return resultVer, result, nil
+		}
+	}
+
+	// If the cniVersion is not present or empty, assume the result is
+	// the same CNI spec version as the config
+	rawResult["cniVersion"] = confVersion
+	newBytes, err := json.Marshal(rawResult)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to remarshal fixed result: %w", err)
+	}
+
+	return confVersion, newBytes, nil
+}
+
+// For example, a testcase could pass an instance of the following fakeExec
+// object to ExecPluginWithResult() to verify the incoming stdin and environment
+// and provide a tailored response:
+//
+//import (
+//	"encoding/json"
+//	"path"
+//	"strings"
+//)
+//
+//type fakeExec struct {
+//	version.PluginDecoder
+//}
+//
+//func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
+//	net := &types.NetConf{}
+//	err := json.Unmarshal(stdinData, net)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to unmarshal configuration: %v", err)
+//	}
+//	pluginName := path.Base(pluginPath)
+//	if pluginName != net.Type {
+//		return nil, fmt.Errorf("plugin name %q did not match config type %q", pluginName, net.Type)
+//	}
+//	for _, e := range environ {
+//		// Check environment for forced failure request
+//		parts := strings.Split(e, "=")
+//		if len(parts) > 0 && parts[0] == "FAIL" {
+//			return nil, fmt.Errorf("failed to execute plugin %s", pluginName)
+//		}
+//	}
+//	return []byte("{\"CNIVersion\":\"0.4.0\"}"), nil
+//}
+//
+//func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
+//	if len(paths) > 0 {
+//		return path.Join(paths[0], plugin), nil
+//	}
+//	return "", fmt.Errorf("failed to find plugin %s in paths %v", plugin, paths)
+//}
+
+func ExecPluginWithResult(ctx context.Context, pluginPath string, netconf []byte, args CNIArgs, exec Exec) (types.Result, error) {
+	if exec == nil {
+		exec = defaultExec
+	}
+
+	stdoutBytes, err := exec.ExecPlugin(ctx, pluginPath, netconf, args.AsEnv())
+	if err != nil {
 		return nil, err
 	}
 
-	return version.NewResult(confVersion, stdoutBytes)
+	resultVersion, fixedBytes, err := fixupResultVersion(netconf, stdoutBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return create.Create(resultVersion, fixedBytes)
 }
 
-func (e *PluginExec) WithoutResult(pluginPath string, netconf []byte, args CNIArgs) error {
-	_, err := e.RawExec.ExecPlugin(pluginPath, netconf, args.AsEnv())
+func ExecPluginWithoutResult(ctx context.Context, pluginPath string, netconf []byte, args CNIArgs, exec Exec) error {
+	if exec == nil {
+		exec = defaultExec
+	}
+	_, err := exec.ExecPlugin(ctx, pluginPath, netconf, args.AsEnv())
 	return err
 }
 
@@ -73,7 +148,10 @@ func (e *PluginExec) WithoutResult(pluginPath string, netconf []byte, args CNIAr
 // For recent-enough plugins, it uses the information returned by the VERSION
 // command.  For older plugins which do not recognize that command, it reports
 // version 0.1.0
-func (e *PluginExec) GetVersionInfo(pluginPath string) (version.PluginInfo, error) {
+func GetVersionInfo(ctx context.Context, pluginPath string, exec Exec) (version.PluginInfo, error) {
+	if exec == nil {
+		exec = defaultExec
+	}
 	args := &Args{
 		Command: "VERSION",
 
@@ -83,7 +161,7 @@ func (e *PluginExec) GetVersionInfo(pluginPath string) (version.PluginInfo, erro
 		Path:   "dummy",
 	}
 	stdin := []byte(fmt.Sprintf(`{"cniVersion":%q}`, version.Current()))
-	stdoutBytes, err := e.RawExec.ExecPlugin(pluginPath, stdin, args.AsEnv())
+	stdoutBytes, err := exec.ExecPlugin(ctx, pluginPath, stdin, args.AsEnv())
 	if err != nil {
 		if err.Error() == "unknown CNI_COMMAND: VERSION" {
 			return version.PluginSupports("0.1.0"), nil
@@ -91,5 +169,19 @@ func (e *PluginExec) GetVersionInfo(pluginPath string) (version.PluginInfo, erro
 		return nil, err
 	}
 
-	return e.VersionDecoder.Decode(stdoutBytes)
+	return exec.Decode(stdoutBytes)
+}
+
+// DefaultExec is an object that implements the Exec interface which looks
+// for and executes plugins from disk.
+type DefaultExec struct {
+	*RawExec
+	version.PluginDecoder
+}
+
+// DefaultExec implements the Exec interface
+var _ Exec = &DefaultExec{}
+
+var defaultExec = &DefaultExec{
+	RawExec: &RawExec{Stderr: os.Stderr},
 }

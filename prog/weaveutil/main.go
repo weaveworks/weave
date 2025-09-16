@@ -90,6 +90,8 @@ func usage() {
 	for cmd := range commands {
 		fmt.Fprintln(os.Stderr, cmd)
 	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "Set an environment variable called DOCKER_API_VERSION to control the API version used.\nDefault is: %v\n", defaulDockerAPIVersion)
 }
 
 func cmdUsage(cmd string, usage string) {

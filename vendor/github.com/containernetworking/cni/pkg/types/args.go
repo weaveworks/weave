@@ -36,7 +36,7 @@ func (b *UnmarshallableBool) UnmarshalText(data []byte) error {
 	case "0", "false":
 		*b = false
 	default:
-		return fmt.Errorf("Boolean unmarshal error: invalid input %s", s)
+		return fmt.Errorf("boolean unmarshal error: invalid input %s", s)
 	}
 	return nil
 }
@@ -63,6 +63,12 @@ func GetKeyField(keyString string, v reflect.Value) reflect.Value {
 	return v.Elem().FieldByName(keyString)
 }
 
+// UnmarshalableArgsError is used to indicate error unmarshalling args
+// from the args-string in the form "K=V;K2=V2;..."
+type UnmarshalableArgsError struct {
+	error
+}
+
 // LoadArgs parses args from a string in the form "K=V;K2=V2;..."
 func LoadArgs(args string, container interface{}) error {
 	if args == "" {
@@ -86,10 +92,25 @@ func LoadArgs(args string, container interface{}) error {
 			continue
 		}
 
-		u := keyField.Addr().Interface().(encoding.TextUnmarshaler)
+		var keyFieldInterface interface{}
+		switch {
+		case keyField.Kind() == reflect.Ptr:
+			keyField.Set(reflect.New(keyField.Type().Elem()))
+			keyFieldInterface = keyField.Interface()
+		case keyField.CanAddr() && keyField.Addr().CanInterface():
+			keyFieldInterface = keyField.Addr().Interface()
+		default:
+			return UnmarshalableArgsError{fmt.Errorf("field '%s' has no valid interface", keyString)}
+		}
+		u, ok := keyFieldInterface.(encoding.TextUnmarshaler)
+		if !ok {
+			return UnmarshalableArgsError{fmt.Errorf(
+				"ARGS: cannot unmarshal into field '%s' - type '%s' does not implement encoding.TextUnmarshaler",
+				keyString, reflect.TypeOf(keyFieldInterface))}
+		}
 		err := u.UnmarshalText([]byte(valueString))
 		if err != nil {
-			return fmt.Errorf("ARGS: error parsing value of pair %q: %v)", pair, err)
+			return fmt.Errorf("ARGS: error parsing value of pair %q: %w", pair, err)
 		}
 	}
 
